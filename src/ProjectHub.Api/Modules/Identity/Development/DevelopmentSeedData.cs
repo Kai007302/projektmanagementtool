@@ -15,6 +15,8 @@ public static class DevelopmentSeedData
 
     public sealed record SeedTeam(Guid Id, Guid OrganizationId, string Name, string Description, IReadOnlyList<(Guid UserId, string Role)> Members);
 
+    public sealed record SeedTask(Guid Id, SeedProject Project, Guid? ParentTaskId, string Title, string Status, string Priority, Guid? AssigneeId, Guid CreatorId);
+
     public sealed record SeedProject(Guid Id, Guid OrganizationId, string Name, Guid OwnerId, IReadOnlyList<(Guid UserId, string Role)> Members);
 
     public static readonly SeedOrganization Contoso = new(Guid.Parse("01920000-0000-7000-8000-000000000001"), "Contoso (Dev)", "contoso-dev", "dev-tenant-contoso");
@@ -63,7 +65,19 @@ public static class DevelopmentSeedData
 
     public static readonly IReadOnlyList<SeedProject> Projects = [IntranetProject, FabrikamProject];
 
+    public static readonly SeedTask ConceptTask = Task(1, IntranetProject, null, "Konzept abstimmen", "done", "high", Ben.Id, Ben.Id);
+    public static readonly SeedTask DesignTask = Task(2, IntranetProject, null, "Design erstellen", "in_progress", "normal", Clara.Id, Ben.Id);
+    public static readonly SeedTask StartPageTask = Task(3, IntranetProject, DesignTask.Id, "Startseite gestalten", "in_progress", "normal", Clara.Id, Clara.Id);
+    public static readonly SeedTask NavigationTask = Task(4, IntranetProject, DesignTask.Id, "Navigation entwerfen", "todo", "low", David.Id, Clara.Id);
+    public static readonly SeedTask ContentTask = Task(5, IntranetProject, null, "Inhalte migrieren", "todo", "urgent", null, Ben.Id);
+    public static readonly SeedTask FabrikamTask = Task(6, FabrikamProject, null, "Portal planen", "todo", "normal", Fritz.Id, Fritz.Id);
+
+    public static readonly IReadOnlyList<SeedTask> Tasks = [ConceptTask, DesignTask, StartPageTask, NavigationTask, ContentTask, FabrikamTask];
+
     public static SeedOrganization OrganizationOf(SeedUser user) => Organizations.Single(o => o.Id == user.OrganizationId);
+
+    private static SeedTask Task(int number, SeedProject project, Guid? parentTaskId, string title, string status, string priority, Guid? assigneeId, Guid creatorId) =>
+        new(Guid.Parse($"01920000-0000-7000-8000-{500 + number:D12}"), project, parentTaskId, title, status, priority, assigneeId, creatorId);
 
     private static SeedUser User(int number, SeedOrganization organization, string objectId, string displayName, string role, string? department) =>
         new(

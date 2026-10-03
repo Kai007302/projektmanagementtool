@@ -4,6 +4,11 @@ ER-Diagramm: `docs/diagrams/er.mmd`
 
 SQL-Startschema: `database/migrations/001_initial.sql`
 
+Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
+
+- `003_identity_organization.sql`: `organization.entra_tenant_id`, `app_user.organization_role`
+- `004_project_soft_delete.sql`: `project.deleted_at` (Projekte werden nur weich gelöscht)
+
 ## Regeln
 
 - Jede organisationsgebundene Ressource besitzt `organization_id` oder ist eindeutig darüber ableitbar.

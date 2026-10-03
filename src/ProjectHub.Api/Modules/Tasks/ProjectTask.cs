@@ -1,0 +1,60 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ProjectHub.Api.Infrastructure.Database;
+
+namespace ProjectHub.Api.Modules.Tasks;
+
+/// <summary>
+/// The central domain object. Kanban and Gantt are views on it and never keep their own copy.
+/// </summary>
+public sealed class ProjectTask : IVersioned
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ProjectId { get; init; }
+    public Guid? ParentTaskId { get; set; }
+    public Guid? KanbanColumnId { get; set; }
+    public required string Title { get; set; }
+    public string? Description { get; set; }
+    public string Status { get; set; } = TaskStatus.Todo;
+    public string Priority { get; set; } = TaskPriority.Normal;
+    public Guid? AssigneeId { get; set; }
+    public Guid CreatorId { get; init; }
+    public DateOnly? StartDate { get; set; }
+    public DateOnly? DueDate { get; set; }
+    public short Progress { get; set; }
+    public decimal? EstimatedHours { get; set; }
+    public decimal? BoardPosition { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public long Version { get; set; }
+}
+
+public static class TaskStatus
+{
+    public const string Todo = "todo";
+    public const string InProgress = "in_progress";
+    public const string Done = "done";
+
+    public static readonly IReadOnlyList<string> All = [Todo, InProgress, Done];
+}
+
+public static class TaskPriority
+{
+    public const string Low = "low";
+    public const string Normal = "normal";
+    public const string High = "high";
+    public const string Urgent = "urgent";
+
+    public static readonly IReadOnlyList<string> All = [Low, Normal, High, Urgent];
+}
+
+internal sealed class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
+{
+    public void Configure(EntityTypeBuilder<ProjectTask> builder)
+    {
+        builder.ToTable("task");
+        builder.Property(t => t.Version).IsConcurrencyToken();
+    }
+}

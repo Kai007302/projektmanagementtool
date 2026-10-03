@@ -60,6 +60,16 @@ public static class DevelopmentSeeder
             }
         }
 
+        foreach (var task in DevelopmentSeedData.Tasks)
+        {
+            await ExecuteAsync(connection, """
+                insert into task (id, organization_id, project_id, parent_task_id, title, status, priority, assignee_id, creator_id)
+                values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                on conflict do nothing
+                """, ct, task.Id, task.Project.OrganizationId, task.Project.Id, (object?)task.ParentTaskId ?? DBNull.Value,
+                task.Title, task.Status, task.Priority, (object?)task.AssigneeId ?? DBNull.Value, task.CreatorId);
+        }
+
         await transaction.CommitAsync(ct);
     }
 

@@ -1,7 +1,6 @@
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Authorization;
-using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.Modules.Teams;
 
@@ -20,21 +19,12 @@ public static class TeamEndpoints
 
         teams.MapGet("/", async (UserContext user, TeamService service, int? limit, int? offset, CancellationToken ct) =>
         {
-            var take = limit ?? 50;
-            var skip = offset ?? 0;
-            if (take is < 1 or > UserEndpoints.MaxPageSize)
+            if (!Paging.TryCreate(limit, offset, out var paging, out var error))
             {
-                return ApiResults.Validation("limit", $"Must be between 1 and {UserEndpoints.MaxPageSize}.");
+                return error!;
             }
 
-            if (skip < 0)
-            {
-                return ApiResults.Validation("offset", "Must not be negative.");
-            }
-
-            var page = await service.ListAsync(user, skip, take + 1, ct);
-            var hasMore = page.Count > take;
-            return Results.Ok(new PagedResponse<TeamSummary>(page.Take(take).ToList(), hasMore ? skip + take : null));
+            return Results.Ok(paging.ToPage(await service.ListAsync(user, paging.Skip, paging.Take + 1, ct)));
         });
 
         teams.MapGet("/{id:guid}", async (Guid id, UserContext user, TeamService service, CancellationToken ct) =>

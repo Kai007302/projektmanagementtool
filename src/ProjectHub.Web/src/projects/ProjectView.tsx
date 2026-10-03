@@ -1,0 +1,117 @@
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { ApiError } from '../api/client'
+import type { Me } from '../identity/api'
+import { TaskBoard } from '../tasks/TaskBoard'
+import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
+import { ActivityFeed } from './ActivityFeed'
+import { MembersPanel } from './MembersPanel'
+
+type Props = { projectId: string; me: Me; onBack: () => void }
+
+export function ProjectView({ projectId, me, onBack }: Props) {
+  const [project, setProject] = useState<ProjectDetails | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [revision, setRevision] = useState(0)
+
+  const load = useCallback(() => {
+    fetchProject(projectId).then(setProject, (e: Error) => setError(e.message))
+  }, [projectId])
+
+  useEffect(load, [load])
+
+  /** Something in the project changed: reload details and the activity feed. */
+  const changed = useCallback(() => {
+    load()
+    setRevision((r) => r + 1)
+  }, [load])
+
+  async function remove() {
+    if (!project || !window.confirm(`Projekt „${project.name}“ wirklich löschen?`)) return
+    try {
+      await deleteProject(project.id)
+      onBack()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <section className="project-view" aria-labelledby="project-heading">
+      <button type="button" className="link-button" onClick={onBack}>
+        ← Alle Projekte
+      </button>
+      {error && <p role="alert">{error}</p>}
+      {!project ? (
+        <p>Projekt wird geladen …</p>
+      ) : (
+        <>
+          <header className="project-header">
+            <div>
+              <h2 id="project-heading">{project.name}</h2>
+              <p className="muted">
+                {projectStatuses[project.status]}
+                {project.description && ` · ${project.description}`}
+              </p>
+            </div>
+            {project.capabilities.canManage && (
+              <button type="button" className="danger" onClick={remove}>
+                Projekt löschen
+              </button>
+            )}
+          </header>
+          {project.capabilities.canEdit && <ProjectEditForm project={project} onSaved={changed} />}
+          <div className="project-layout">
+            <TaskBoard project={project} me={me} onChanged={changed} />
+            <aside className="project-side">
+              <MembersPanel project={project} onChanged={changed} />
+              <ActivityFeed projectId={project.id} revision={revision} />
+            </aside>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function ProjectEditForm({ project, onSaved }: { project: ProjectDetails; onSaved: () => void }) {
+  const [name, setName] = useState(project.name)
+  const [status, setStatus] = useState<ProjectStatus>(project.status)
+  const [message, setMessage] = useState<string | null>(null)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setMessage(null)
+    try {
+      await updateProject(project.id, project.version, { name, status })
+      onSaved()
+    } catch (e) {
+      setMessage(
+        e instanceof ApiError && e.status === 409
+          ? 'Jemand anderes hat das Projekt inzwischen geändert. Der aktuelle Stand wurde geladen.'
+          : (e as Error).message,
+      )
+      if (e instanceof ApiError && e.status === 409) onSaved()
+    }
+  }
+
+  return (
+    <form className="inline-form" onSubmit={submit}>
+      <label>
+        Name
+        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+      </label>
+      <label>
+        Status
+        <select value={status} onChange={(event) => setStatus(event.target.value as ProjectStatus)}>
+          {Object.entries(projectStatuses).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button type="submit">Speichern</button>
+      {message && <p role="alert">{message}</p>}
+    </form>
+  )
+}

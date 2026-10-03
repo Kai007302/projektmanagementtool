@@ -1,10 +1,15 @@
 using ProjectHub.Api;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Health;
+using ProjectHub.Api.Infrastructure.Events;
+using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
+using ProjectHub.Api.Modules.Comments;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Organizations;
+using ProjectHub.Api.Modules.Projects;
+using ProjectHub.Api.Modules.Tasks;
 using ProjectHub.Api.Modules.Teams;
 using ProjectHub.Api.Modules.Users;
 
@@ -20,7 +25,12 @@ builder.Services.AddProjectHubHealthChecks(settings);
 builder.Services.AddProjectHubDatabase(settings);
 builder.Services.AddIdentityModule(builder.Environment, builder.Configuration);
 builder.Services.AddAuditModule();
+builder.Services.AddDomainEvents();
 builder.Services.AddTeamsModule();
+builder.Services.AddProjectsModule();
+builder.Services.AddTasksModule();
+builder.Services.AddCommentsModule();
+builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -52,7 +62,11 @@ app.MapProjectHubHealthChecks();
 app.MapApiV1()
     .MapUserEndpoints()
     .MapOrganizationEndpoints()
-    .MapTeamEndpoints();
+    .MapTeamEndpoints()
+    .MapProjectEndpoints()
+    .MapTaskEndpoints()
+    .MapCommentEndpoints()
+    .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>());
 
 app.Run();
 
