@@ -43,29 +43,75 @@ Die Versionen wurden am 25.09.2026 gegen die offiziellen Quellen überprüft. De
 Voraussetzungen:
 
 - Docker Desktop / Docker Engine
-- Node.js LTS
+- Node.js 22 LTS
 - .NET 10 SDK
 - Git
 
-Infrastruktur starten:
+### 1. Infrastruktur (PostgreSQL 18, Redis 8)
 
 ```bash
 docker compose up -d
 ```
 
-PostgreSQL:
+PostgreSQL: `postgresql://projecthub:projecthub_dev@localhost:5432/projecthub`
+Redis: `redis://localhost:6379`
 
-```text
-postgresql://projecthub:projecthub_dev@localhost:5432/projecthub
+### 2. Backend
+
+```bash
+dotnet run --project src/ProjectHub.Api --launch-profile http
 ```
 
-Redis:
+- läuft auf http://localhost:5080
+- wendet beim Start alle noch fehlenden Skripte aus `database/migrations/` an (ADR 0005)
+- `GET /health/live` → 200, sobald der Prozess läuft
+- `GET /health/ready` → 200, wenn PostgreSQL und Redis erreichbar sind, sonst 503
+- OpenAPI (nur Development): http://localhost:5080/openapi/v1.json
 
-```text
-redis://localhost:6379
+### 3. Frontend
+
+```bash
+cd src/ProjectHub.Web
+npm install
+npm run dev
 ```
+
+- läuft auf http://localhost:5173 und leitet `/api` und `/health` an das Backend weiter
+- anderes Backend: `PROJECTHUB_API_URL=http://localhost:1234 npm run dev`
+
+### Konfiguration
+
+Die Variablen aus `.env.example` werden als Umgebungsvariablen gelesen. Für die lokale Entwicklung stehen dieselben Werte bereits in `src/ProjectHub.Api/appsettings.Development.json`; gesetzte Umgebungsvariablen haben Vorrang.
+
+Im Development-Modus meldet ein gekapselter Development-Identity-Provider jede Anfrage als synthetischen Benutzer an (`DevelopmentIdentity` in `appsettings.Development.json`). Außerhalb von Development startet die API mit diesem Provider nicht. Alle Endpunkte verlangen standardmäßig einen angemeldeten Benutzer; Ausnahmen wie die Health-Checks sind explizit markiert.
 
 Für Microsoft/Webex werden in der lokalen Entwicklung Mock-/Fake-Provider eingesetzt. Produktive Zugangsdaten werden nie aus dem Repository geladen.
+
+### Tests und Checks
+
+```bash
+# Backend (Integrationstests starten PostgreSQL/Redis per Testcontainers, Docker muss laufen)
+dotnet build
+dotnet test
+
+# Frontend
+cd src/ProjectHub.Web
+npm run lint
+npm test -- --run
+npm run build
+```
+
+### Projektstruktur
+
+```text
+src/ProjectHub.Api/                 ASP.NET Core API (modularer Monolith)
+  Infrastructure/                   Querschnitt: Datenbank-Migrationen, Health-Checks
+  Modules/<Modul>/                  ein Ordner pro fachlichem Modul (ARCHITECTURE.md)
+src/ProjectHub.Web/                 React + TypeScript + Vite
+tests/ProjectHub.Api.UnitTests/
+tests/ProjectHub.Api.IntegrationTests/
+database/migrations/                versionierte SQL-Skripte (einzige Schemaquelle)
+```
 
 ## Verbindliche Dokumentation
 

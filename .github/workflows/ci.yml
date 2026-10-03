@@ -14,7 +14,6 @@ jobs:
         run: ./scripts/validate-structure.sh
 
   backend:
-    if: ${{ hashFiles('src/ProjectHub.Api/**/*.csproj') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +25,6 @@ jobs:
       - run: dotnet test --no-build --configuration Release
 
   frontend:
-    if: ${{ hashFiles('src/ProjectHub.Web/package.json') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +35,8 @@ jobs:
           cache-dependency-path: src/ProjectHub.Web/package-lock.json
       - working-directory: src/ProjectHub.Web
         run: npm ci
+      - working-directory: src/ProjectHub.Web
+        run: npm run lint
       - working-directory: src/ProjectHub.Web
         run: npm run build
       - working-directory: src/ProjectHub.Web

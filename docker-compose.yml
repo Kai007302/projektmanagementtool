@@ -9,8 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - projecthub-postgres:/var/lib/postgresql/data
-      - ./database/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+      - projecthub-postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U projecthub -d projecthub"]
       interval: 5s

@@ -1,0 +1,29 @@
+.home {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4rem 1rem;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  background: var(--status-bg);
+  color: var(--status-fg);
+}
+
+.status-checking {
+  --status-bg: #eef1f5;
+  --status-fg: #3b4654;
+}
+
+.status-ready {
+  --status-bg: #e3f4ea;
+  --status-fg: #145c32;
+}
+
+.status-unavailable {
+  --status-bg: #fbe7e7;
+  --status-fg: #8a1c1c;
+}

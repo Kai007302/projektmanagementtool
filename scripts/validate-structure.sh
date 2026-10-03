@@ -14,6 +14,7 @@ required=(
   docs/REFERENCES.md
   docs/diagrams/er.mmd
   database/migrations/001_initial.sql
+  database/migrations/002_knowledge.sql
   docker-compose.yml
   .env.example
   ai/AI_WORKFLOW.md
