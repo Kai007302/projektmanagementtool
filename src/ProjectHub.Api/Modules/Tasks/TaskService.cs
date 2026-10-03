@@ -147,6 +147,11 @@ public sealed class TaskService(
         activity.Record(user, projectId, ActivityActions.TaskCreated, "task", task.Id, new { task.Title, task.ParentTaskId });
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(new ProjectContentChanged(projectId, ProjectContentChanged.Tasks), ct);
+        if (task.AssigneeId is { } assigneeId)
+        {
+            await events.PublishAsync(new TaskAssigned(user.OrganizationId, projectId, task.Id, assigneeId, user.UserId), ct);
+        }
+
         return await Project(ActiveTasks(user).Where(t => t.Id == task.Id)).SingleAsync(ct);
     }
 
@@ -173,6 +178,7 @@ public sealed class TaskService(
             return ServiceFailure.StaleVersion(task.Version);
         }
 
+        var previousAssignee = task.AssigneeId;
         var changed = new List<string>();
         if (!patch.TryApply<string>("title", v => task.Title = v?.Trim() ?? string.Empty, changed, out var error)
             || !patch.TryApply<string>("description", v => task.Description = Normalize(v), changed, out error)
@@ -204,6 +210,10 @@ public sealed class TaskService(
             }
 
             await events.PublishAsync(new ProjectContentChanged(task.ProjectId, ProjectContentChanged.Tasks), ct);
+            if (changed.Contains("assigneeId") && task.AssigneeId is { } assigneeId && assigneeId != previousAssignee)
+            {
+                await events.PublishAsync(new TaskAssigned(user.OrganizationId, task.ProjectId, task.Id, assigneeId, user.UserId), ct);
+            }
         }
 
         return await Project(ActiveTasks(user).Where(t => t.Id == task.Id)).SingleAsync(ct);

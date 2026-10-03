@@ -3,9 +3,17 @@ import type { Me } from '../identity/api'
 import { createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
 import { ProjectView } from './ProjectView'
 
-export function ProjectsPage({ me, onOpenArticle }: { me: Me; onOpenArticle?: (id: string) => void }) {
+type Props = {
+  me: Me
+  onOpenArticle?: (id: string) => void
+  /** Opens this project (and task) right away, e.g. from a notification. */
+  initialProjectId?: string | null
+  initialTaskId?: string | null
+}
+
+export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialProjectId)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -23,6 +31,7 @@ export function ProjectsPage({ me, onOpenArticle }: { me: Me; onOpenArticle?: (i
         key={selected}
         projectId={selected}
         me={me}
+        initialTaskId={selected === initialProjectId ? initialTaskId : null}
         onOpenArticle={onOpenArticle}
         onBack={() => {
           setSelected(null)

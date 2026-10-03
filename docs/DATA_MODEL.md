@@ -10,6 +10,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `004_project_soft_delete.sql`: `project.deleted_at` (Projekte werden nur weich gelöscht)
 - `005_kanban_column_status.sql`: `kanban_column.task_status`. Jede Spalte steht für einen Task-Status; die Spalte einer Karte ergibt sich aus Status, `task.kanban_column_id` und `task.board_position` (Kanban bleibt eine Ansicht auf Tasks)
 - `006_knowledge_visibility_search.sql`: `knowledge_article.visibility` (`organization`/`restricted`, DEC-020), `knowledge_article.search_text` (Klartext des aktuellen Inhalts) und ein GIN-Index für die Volltextsuche (`german`) über Titel, Zusammenfassung und `search_text`
+- `007_notification_unread.sql`: Teilindex auf ungelesene Benachrichtigungen je Person (Zähler der Glocke)
 
 ## Regeln
 
@@ -150,6 +151,12 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 - `task_dependency`: Quelle → Ziel mit `dependency_type` (`finish_to_start`, `start_to_start`, `finish_to_finish`, `start_to_finish`). Beide Tasks im selben Projekt, höchstens eine Abhängigkeit je Paar, keine Kreise (geprüft unter einer Advisory-Sperre je Projekt). Abhängigkeiten weich gelöschter Tasks bleiben in der Tabelle, werden aber nicht mehr angezeigt.
 - Verletzt ist eine Abhängigkeit, wenn `finish_to_start`: Ziel beginnt am oder vor dem Endtag der Quelle; `start_to_start`: Ziel beginnt vor der Quelle; `finish_to_finish`: Ziel endet vor der Quelle; `start_to_finish`: Ziel endet vor dem Beginn der Quelle. Sie wird nur angezeigt (DEC-023).
 - `gantt_milestone`: Name und Datum je Projekt, versioniert.
+
+## Notifications
+
+- `notification`: eine Nachricht für genau eine Person (`user_id`) mit `type` (`task_assigned`, `task_comment_mention`, `knowledge_comment_mention`, `project_member_added`), Titel, optionalem Auszug (höchstens 200 Zeichen), Verweis auf die Ressource (`task`, `knowledge_article`, `project`) und `read_at`.
+- `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` bleibt bis Phase 9 ungenutzt.
+- Zustellung und Mail siehe ADR 0008.
 
 ## Cross-domain references
 

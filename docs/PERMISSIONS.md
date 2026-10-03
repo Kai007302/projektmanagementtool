@@ -99,6 +99,14 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Suche und alle späteren AI-Schnittstellen (`IKnowledgeSearch`, `IKnowledgeSemanticSearch`, `IKnowledgeAnswerService`) bekommen den `KnowledgeReader` und filtern in der Datenbankabfrage; nicht lesbare Inhalte verlassen die Datenbank nicht.
 - Statuswechsel, Sichtbarkeit, Freigaben, Anlage und Löschung werden im `audit_log` protokolliert.
 
+## Benachrichtigungen
+
+- Jede Person sieht und ändert nur ihre eigenen Benachrichtigungen und Einstellungen. Fremde Benachrichtigungen sind „nicht gefunden“ (404).
+- Benachrichtigt wird nur, wer die Ressource zum Zeitpunkt des Ereignisses sehen darf (zuständig sein und erwähnt werden setzen das bereits voraus). Öffnen prüft die Rechte erneut.
+- Über eigene Aktionen gibt es keine Benachrichtigung.
+- Mails enthalten nur Titel und Link, keine Kommentartexte (ADR 0008).
+- Der Realtime-Hub `/api/v1/hubs/notifications` stellt nur an die angemeldete Person zu und überträgt nur den Zähler.
+
 ## Identität
 
 - Außerhalb von Development: Microsoft Entra ID. Die API validiert Bearer-Tokens gegen `https://login.microsoftonline.com/{ENTRA_TENANT_ID}/v2.0` mit Audience `ENTRA_CLIENT_ID`. Die App-Registrierung selbst ist ein Human Review Gate; ohne sie ist kein Login möglich (401). Der Login-Flow im Frontend (MSAL) folgt, sobald die Registrierung existiert.

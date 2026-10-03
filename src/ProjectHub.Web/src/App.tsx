@@ -4,6 +4,8 @@ import { fetchMe, fetchOrganization, type Me, type Organization } from './identi
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { getDevUser, setDevUser } from './identity/devUser'
 import { KnowledgePage } from './knowledge/KnowledgePage'
+import type { Notification } from './notifications/api'
+import { NotificationBell } from './notifications/NotificationBell'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import './App.css'
@@ -32,6 +34,8 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('projects')
   const [openArticle, setOpenArticle] = useState<string | null>(null)
+  // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
+  const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -50,6 +54,17 @@ function App() {
     }
   }, [devUser])
 
+  function openNotification(notification: Notification) {
+    if (notification.resourceType === 'knowledge_article' && notification.resourceId) {
+      setOpenArticle(notification.resourceId)
+      setTab('knowledge')
+    } else if (notification.projectId) {
+      const taskId = notification.resourceType === 'task' ? notification.resourceId : null
+      setOpenProject((current) => ({ projectId: notification.projectId!, taskId, jump: (current?.jump ?? 0) + 1 }))
+      setTab('projects')
+    }
+  }
+
   function switchUser(objectId: string) {
     setDevUser(objectId)
     setSession(null)
@@ -66,9 +81,12 @@ function App() {
         </div>
         <div className="account">
           {session && (
-            <p>
-              <strong>{session.me.displayName}</strong> · {roleText[session.me.organizationRole]}
-            </p>
+            <div className="account-row">
+              <p>
+                <strong>{session.me.displayName}</strong> · {roleText[session.me.organizationRole]}
+              </p>
+              <NotificationBell key={session.me.id} onOpen={openNotification} />
+            </div>
           )}
           {import.meta.env.DEV && <DevUserSwitcher current={devUser} onChange={switchUser} />}
         </div>
@@ -87,6 +105,7 @@ function App() {
                   onClick={() => {
                     setTab(value)
                     setOpenArticle(null)
+                    setOpenProject(null)
                   }}
                 >
                   {tabText[value]}
@@ -95,8 +114,10 @@ function App() {
             </nav>
             {tab === 'projects' && (
               <ProjectsPage
-                key={session.me.id}
+                key={`${session.me.id}:${openProject?.jump ?? 0}`}
                 me={session.me}
+                initialProjectId={openProject?.projectId ?? null}
+                initialTaskId={openProject?.taskId ?? null}
                 onOpenArticle={(id) => {
                   setOpenArticle(id)
                   setTab('knowledge')

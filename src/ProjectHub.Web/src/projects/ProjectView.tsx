@@ -10,13 +10,13 @@ import { deleteProject, fetchProject, projectStatuses, updateProject, type Proje
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 
-type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void }
+type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
 type View = 'board' | 'list' | 'gantt'
 
 const viewText: Record<View, string> = { board: 'Board', list: 'Liste', gantt: 'Gantt' }
 
-export function ProjectView({ projectId, me, onBack, onOpenArticle }: Props) {
+export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskId = null }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
@@ -86,7 +86,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle }: Props) {
             ))}
           </nav>
           <div className={view === 'list' ? 'project-layout' : 'project-layout wide'}>
-            {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} />}
+            {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={initialTaskId} />}
             {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
             {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
             <aside className="project-side">

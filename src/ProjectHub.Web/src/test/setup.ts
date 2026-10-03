@@ -9,3 +9,8 @@ vi.mock('../realtime/projectEvents', () => ({
   subscribeToProject: vi.fn(() => () => {}),
   useProjectEvents: vi.fn(),
 }))
+
+vi.mock('../realtime/notificationEvents', () => ({
+  subscribeToNotifications: vi.fn(() => () => {}),
+  useNotificationEvents: vi.fn(),
+}))
