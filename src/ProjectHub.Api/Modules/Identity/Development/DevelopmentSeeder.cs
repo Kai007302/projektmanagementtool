@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Npgsql;
 
 namespace ProjectHub.Api.Modules.Identity.Development;
@@ -70,7 +71,86 @@ public static class DevelopmentSeeder
                 task.Title, task.Status, task.Priority, (object?)task.AssigneeId ?? DBNull.Value, task.CreatorId);
         }
 
+        await SeedKnowledgeAsync(connection, ct);
         await transaction.CommitAsync(ct);
+    }
+
+    private static async Task SeedKnowledgeAsync(NpgsqlConnection connection, CancellationToken ct)
+    {
+        foreach (var space in DevelopmentSeedData.Spaces)
+        {
+            await ExecuteAsync(connection, """
+                insert into knowledge_space (id, organization_id, name, description) values ($1, $2, $3, $4)
+                on conflict do nothing
+                """, ct, space.Id, space.OrganizationId, space.Name, space.Description);
+        }
+
+        foreach (var article in DevelopmentSeedData.Articles)
+        {
+            // The first version gets the article id shifted by 100 in its last digits.
+            var lastDigits = long.Parse(article.Id.ToString()[^12..]);
+            var versionId = Guid.Parse($"{article.Id.ToString()[..^12]}{lastDigits + 100:D12}");
+            var content = Knowledge.BlockContent.Normalize(JsonNode.Parse(article.ContentJson), out var contentError)
+                          ?? throw new InvalidOperationException($"Seed article '{article.Title}': {contentError}");
+            await ExecuteAsync(connection, """
+                insert into knowledge_article (id, organization_id, knowledge_space_id, title, slug, article_type, summary, owner_id,
+                                               status, visibility, published_at, search_text)
+                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, case when $9 = 'published' then now() end, $11)
+                on conflict do nothing
+                """, ct, article.Id, article.OrganizationId, (object?)article.SpaceId ?? DBNull.Value, article.Title, article.Slug,
+                article.ArticleType, article.Summary, article.OwnerId, article.Status, article.Visibility,
+                content.PlainText);
+            await ExecuteAsync(connection, """
+                insert into knowledge_version (id, organization_id, article_id, version_number, content_json, created_by, change_note)
+                values ($1, $2, $3, 1, $4::jsonb, $5, 'Testdaten')
+                on conflict do nothing
+                """, ct, versionId, article.OrganizationId, article.Id, content.Content.ToJsonString(), article.OwnerId);
+            await ExecuteAsync(connection, """
+                update knowledge_article set current_version_id = $2 where id = $1 and current_version_id is null
+                """, ct, article.Id, versionId);
+
+            foreach (var tag in article.Tags)
+            {
+                await ExecuteAsync(connection, """
+                    insert into knowledge_tag (organization_id, name) values ($1, $2) on conflict do nothing
+                    """, ct, article.OrganizationId, tag);
+                await ExecuteAsync(connection, """
+                    insert into knowledge_article_tag (organization_id, article_id, tag_id)
+                    select $1, $2, id from knowledge_tag where organization_id = $1 and lower(name) = lower($3)
+                    on conflict do nothing
+                    """, ct, article.OrganizationId, article.Id, tag);
+            }
+        }
+
+        foreach (var relation in DevelopmentSeedData.Relations)
+        {
+            var source = DevelopmentSeedData.Articles.Single(a => a.Id == relation.SourceId);
+            await ExecuteAsync(connection, """
+                insert into knowledge_relation (organization_id, source_article_id, target_article_id, relation_type, created_by)
+                values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, source.OrganizationId, relation.SourceId, relation.TargetId, relation.RelationType, source.OwnerId);
+        }
+
+        foreach (var (articleId, principalType, principalId, permission) in DevelopmentSeedData.KnowledgeGrants)
+        {
+            var article = DevelopmentSeedData.Articles.Single(a => a.Id == articleId);
+            await ExecuteAsync(connection, """
+                insert into knowledge_permission (organization_id, article_id, principal_type, principal_id, permission)
+                values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, article.OrganizationId, articleId, principalType, principalId, permission);
+        }
+
+        foreach (var (articleId, resourceType, resourceId, createdBy) in DevelopmentSeedData.KnowledgeReferences)
+        {
+            var article = DevelopmentSeedData.Articles.Single(a => a.Id == articleId);
+            await ExecuteAsync(connection, """
+                insert into knowledge_reference (organization_id, article_id, resource_type, resource_id, created_by)
+                values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, article.OrganizationId, articleId, resourceType, resourceId, createdBy);
+        }
     }
 
     private static async Task ExecuteAsync(NpgsqlConnection connection, string sql, CancellationToken ct, params object[] values)

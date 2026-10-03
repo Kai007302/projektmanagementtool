@@ -17,6 +17,12 @@ public static class AuditActions
     public const string ProjectMemberRemoved = "ProjectMemberRemoved";
     public const string TaskDeleted = "TaskDeleted";
     public const string BoardColumnDeleted = "BoardColumnDeleted";
+    public const string KnowledgeSpaceCreated = "KnowledgeSpaceCreated";
+    public const string KnowledgeArticleCreated = "KnowledgeArticleCreated";
+    public const string KnowledgeStatusChanged = "KnowledgeStatusChanged";
+    public const string KnowledgeVisibilityChanged = "KnowledgeVisibilityChanged";
+    public const string KnowledgePermissionsChanged = "KnowledgePermissionsChanged";
+    public const string KnowledgeArticleDeleted = "KnowledgeArticleDeleted";
 }
 
 public interface IAuditLog

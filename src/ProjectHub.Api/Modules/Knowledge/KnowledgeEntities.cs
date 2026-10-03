@@ -1,0 +1,242 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ProjectHub.Api.Infrastructure.Database;
+
+namespace ProjectHub.Api.Modules.Knowledge;
+
+/// <summary>Optional container for a subject area. Projects are never bound to a space.</summary>
+public sealed class KnowledgeSpace : IVersioned
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public required string Name { get; set; }
+    public string? Description { get; set; }
+    public Guid? OwnerId { get; set; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public long Version { get; set; }
+}
+
+public sealed class KnowledgeArticle : IVersioned
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid? KnowledgeSpaceId { get; set; }
+    public required string Title { get; set; }
+    public required string Slug { get; set; }
+    public required string ArticleType { get; set; }
+    public string? Summary { get; set; }
+    public Guid? OwnerId { get; set; }
+    public string Status { get; set; } = KnowledgeStatus.Draft;
+    public string Visibility { get; set; } = KnowledgeVisibility.Organization;
+    public Guid? CurrentVersionId { get; set; }
+    public DateTimeOffset? PublishedAt { get; set; }
+    public DateOnly? ReviewDueAt { get; set; }
+    public string SearchText { get; set; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public long Version { get; set; }
+}
+
+/// <summary>An immutable snapshot of an article's content. Every content change adds one.</summary>
+public sealed class KnowledgeVersion
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ArticleId { get; init; }
+    public int VersionNumber { get; init; }
+    public required string ContentJson { get; init; }
+    public string? Summary { get; init; }
+    public Guid CreatedBy { get; init; }
+    public string? ChangeNote { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+public sealed class KnowledgeTag
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public required string Name { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+public sealed class KnowledgeArticleTag
+{
+    public Guid OrganizationId { get; init; }
+    public Guid ArticleId { get; init; }
+    public Guid TagId { get; init; }
+}
+
+public sealed class KnowledgeRelation
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid SourceArticleId { get; init; }
+    public Guid TargetArticleId { get; init; }
+    public required string RelationType { get; init; }
+    public Guid CreatedBy { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+public sealed class KnowledgeComment : IVersioned
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ArticleId { get; init; }
+    public Guid AuthorId { get; init; }
+    public required string Content { get; set; }
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public long Version { get; set; }
+}
+
+/// <summary>A link from an article to a project, task, team or whiteboard.</summary>
+public sealed class KnowledgeReference
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ArticleId { get; init; }
+    public required string ResourceType { get; init; }
+    public Guid ResourceId { get; init; }
+    public Guid CreatedBy { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>An explicit grant on one article for a user or a team.</summary>
+public sealed class KnowledgePermission
+{
+    public Guid Id { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ArticleId { get; init; }
+    public required string PrincipalType { get; init; }
+    public Guid PrincipalId { get; init; }
+    public required string Permission { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+public static class KnowledgeStatus
+{
+    public const string Draft = "draft";
+    public const string Review = "review";
+    public const string Published = "published";
+    public const string Archived = "archived";
+
+    public static readonly IReadOnlyList<string> All = [Draft, Review, Published, Archived];
+}
+
+public static class KnowledgeVisibility
+{
+    public const string Organization = "organization";
+    public const string Restricted = "restricted";
+
+    public static readonly IReadOnlyList<string> All = [Organization, Restricted];
+}
+
+public static class KnowledgeArticleType
+{
+    public static readonly IReadOnlyList<string> All =
+        ["article", "how_to", "best_practice", "process", "policy", "faq", "template", "checklist", "glossary"];
+}
+
+public static class KnowledgeRelationType
+{
+    public const string Related = "RELATED";
+    public const string Requires = "REQUIRES";
+    public const string PartOf = "PART_OF";
+    public const string Supersedes = "SUPERSEDES";
+    public const string References = "REFERENCES";
+
+    public static readonly IReadOnlyList<string> All = [Related, Requires, PartOf, Supersedes, References];
+}
+
+public static class KnowledgeResourceType
+{
+    public const string Project = "project";
+    public const string Task = "task";
+    public const string Team = "team";
+    public const string Whiteboard = "whiteboard";
+
+    /// <summary>Whiteboards follow in phase 7; references to them are rejected until then.</summary>
+    public static readonly IReadOnlyList<string> Supported = [Project, Task, Team];
+}
+
+/// <summary>Levels of an explicit grant; each includes the ones before it.</summary>
+public static class KnowledgeGrant
+{
+    public const string View = "view";
+    public const string Edit = "edit";
+    public const string Admin = "admin";
+
+    public static readonly IReadOnlyList<string> All = [View, Edit, Admin];
+
+    public static int Rank(string grant) => grant switch
+    {
+        View => 1,
+        Edit => 2,
+        Admin => 3,
+        _ => 0,
+    };
+}
+
+internal sealed class KnowledgeConfiguration :
+    IEntityTypeConfiguration<KnowledgeSpace>,
+    IEntityTypeConfiguration<KnowledgeArticle>,
+    IEntityTypeConfiguration<KnowledgeVersion>,
+    IEntityTypeConfiguration<KnowledgeTag>,
+    IEntityTypeConfiguration<KnowledgeArticleTag>,
+    IEntityTypeConfiguration<KnowledgeRelation>,
+    IEntityTypeConfiguration<KnowledgeComment>,
+    IEntityTypeConfiguration<KnowledgeReference>,
+    IEntityTypeConfiguration<KnowledgePermission>
+{
+    public void Configure(EntityTypeBuilder<KnowledgeSpace> builder)
+    {
+        builder.ToTable("knowledge_space");
+        builder.Property(s => s.Version).IsConcurrencyToken();
+    }
+
+    public void Configure(EntityTypeBuilder<KnowledgeArticle> builder)
+    {
+        builder.ToTable("knowledge_article");
+        builder.Property(a => a.Version).IsConcurrencyToken();
+
+        // Article and version reference each other; EF orders the inserts through these relationships.
+        builder.HasOne<KnowledgeVersion>().WithMany().HasForeignKey(a => a.CurrentVersionId);
+        builder.HasOne<KnowledgeSpace>().WithMany().HasForeignKey(a => a.KnowledgeSpaceId);
+    }
+
+    public void Configure(EntityTypeBuilder<KnowledgeVersion> builder)
+    {
+        builder.ToTable("knowledge_version");
+        builder.Property(v => v.ContentJson).HasColumnType("jsonb");
+        builder.HasOne<KnowledgeArticle>().WithMany().HasForeignKey(v => v.ArticleId);
+    }
+
+    public void Configure(EntityTypeBuilder<KnowledgeTag> builder) => builder.ToTable("knowledge_tag");
+
+    public void Configure(EntityTypeBuilder<KnowledgeArticleTag> builder)
+    {
+        builder.ToTable("knowledge_article_tag");
+        builder.HasKey(t => new { t.ArticleId, t.TagId });
+        builder.HasOne<KnowledgeArticle>().WithMany().HasForeignKey(t => t.ArticleId);
+        builder.HasOne<KnowledgeTag>().WithMany().HasForeignKey(t => t.TagId);
+    }
+
+    public void Configure(EntityTypeBuilder<KnowledgeRelation> builder) => builder.ToTable("knowledge_relation");
+
+    public void Configure(EntityTypeBuilder<KnowledgeComment> builder)
+    {
+        builder.ToTable("knowledge_comment");
+        builder.Property(c => c.Version).IsConcurrencyToken();
+    }
+
+    public void Configure(EntityTypeBuilder<KnowledgeReference> builder) => builder.ToTable("knowledge_reference");
+
+    public void Configure(EntityTypeBuilder<KnowledgePermission> builder)
+    {
+        builder.ToTable("knowledge_permission");
+        builder.HasOne<KnowledgeArticle>().WithMany().HasForeignKey(p => p.ArticleId);
+    }
+}

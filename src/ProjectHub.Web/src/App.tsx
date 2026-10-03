@@ -3,6 +3,7 @@ import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { getDevUser, setDevUser } from './identity/devUser'
+import { KnowledgePage } from './knowledge/KnowledgePage'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import './App.css'
@@ -20,9 +21,9 @@ const roleText: Record<Me['organizationRole'], string> = {
 
 type Session = { me: Me; organization: Organization }
 
-type Tab = 'projects' | 'teams'
+type Tab = 'projects' | 'knowledge' | 'teams'
 
-const tabText: Record<Tab, string> = { projects: 'Projekte', teams: 'Teams' }
+const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', teams: 'Teams' }
 
 function App() {
   const [status, setStatus] = useState<ApiStatus>('checking')
@@ -30,6 +31,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('projects')
+  const [openArticle, setOpenArticle] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -82,17 +84,27 @@ function App() {
                   type="button"
                   className={value === tab ? 'tab active' : 'tab'}
                   aria-current={value === tab ? 'page' : undefined}
-                  onClick={() => setTab(value)}
+                  onClick={() => {
+                    setTab(value)
+                    setOpenArticle(null)
+                  }}
                 >
                   {tabText[value]}
                 </button>
               ))}
             </nav>
-            {tab === 'projects' ? (
-              <ProjectsPage key={session.me.id} me={session.me} />
-            ) : (
-              <TeamsPage key={session.me.id} me={session.me} />
+            {tab === 'projects' && (
+              <ProjectsPage
+                key={session.me.id}
+                me={session.me}
+                onOpenArticle={(id) => {
+                  setOpenArticle(id)
+                  setTab('knowledge')
+                }}
+              />
             )}
+            {tab === 'knowledge' && <KnowledgePage key={`${session.me.id}:${openArticle}`} me={session.me} initialArticleId={openArticle} />}
+            {tab === 'teams' && <TeamsPage key={session.me.id} me={session.me} />}
           </>
         )}
       </main>

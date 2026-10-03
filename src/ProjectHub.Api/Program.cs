@@ -8,6 +8,7 @@ using ProjectHub.Api.Modules.Comments;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Kanban;
+using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Organizations;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Realtime;
@@ -33,6 +34,7 @@ builder.Services.AddProjectsModule();
 builder.Services.AddTasksModule();
 builder.Services.AddCommentsModule();
 builder.Services.AddKanbanModule();
+builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 
@@ -71,7 +73,8 @@ app.MapApiV1()
     .MapTaskEndpoints()
     .MapCommentEndpoints()
     .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>())
-    .MapKanbanEndpoints();
+    .MapKanbanEndpoints()
+    .MapKnowledgeEndpoints();
 
 app.MapRealtimeEndpoints();
 
