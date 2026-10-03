@@ -1,13 +1,12 @@
 namespace ProjectHub.Api.Modules.Identity.Development;
 
-/// <summary>Synthetic user signed in automatically in Development. Never real people.</summary>
 public sealed class DevelopmentIdentityOptions
 {
     public const string SectionName = "DevelopmentIdentity";
 
-    public string ObjectId { get; set; } = "00000000-0000-0000-0000-000000000001";
+    /// <summary>Request header that selects a synthetic user by object id.</summary>
+    public const string UserHeader = "X-Dev-User";
 
-    public string DisplayName { get; set; } = "Dev User";
-
-    public string Email { get; set; } = "dev.user@example.invalid";
+    /// <summary>Object id of the synthetic user signed in when no header is sent.</summary>
+    public string DefaultObjectId { get; set; } = DevelopmentSeedData.Ada.ObjectId;
 }

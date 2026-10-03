@@ -16,6 +16,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel |
 | DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
 | DEC-012 | Mail als Benutzer | offen | zunächst nein; nur System-Mailbox |
+| DEC-013 | Benutzer-Provisionierung | offen | Benutzer werden nicht automatisch beim ersten Login angelegt; Abgleich über Entra Groups/SCIM oder Just-in-Time klären. Bis dahin: unbekannte Benutzer erhalten 403 |
+| DEC-014 | Rolle `member` vs. `editor` im Projekt | offen | `member` arbeitet an Inhalten (Tasks, Kommentare), `editor` ändert zusätzlich Projektdaten und Struktur; mit Fachbereich bestätigen |
 
 
 ## Knowledge / AI

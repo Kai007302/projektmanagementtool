@@ -126,3 +126,11 @@ Knowledge kann referenzieren:
 - Whiteboard
 
 Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State.
+
+
+# Identity & Organization (Migration 003)
+
+- `organization.entra_tenant_id`: ordnet einen Entra-ID-Tenant (Token-Claim `tid`) genau einer Organisation zu. Eindeutig, falls gesetzt.
+- `app_user.organization_role`: organisationsweite Rolle, `admin` oder `member` (Default). Projektrollen stehen weiterhin in `project_member.role`.
+
+Ein Request wird über `tid` → Organisation und `oid` → `app_user.entra_object_id` innerhalb dieser Organisation einem aktiven Benutzer zugeordnet. Alle weiteren Abfragen starten von dieser `organization_id`.
