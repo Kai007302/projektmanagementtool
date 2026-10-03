@@ -48,6 +48,11 @@ public static class ActivityActions
     public const string BoardColumnCreated = "BoardColumnCreated";
     public const string BoardColumnUpdated = "BoardColumnUpdated";
     public const string BoardColumnDeleted = "BoardColumnDeleted";
+    public const string DependencyAdded = "DependencyAdded";
+    public const string DependencyRemoved = "DependencyRemoved";
+    public const string MilestoneCreated = "MilestoneCreated";
+    public const string MilestoneUpdated = "MilestoneUpdated";
+    public const string MilestoneDeleted = "MilestoneDeleted";
     public const string CommentAdded = "CommentAdded";
     public const string AttachmentAdded = "AttachmentAdded";
     public const string AttachmentDeleted = "AttachmentDeleted";

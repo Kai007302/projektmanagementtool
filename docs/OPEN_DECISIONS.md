@@ -26,6 +26,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-020 | Sichtbarkeit veröffentlichten Wissens | entschieden (Kai, 2026-10-03) | veröffentlichte und archivierte Artikel lesen alle in der Organisation; einzelne Artikel können auf „eingeschränkt“ gestellt werden und sind dann nur über Freigaben sichtbar. Entwürfe und Artikel in Prüfung sind nie organisationsweit sichtbar |
 | DEC-021 | Wer Wissensartikel veröffentlicht | offen | Artikel-Admins: Organisations-Admins, die verantwortliche Person (Owner) und Personen/Teams mit Freigabe „Verwalten“. Zur Prüfung geben darf, wer bearbeiten darf |
 | DEC-022 | Verweise von Wissen auf Whiteboards | offen | erst mit dem Whiteboard-Modul (Phase 7); bis dahin lehnt die API `whiteboard` als Verweisziel ab |
+| DEC-023 | Abhängigkeiten im Gantt | offen | nur Warnung: verletzte Abhängigkeiten werden markiert, Nachfolger werden nicht automatisch verschoben. Nur innerhalb eines Projekts, höchstens eine Abhängigkeit je Aufgabenpaar, keine Kreise |
+| DEC-024 | Wer Gantt-Termine und Meilensteine pflegt | offen | Termine verschieben und Abhängigkeiten pflegen: Contribute (wie Aufgaben ändern); Meilensteine: Edit (Projektstruktur) |
 
 
 ## Knowledge / AI

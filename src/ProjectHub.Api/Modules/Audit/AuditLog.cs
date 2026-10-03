@@ -17,6 +17,7 @@ public static class AuditActions
     public const string ProjectMemberRemoved = "ProjectMemberRemoved";
     public const string TaskDeleted = "TaskDeleted";
     public const string BoardColumnDeleted = "BoardColumnDeleted";
+    public const string MilestoneDeleted = "MilestoneDeleted";
     public const string KnowledgeSpaceCreated = "KnowledgeSpaceCreated";
     public const string KnowledgeArticleCreated = "KnowledgeArticleCreated";
     public const string KnowledgeStatusChanged = "KnowledgeStatusChanged";

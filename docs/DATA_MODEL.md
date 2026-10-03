@@ -142,6 +142,15 @@ Kommentare auf Knowledge Articles. @Mentions verwenden die bestehende Notificati
 
 Knowledge kann auf Organization-, Team- oder expliziter User-Ebene sichtbar gemacht werden. Backend-Authorization ist verbindlich. Regeln: `docs/PERMISSIONS.md` (Abschnitt Wissen).
 
+## Gantt
+
+Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration:
+
+- Balken: `task.start_date`/`task.due_date` (beide inklusiv; ein Task mit nur einem Datum belegt einen Tag), Fortschritt aus `task.progress`, Hierarchie aus `task.parent_task_id`. Verschoben wird über `PATCH /tasks/{id}` mit `version`.
+- `task_dependency`: Quelle → Ziel mit `dependency_type` (`finish_to_start`, `start_to_start`, `finish_to_finish`, `start_to_finish`). Beide Tasks im selben Projekt, höchstens eine Abhängigkeit je Paar, keine Kreise (geprüft unter einer Advisory-Sperre je Projekt). Abhängigkeiten weich gelöschter Tasks bleiben in der Tabelle, werden aber nicht mehr angezeigt.
+- Verletzt ist eine Abhängigkeit, wenn `finish_to_start`: Ziel beginnt am oder vor dem Endtag der Quelle; `start_to_start`: Ziel beginnt vor der Quelle; `finish_to_finish`: Ziel endet vor der Quelle; `start_to_finish`: Ziel endet vor dem Beginn der Quelle. Sie wird nur angezeigt (DEC-023).
+- `gantt_milestone`: Name und Datum je Projekt, versioniert.
+
 ## Cross-domain references
 
 Knowledge kann referenzieren:

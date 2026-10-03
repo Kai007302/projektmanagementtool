@@ -46,6 +46,9 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 | Kanban-Board ansehen | View |
 | Karten verschieben (ändert den Status der Aufgabe) | Contribute |
 | Spalten anlegen, ändern, sortieren, löschen | Edit |
+| Gantt ansehen | View |
+| Termine im Gantt verschieben (ändert Start/Ende der Aufgabe), Abhängigkeiten anlegen und löschen | Contribute (DEC-024) |
+| Meilensteine anlegen, ändern, löschen | Edit (DEC-024) |
 | Realtime-Benachrichtigungen eines Projekts empfangen | View (geprüft beim Beitritt zur Projektgruppe) |
 
 - Ein Projekt behält immer mindestens einen `admin`; die letzte Admin-Rolle kann nicht entzogen werden (409).
