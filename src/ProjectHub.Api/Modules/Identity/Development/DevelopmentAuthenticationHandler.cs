@@ -19,7 +19,12 @@ internal sealed class DevelopmentAuthenticationHandler(
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        string objectId = Request.Headers[DevelopmentIdentityOptions.UserHeader].FirstOrDefault() ?? identity.Value.DefaultObjectId;
+        // Browsers cannot send headers on WebSocket requests, so the realtime hub also accepts a query parameter.
+        string objectId = Request.Headers[DevelopmentIdentityOptions.UserHeader].FirstOrDefault()
+                          ?? (Request.Path.StartsWithSegments(DevelopmentIdentityOptions.HubPathPrefix)
+                              ? Request.Query[DevelopmentIdentityOptions.UserQueryParameter].FirstOrDefault()
+                              : null)
+                          ?? identity.Value.DefaultObjectId;
         var user = DevelopmentSeedData.Users.SingleOrDefault(u => u.ObjectId == objectId);
         if (user is null)
         {

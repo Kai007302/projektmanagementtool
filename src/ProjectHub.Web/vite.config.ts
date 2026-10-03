@@ -9,7 +9,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': apiUrl,
+      // ws: the realtime hub below /api/v1/hubs upgrades to WebSockets.
+      '/api': { target: apiUrl, ws: true },
       '/health': apiUrl,
     },
   },

@@ -70,6 +70,7 @@ function projectRoutes(capabilities = all, tasks = [design, mockups]) {
 
 async function openProject() {
   await userEvent.click(await screen.findByRole('button', { name: /Intranet/ }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Liste' }))
   return within(await screen.findByRole('region', { name: 'Aufgaben' }))
 }
 

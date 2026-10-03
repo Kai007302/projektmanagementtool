@@ -11,6 +11,10 @@ const actionText: Record<string, string> = {
   TaskCreated: 'hat eine Aufgabe angelegt',
   TaskUpdated: 'hat eine Aufgabe geändert',
   TaskDeleted: 'hat eine Aufgabe gelöscht',
+  TaskMoved: 'hat eine Aufgabe verschoben',
+  BoardColumnCreated: 'hat eine Spalte angelegt',
+  BoardColumnUpdated: 'hat eine Spalte geändert',
+  BoardColumnDeleted: 'hat eine Spalte gelöscht',
   CommentAdded: 'hat kommentiert',
   AttachmentAdded: 'hat eine Datei angehängt',
   AttachmentDeleted: 'hat eine Datei entfernt',
@@ -19,8 +23,10 @@ const actionText: Record<string, string> = {
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
 
 function describe(entry: Activity): string {
-  const title = typeof entry.metadata.Title === 'string' ? ` „${entry.metadata.Title}“` : ''
-  return `${actionText[entry.action] ?? entry.action}${title}`
+  const name = entry.metadata.Title ?? entry.metadata.Name
+  const title = typeof name === 'string' ? ` „${name}“` : ''
+  const column = typeof entry.metadata.Column === 'string' ? ` nach „${entry.metadata.Column}“` : ''
+  return `${actionText[entry.action] ?? entry.action}${title}${column}`
 }
 
 export function ActivityFeed({ projectId, revision }: { projectId: string; revision: number }) {

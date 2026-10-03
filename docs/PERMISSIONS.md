@@ -43,6 +43,11 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 | Datei löschen | wer sie hochgeladen hat oder Manage |
 | Erwähnen (`@`) | nur Mitglieder des Projekts |
 
+| Kanban-Board ansehen | View |
+| Karten verschieben (ändert den Status der Aufgabe) | Contribute |
+| Spalten anlegen, ändern, sortieren, löschen | Edit |
+| Realtime-Benachrichtigungen eines Projekts empfangen | View (geprüft beim Beitritt zur Projektgruppe) |
+
 - Ein Projekt behält immer mindestens einen `admin`; die letzte Admin-Rolle kann nicht entzogen werden (409).
 - Gelöschte Projekte und Aufgaben (Soft Delete) sind für alle „nicht gefunden“ (404).
 - Änderungen per `PATCH` brauchen die aktuelle `version`; ist sie veraltet, antwortet die API mit 409 und ändert nichts.
@@ -62,4 +67,5 @@ Team-Anlage und Mitgliederänderungen werden im `audit_log` protokolliert (`Team
 
 - Außerhalb von Development: Microsoft Entra ID. Die API validiert Bearer-Tokens gegen `https://login.microsoftonline.com/{ENTRA_TENANT_ID}/v2.0` mit Audience `ENTRA_CLIENT_ID`. Die App-Registrierung selbst ist ein Human Review Gate; ohne sie ist kein Login möglich (401). Der Login-Flow im Frontend (MSAL) folgt, sobald die Registrierung existiert.
 - Development: ein gekapselter Development-Identity-Provider meldet einen der synthetischen Benutzer aus `DevelopmentSeedData` an (Header `X-Dev-User`, Standard `dev-ada`). Er stellt dieselben Claims wie Entra aus (`oid`, `tid`, `name`, `preferred_username`) und verweigert den Start außerhalb von Development.
+- Realtime (SignalR, `/api/v1/hubs/projects`): Browser können bei WebSockets keine Header senden. Mit Entra kommt das Token deshalb als `access_token` in der Query, im Development-Modus der synthetische Benutzer als `devUser`. Beides gilt nur für Pfade unter `/api/v1/hubs`. Nachrichten enthalten nur die Projekt-ID; Inhalte lädt der Client über die autorisierte API.
 - Benutzer werden nicht automatisch angelegt (DEC-013). Authentifizierte Konten ohne aktiven ProjectHub-Benutzer erhalten 403.

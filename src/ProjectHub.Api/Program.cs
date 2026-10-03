@@ -7,8 +7,10 @@ using ProjectHub.Api.Modules.Audit;
 using ProjectHub.Api.Modules.Comments;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
+using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Organizations;
 using ProjectHub.Api.Modules.Projects;
+using ProjectHub.Api.Modules.Realtime;
 using ProjectHub.Api.Modules.Tasks;
 using ProjectHub.Api.Modules.Teams;
 using ProjectHub.Api.Modules.Users;
@@ -30,6 +32,8 @@ builder.Services.AddTeamsModule();
 builder.Services.AddProjectsModule();
 builder.Services.AddTasksModule();
 builder.Services.AddCommentsModule();
+builder.Services.AddKanbanModule();
+builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
@@ -66,7 +70,10 @@ app.MapApiV1()
     .MapProjectEndpoints()
     .MapTaskEndpoints()
     .MapCommentEndpoints()
-    .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>());
+    .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>())
+    .MapKanbanEndpoints();
+
+app.MapRealtimeEndpoints();
 
 app.Run();
 

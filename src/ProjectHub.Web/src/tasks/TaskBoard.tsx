@@ -4,9 +4,9 @@ import type { ProjectDetails } from '../projects/api'
 import { createTask, fetchTasks, taskPriorities, taskStatuses, type Task } from './api'
 import { TaskDetails } from './TaskDetails'
 
-type Props = { project: ProjectDetails; me: Me; onChanged: () => void }
+type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
-export function TaskBoard({ project, me, onChanged }: Props) {
+export function TaskBoard({ project, me, revision, onChanged }: Props) {
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +18,7 @@ export function TaskBoard({ project, me, onChanged }: Props) {
     )
   }, [project.id])
 
-  useEffect(load, [load])
+  useEffect(load, [load, revision])
 
   const changed = useCallback(() => {
     load()
