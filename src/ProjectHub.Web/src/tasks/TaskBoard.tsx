@@ -3,6 +3,7 @@ import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { createTask, fetchTasks, taskPriorities, taskStatuses, type Task } from './api'
 import { TaskDetails } from './TaskDetails'
+import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -11,12 +12,13 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchTasks(project.id).then(
+    latest(fetchTasks(project.id)).then(
       (page) => setTasks(page.items),
       (e: Error) => setError(e.message),
     )
-  }, [project.id])
+  }, [latest, project.id])
 
   useEffect(load, [load, revision])
 

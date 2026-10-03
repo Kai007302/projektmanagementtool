@@ -16,6 +16,7 @@ import {
   type KanbanCard,
   type KanbanColumn,
 } from './api'
+import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
 
@@ -44,9 +45,10 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
   const [selected, setSelected] = useState<string | null>(initialTaskId)
   const { canContribute, canEdit } = project.capabilities
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchBoard(project.id).then(setBoard, (e: Error) => setError(e.message))
-  }, [project.id])
+    latest(fetchBoard(project.id)).then(setBoard, (e: Error) => setError(e.message))
+  }, [latest, project.id])
 
   useEffect(load, [load, revision])
 

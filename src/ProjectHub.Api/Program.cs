@@ -1,6 +1,7 @@
 using ProjectHub.Api;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Health;
+using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
@@ -36,6 +37,7 @@ builder.Services.AddSingleton(settings);
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddHttpHardening(builder.Configuration);
 builder.Services.AddOpenApi();
 builder.Services.AddProjectHubHealthChecks(settings);
 builder.Services.AddProjectHubDatabase(settings);
@@ -69,10 +71,13 @@ if (settings.SeedDevelopmentData && app.Environment.IsDevelopment())
     await DevelopmentSeeder.SeedAsync(settings.DatabaseConnection);
 }
 
+app.UseForwardedHeadersWhenTrusted();
+app.UseSecurityHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.UseUserContext();
 

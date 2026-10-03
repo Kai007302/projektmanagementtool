@@ -27,5 +27,43 @@ services:
       timeout: 3s
       retries: 20
 
+  # Both app containers (ADR 0012): docker compose --profile app up --build, then http://localhost:8080.
+  # Development by default (synthetic users); PROJECTHUB_ENVIRONMENT=Production needs Entra ID settings.
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: src/ProjectHub.Api/Dockerfile
+    image: projecthub-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${PROJECTHUB_ENVIRONMENT:-Development}
+      PROJECTHUB_DB_CONNECTION: Host=postgres;Port=5432;Database=projecthub;Username=projecthub;Password=projecthub_dev;GSS Encryption Mode=Disable
+      REDIS_CONNECTION: redis:6379
+      PROJECTHUB_APPLY_MIGRATIONS: "true"
+      PROJECTHUB_SEED_DEVELOPMENT_DATA: "true"
+      PROJECTHUB_TRUST_FORWARDED_HEADERS: "true"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-00000000-0000-0000-0000-000000000000}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:-00000000-0000-0000-0000-000000000000}
+    volumes:
+      - projecthub-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    profiles: [app]
+    build:
+      context: src/ProjectHub.Web
+      args:
+        VITE_DEV_IDENTITY: ${PROJECTHUB_WEB_DEV_IDENTITY:-true}
+    image: projecthub-web
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+
 volumes:
   projecthub-postgres:
+  projecthub-data:

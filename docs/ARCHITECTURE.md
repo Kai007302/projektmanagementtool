@@ -99,6 +99,10 @@ Persistenz: Updates + Snapshots/Compaction.
 
 Umsetzung (ADR 0009): eigener SignalR-Hub im API-Server, Updates werden geprüft, in `whiteboard_update` gespeichert und dann über Redis an die anderen Instanzen verteilt. Ein Hintergrunddienst fasst ruhige Whiteboards zu Snapshots zusammen. Yjs-Dekodierung (yrs) läuft nur in einem isolierten Kindprozess, weil manche fehlerhaften Updates den Prozess beenden. Presence ist flüchtig und wird nie gespeichert.
 
+## Auslieferung
+
+Zwei Container (ADR 0012): Nginx liefert die Oberfläche aus und leitet `/api` (einschließlich WebSockets) und `/health` an die API weiter; Browser sprechen nur mit dieser einen Origin. TLS endet am Ingress (Front Door/App Service/Container Apps), die API ist nur intern erreichbar und übernimmt Client-Adresse und Schema aus genau einem Proxy-Eintrag.
+
 ## Horizontal Scaling
 
 API-Instanzen müssen stateless sein.

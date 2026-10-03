@@ -1,6 +1,6 @@
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { useEffect, useRef } from 'react'
-import { getDevUser } from '../identity/devUser'
+import { devIdentityEnabled, getDevUser } from '../identity/devUser'
 
 export type ProjectChange = { projectId: string; area: 'tasks' | 'board' | 'gantt' | 'whiteboards' | 'webex' }
 
@@ -12,7 +12,7 @@ const hubPath = '/api/v1/hubs/projects'
  */
 export function subscribeToProject(projectId: string, onChange: (change: ProjectChange) => void): () => void {
   // Browsers cannot send headers on WebSockets, so the development identity goes into the query.
-  const devUser = import.meta.env.DEV ? getDevUser() : null
+  const devUser = devIdentityEnabled ? getDevUser() : null
   const url = devUser ? `${hubPath}?devUser=${encodeURIComponent(devUser)}` : hubPath
   const connection = new HubConnectionBuilder()
     .withUrl(url)

@@ -124,15 +124,25 @@ npm run build
 # End-to-End (Playwright; PostgreSQL/Redis per docker compose, API und Vite startet Playwright selbst)
 npx playwright install chromium   # einmalig
 npm run e2e
+
+# End-to-End gegen die Container mit Content Security Policy (so läuft es in der CI)
+docker compose --profile app up -d --build   # im Repository-Wurzelverzeichnis
+PROJECTHUB_E2E_BASE_URL=http://localhost:8080 npm run e2e
 ```
+
+### Container
+
+`docker compose --profile app up --build` baut und startet API und Web-Container (ADR 0012); die App läuft dann auf http://localhost:8080. Standard ist Development mit den synthetischen Benutzern. Der Web-Container liefert den Produktions-Build mit Sicherheits-Headern aus und leitet `/api` und `/health` an die API weiter, damit der Browser nur eine Adresse kennt. TLS übernimmt im Betrieb der Ingress davor.
 
 ### Projektstruktur
 
 ```text
 src/ProjectHub.Api/                 ASP.NET Core API (modularer Monolith)
-  Infrastructure/                   Querschnitt: Datenbank-Migrationen, Health-Checks
+  Infrastructure/                   Querschnitt: Datenbank-Migrationen, Health-Checks, HTTP-Härtung
+  Dockerfile                        API-Container (ADR 0012)
   Modules/<Modul>/                  ein Ordner pro fachlichem Modul (ARCHITECTURE.md)
 src/ProjectHub.Web/                 React + TypeScript + Vite
+  Dockerfile, deploy/               Web-Container: Nginx, Sicherheits-Header, Weiterleitung an die API
 tests/ProjectHub.Api.UnitTests/
 tests/ProjectHub.Api.IntegrationTests/
 database/migrations/                versionierte SQL-Skripte (einzige Schemaquelle)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchActivity, type Activity } from './api'
+import { useLatest } from '../api/useLatest'
 
 const actionText: Record<string, string> = {
   ProjectCreated: 'hat das Projekt angelegt',
@@ -42,10 +43,11 @@ function describe(entry: Activity): string {
 
 export function ActivityFeed({ projectId, revision }: { projectId: string; revision: number }) {
   const [entries, setEntries] = useState<Activity[]>([])
+  const latest = useLatest()
 
   useEffect(() => {
-    fetchActivity(projectId).then((page) => setEntries(page.items), () => setEntries([]))
-  }, [projectId, revision])
+    latest(fetchActivity(projectId)).then((page) => setEntries(page.items), () => setEntries([]))
+  }, [latest, projectId, revision])
 
   return (
     <section className="panel" aria-labelledby="activity-heading">

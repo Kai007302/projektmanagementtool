@@ -1,0 +1,25 @@
+# Dependency updates (docs/SECURITY.md): weekly, minor and patch updates grouped per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        update-types: [ minor, patch ]
+  - package-ecosystem: npm
+    directory: /src/ProjectHub.Web
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        update-types: [ minor, patch ]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories: [ /src/ProjectHub.Api, /src/ProjectHub.Web ]
+    schedule:
+      interval: weekly

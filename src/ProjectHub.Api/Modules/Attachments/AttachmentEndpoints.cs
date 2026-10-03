@@ -28,6 +28,7 @@ public static class AttachmentEndpoints
         api.MapPost("/tasks/{taskId:guid}/attachments", async (Guid taskId, IFormFile? file, UserContext user, AttachmentService service, CancellationToken ct) =>
                 ApiResults.From(await service.UploadAsync(user, taskId, file, ct), a => Results.Created($"/api/v1/attachments/{a.Id}", a)))
             .DisableAntiforgery()
+            .RequireRateLimiting(HttpHardening.UploadPolicy)
             .WithMetadata(new RequestSizeLimitAttributeMetadata(options.MaxSizeBytes + 1024 * 1024));
 
         api.MapGet("/attachments/{id:guid}/content", async (Guid id, UserContext user, AttachmentService service, HttpContext http, CancellationToken ct) =>

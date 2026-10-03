@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { type APIRequestContext } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, signInAs, uniqueTitle } from './helpers'
 
 // Phase 9 acceptance: Webex meetings and the project space are linked, and notifications arrive per Webex (fake bot).

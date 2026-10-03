@@ -1,8 +1,13 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
+using ProjectHub.Api.Modules.Integrations.Webex;
 
 namespace ProjectHub.Api.IntegrationTests;
 
@@ -12,8 +17,12 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
 {
     private WebApplicationFactory<Program> factory = null!;
 
+    private const string WebhookSecret = "production-webhook-secret";
+
     public Task InitializeAsync()
     {
+        // Outside Development the API never migrates by itself.
+        DatabaseMigrator.Migrate(infrastructure.Postgres.GetConnectionString(), NullLogger.Instance);
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
@@ -21,6 +30,7 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
             builder.UseSetting(ProjectHubSettings.RedisConnectionKey, infrastructure.Redis.GetConnectionString());
             builder.UseSetting(EntraIdRegistration.TenantIdKey, "00000000-0000-0000-0000-000000000000");
             builder.UseSetting(EntraIdRegistration.ClientIdKey, "00000000-0000-0000-0000-000000000000");
+            builder.UseSetting(WebexOptions.WebhookSecretKey, WebhookSecret);
         });
         return Task.CompletedTask;
     }
@@ -61,5 +71,24 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
         var response = await factory.CreateClient().GetAsync("/health/live");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Webex_webhooks_need_a_signature_but_no_token()
+    {
+        var body = $$$"""{"id":"wh-prod","resource":"messages","event":"created","data":{"id":"{{{Guid.NewGuid()}}}"}}""";
+        var signature = Convert.ToHexStringLower(HMACSHA1.HashData(Encoding.UTF8.GetBytes(WebhookSecret), Encoding.UTF8.GetBytes(body)));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/integrations/webex/webhook")
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add(WebexWebhookService.SignatureHeader, signature);
+
+        var signed = await factory.CreateClient().SendAsync(request);
+        var unsigned = await factory.CreateClient().PostAsync("/api/v1/integrations/webex/webhook", new StringContent(body, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, unsigned.StatusCode);
+        Assert.DoesNotContain(unsigned.Headers.WwwAuthenticate, h => h.Scheme == "Bearer");
     }
 }

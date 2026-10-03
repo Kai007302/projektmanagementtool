@@ -46,24 +46,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: src/ProjectHub.Web/package-lock.json
-      - name: Start PostgreSQL and Redis
-        run: docker compose up -d --wait
-      - run: dotnet build src/ProjectHub.Api
+      # The real containers (ADR 0012): nginx with the Content Security Policy in front of the API.
+      # The web image is built with synthetic sign-in, the API runs in Development with seeded data.
+      - name: Build and start the app containers
+        run: |
+          docker compose --profile app up -d --build --wait
+          timeout 180 bash -c 'until curl -sf http://localhost:8080/health/ready; do sleep 2; done'
       - working-directory: src/ProjectHub.Web
         run: npm ci
       - working-directory: src/ProjectHub.Web
         run: npx playwright install --with-deps chromium
-      - name: End-to-end tests (API and Vite are started by Playwright)
+      - name: End-to-end tests against the containers
         working-directory: src/ProjectHub.Web
+        env:
+          PROJECTHUB_E2E_BASE_URL: http://localhost:8080
         run: npm run e2e
+      - if: failure()
+        run: mkdir -p src/ProjectHub.Web/test-results && docker compose --profile app logs --no-color > src/ProjectHub.Web/test-results/containers.log
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -71,3 +75,47 @@ jobs:
           path: |
             src/ProjectHub.Web/playwright-report
             src/ProjectHub.Web/test-results
+
+  # Security scans (docs/SECURITY.md, App Security). CodeQL runs in codeql.yml, ZAP in zap.yml.
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production images
+        run: |
+          docker build -f src/ProjectHub.Api/Dockerfile -t projecthub-api .
+          docker build -t projecthub-web src/ProjectHub.Web
+      - name: Scan the images for fixable high and critical vulnerabilities (Trivy)
+        run: |
+          for image in projecthub-api projecthub-web; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.75.0 image \
+              --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress "$image"
+          done
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: NuGet packages with known vulnerabilities
+        run: |
+          dotnet restore
+          dotnet list package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -q "has the following vulnerable packages" vulnerable.txt
+      - name: npm packages shipped to the browser with high or critical vulnerabilities
+        working-directory: src/ProjectHub.Web
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan the whole history for secrets (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo --redact --no-banner

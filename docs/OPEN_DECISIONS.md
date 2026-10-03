@@ -33,6 +33,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-027 | Wer Whiteboards pflegt | offen | ansehen: View; zeichnen: Contribute (wie Aufgaben); anlegen, umbenennen, löschen: Edit |
 | DEC-028 | Outlook-Termine aus Aufgaben und Meilensteinen | offen | ohne Graph-Berechtigung: `.ics`-Datei und Outlook-Deeplink im Browser. Delegiertes `Calendars.ReadWrite` (Termin ohne eigenen Klick in Outlook) erst bei konkretem Bedarf |
 | DEC-029 | Mail-Warteschlange bis Azure | entschieden (Kai, 2026-10-03) | Tabelle `mail_outbox` in PostgreSQL mit Hintergrund-Worker (ADR 0010); Service Bus später dahinter |
+| DEC-030 | Rate Limits und Größenlimits | offen | je Person und Minute: 600 Anfragen, 30 Uploads; Webex-Webhook 120 je Adresse; Anfragen höchstens 4 MB (Uploads eigenes Limit). Zähler je Instanz, verteilt erst bei Bedarf (ADR 0012) |
+| DEC-031 | Auslieferung der Oberfläche | offen | eigener Web-Container (Nginx) vor der API, eine Origin für Browser, TLS am Ingress (ADR 0012) |
 
 
 ## Knowledge / AI

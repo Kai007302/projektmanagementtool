@@ -1,0 +1,34 @@
+name: DAST
+
+# OWASP ZAP baseline (passive) scan of the containers as they run in production: Production environment,
+# no synthetic sign-in. Weekly and on demand; it does not replace the pentest before the rollout.
+on:
+  schedule:
+    - cron: '41 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    env:
+      PROJECTHUB_ENVIRONMENT: Production
+      PROJECTHUB_WEB_DEV_IDENTITY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the app containers
+        run: |
+          docker compose --profile app up -d --build --wait
+          timeout 180 bash -c 'until curl -sf http://localhost:8080/health/ready; do sleep 2; done'
+      - name: ZAP baseline scan
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:8080 -r report.html -J report.json -I
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap

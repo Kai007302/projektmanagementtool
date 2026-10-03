@@ -11,6 +11,7 @@ import { deleteProject, fetchProject, projectStatuses, updateProject, type Proje
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 import { WebexPanel } from '../webex/WebexPanel'
+import { useLatest } from '../api/useLatest'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
@@ -24,9 +25,10 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   const [revision, setRevision] = useState(0)
   const [view, setView] = useState<View>('board')
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchProject(projectId).then(setProject, (e: Error) => setError(e.message))
-  }, [projectId])
+    latest(fetchProject(projectId)).then(setProject, (e: Error) => setError(e.message))
+  }, [latest, projectId])
 
   useEffect(load, [load])
 

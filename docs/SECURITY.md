@@ -61,6 +61,8 @@ Sicherheitsrelevante Aktionen auditieren:
 
 ## App Security
 
+Umsetzung und Werte: ADR 0012. TLS und die Weiterleitung auf HTTPS übernimmt der Ingress; HSTS, CSP und die übrigen Header setzen Web-Container und API; Rate Limits und Größenlimits die API; Dependency-, Secret- und Container-Scanning sowie SAST (CodeQL) laufen in der CI, eine ZAP-Baseline (DAST) wöchentlich. Pentest vor dem Rollout bleibt offen.
+
 Mindestens:
 
 - TLS

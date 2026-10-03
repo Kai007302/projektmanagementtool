@@ -1,7 +1,13 @@
 import { expect, type Page } from '@playwright/test'
 
+/** Content Security Policy violations the browser reported on any signed-in page; see fixtures.ts. */
+export const cspViolations: string[] = []
+
 /** Signs in as one of the synthetic development users (DevelopmentSeedData) and opens a tab. */
 export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | 'Wissen' | 'Teams' = 'Wissen') {
+  page.on('console', (message) => {
+    if (message.type() === 'error' && message.text().includes('Content Security Policy')) cspViolations.push(message.text())
+  })
   await page.goto('/')
   await page.evaluate((id) => localStorage.setItem('projecthub.devUser', id), objectId)
   await page.reload()

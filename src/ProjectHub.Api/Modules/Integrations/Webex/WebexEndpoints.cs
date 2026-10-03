@@ -96,7 +96,8 @@ public static class WebexEndpoints
                     _ => Results.Ok(),
                 };
             })
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting(HttpHardening.WebhookPolicy);
         return endpoints;
     }
 

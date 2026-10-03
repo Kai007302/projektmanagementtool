@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, signInAs, uniqueTitle } from './helpers'
 
 // Phase 5 acceptance: plan tasks on the timeline, link them, add a milestone; viewers follow along live.
@@ -53,9 +54,12 @@ test('tasks are planned, linked and moved on the Gantt chart while a viewer watc
   const schedule = ben.getByRole('form', { name: 'Termin' })
   await schedule.getByLabel('Start').fill(day(2))
   await schedule.getByLabel('Ende').fill(day(6))
+  // The details remount with the reloaded task version, so wait for the reload before using them again.
+  const rescheduled = ben.waitForResponse((r) => r.request().method() === 'GET' && r.url().endsWith(`/projects/${project.id}/gantt`))
   await schedule.getByRole('button', { name: 'Termin speichern' }).click()
   await expect(bar(ben, 'Umsetzung')).toBeVisible()
   await expect.poll(async () => (await implementation()).startDate).toBe(day(2))
+  await rescheduled
 
   // Linking it after "Analyse" flags the overlap; dependencies only warn.
   const link = ben.getByRole('form', { name: 'Vorgänger hinzufügen' })
