@@ -32,7 +32,7 @@ test('two people draw together, a viewer follows and the board survives a reload
 
   const ben = await openWhiteboards(browser, 'dev-ben', name)
   await ben.getByLabel('Neues Whiteboard').fill('Workshop')
-  await ben.getByRole('button', { name: 'Anlegen' }).click()
+  await ben.getByRole('button', { name: 'Anlegen', exact: true }).click()
   await expect(ben.getByRole('heading', { name: 'Workshop' })).toBeVisible()
   await expect(ben.getByText(/^Verbunden/)).toBeVisible()
 
