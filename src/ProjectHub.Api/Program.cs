@@ -17,6 +17,14 @@ using ProjectHub.Api.Modules.Realtime;
 using ProjectHub.Api.Modules.Tasks;
 using ProjectHub.Api.Modules.Teams;
 using ProjectHub.Api.Modules.Users;
+using ProjectHub.Api.Modules.Whiteboard;
+
+if (args is [WhiteboardEngineHost.Argument])
+{
+    // Child process that decodes Yjs updates in isolation (ADR 0009); see WhiteboardEngine.
+    WhiteboardEngineHost.Run();
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +49,7 @@ builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
+builder.Services.AddWhiteboardModule(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -81,10 +90,12 @@ app.MapApiV1()
     .MapKanbanEndpoints()
     .MapGanttEndpoints()
     .MapNotificationEndpoints()
+    .MapWhiteboardEndpoints()
     .MapKnowledgeEndpoints();
 
 app.MapRealtimeEndpoints();
 app.MapNotificationHub();
+app.MapWhiteboardHub();
 
 app.Run();
 

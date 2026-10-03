@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Me, User } from '../identity/api'
 import { fetchTeams, fetchUsers, type TeamSummary } from '../teams/api'
+import { fetchWhiteboards, type Whiteboard } from '../whiteboard/api'
 import {
   addKnowledgeComment,
   addReference,
@@ -199,11 +200,38 @@ export function ReferencesPanel({ details, onChanged }: PanelProps) {
           {type === 'project' && <ProjectPicker label="Projekt" value={resourceId} onChange={setResourceId} />}
           {type === 'task' && <TaskPicker label="Verknüpfung" value={resourceId} onChange={setResourceId} />}
           {type === 'team' && <TeamPicker value={resourceId} onChange={setResourceId} />}
+          {type === 'whiteboard' && <WhiteboardPicker value={resourceId} onChange={setResourceId} />}
           <button type="submit">Verknüpfen</button>
           {error && <p role="alert">{error}</p>}
         </form>
       )}
     </section>
+  )
+}
+
+/** Picks a project first, then one of its whiteboards. */
+function WhiteboardPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [projectId, setProjectId] = useState('')
+  const [boards, setBoards] = useState<Whiteboard[]>([])
+  useEffect(() => {
+    if (!projectId) return
+    fetchWhiteboards(projectId).then((page) => setBoards(page.items), () => setBoards([]))
+  }, [projectId])
+  return (
+    <div className="block-fields">
+      <ProjectPicker label="Whiteboard: Projekt" value={projectId} onChange={setProjectId} required={false} />
+      <label className="grow">
+        Whiteboard
+        <select value={value} onChange={(event) => onChange(event.target.value)} required disabled={!projectId}>
+          <option value="">Whiteboard wählen …</option>
+          {boards.map((board) => (
+            <option key={board.id} value={board.id}>
+              {board.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
   )
 }
 

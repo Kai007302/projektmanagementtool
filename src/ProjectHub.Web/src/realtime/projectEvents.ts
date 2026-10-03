@@ -2,7 +2,7 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { useEffect, useRef } from 'react'
 import { getDevUser } from '../identity/devUser'
 
-export type ProjectChange = { projectId: string; area: 'tasks' | 'board' | 'gantt' }
+export type ProjectChange = { projectId: string; area: 'tasks' | 'board' | 'gantt' | 'whiteboards' }
 
 const hubPath = '/api/v1/hubs/projects'
 

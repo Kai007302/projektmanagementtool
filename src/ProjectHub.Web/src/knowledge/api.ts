@@ -6,7 +6,7 @@ export type ArticleStatus = 'draft' | 'review' | 'published' | 'archived'
 export type Visibility = 'organization' | 'restricted'
 export type Grant = 'view' | 'edit' | 'admin'
 export type RelationType = 'RELATED' | 'REQUIRES' | 'PART_OF' | 'SUPERSEDES' | 'REFERENCES'
-export type ResourceType = 'project' | 'task' | 'team'
+export type ResourceType = 'project' | 'task' | 'team' | 'whiteboard'
 
 export const articleTypes: Record<ArticleType, string> = {
   article: 'Artikel',
@@ -42,7 +42,7 @@ export const relationTypes: Record<RelationType, { outgoing: string; incoming: s
   REFERENCES: { outgoing: 'Verweist auf', incoming: 'Referenziert von' },
 }
 
-export const resourceTypes: Record<ResourceType, string> = { project: 'Projekt', task: 'Aufgabe', team: 'Team' }
+export const resourceTypes: Record<ResourceType, string> = { project: 'Projekt', task: 'Aufgabe', team: 'Team', whiteboard: 'Whiteboard' }
 
 export type ArticleSummary = {
   id: string
@@ -162,4 +162,4 @@ export const deleteKnowledgeComment = (commentId: string) => apiFetch<void>(`${b
 
 /** Visible articles that reference a project, task or team. */
 export const fetchLinkedKnowledge = (resourceType: ResourceType, id: string) =>
-  apiFetch<ArticleSummary[]>(`/api/v1/${resourceType === 'project' ? 'projects' : resourceType === 'task' ? 'tasks' : 'teams'}/${id}/knowledge`)
+  apiFetch<ArticleSummary[]>(`/api/v1/${resourceType}s/${id}/knowledge`)

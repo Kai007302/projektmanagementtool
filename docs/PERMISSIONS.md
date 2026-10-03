@@ -49,6 +49,9 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 | Gantt ansehen | View |
 | Termine im Gantt verschieben (ändert Start/Ende der Aufgabe), Abhängigkeiten anlegen und löschen | Contribute (DEC-024) |
 | Meilensteine anlegen, ändern, löschen | Edit (DEC-024) |
+| Whiteboards ansehen, live mitverfolgen, Mauszeiger der anderen sehen und eigenen zeigen | View (DEC-027) |
+| Auf Whiteboards zeichnen (Updates schicken) | Contribute (DEC-027, bei jedem Update geprüft) |
+| Whiteboards anlegen, umbenennen, löschen | Edit (DEC-027) |
 | Realtime-Benachrichtigungen eines Projekts empfangen | View (geprüft beim Beitritt zur Projektgruppe) |
 
 - Ein Projekt behält immer mindestens einen `admin`; die letzte Admin-Rolle kann nicht entzogen werden (409).

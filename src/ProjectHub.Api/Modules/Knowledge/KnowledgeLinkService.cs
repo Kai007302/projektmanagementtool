@@ -7,6 +7,7 @@ using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
 using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.Modules.Knowledge;
 
@@ -168,7 +169,7 @@ public sealed class KnowledgeLinkService(
     }
 
     /// <summary>
-    /// The other direction: visible articles that reference a project, task or team.
+    /// The other direction: visible articles that reference a project, task, team or whiteboard.
     /// The resource itself must be visible to the caller, otherwise it does not exist for them.
     /// </summary>
     public async Task<ServiceResult<IReadOnlyList<ArticleSummary>>> ArticlesReferencingAsync(
@@ -180,6 +181,7 @@ public sealed class KnowledgeLinkService(
             {
                 KnowledgeResourceType.Project => "Project",
                 KnowledgeResourceType.Task => "Task",
+                KnowledgeResourceType.Whiteboard => "Whiteboard",
                 _ => "Team",
             });
         }
@@ -285,6 +287,22 @@ public sealed class KnowledgeLinkService(
                 if (await authorization.CanViewProjectAsync(user, task.ProjectId, ct))
                 {
                     result[(KnowledgeResourceType.Task, task.Id)] = new Resolved(task.Title, task.ProjectId);
+                }
+            }
+        }
+
+        var whiteboardIds = resources.Where(r => r.Type == KnowledgeResourceType.Whiteboard).Select(r => r.Id).ToList();
+        if (whiteboardIds.Count > 0)
+        {
+            var boards = await db.Set<ProjectWhiteboard>()
+                .Where(w => whiteboardIds.Contains(w.Id) && w.OrganizationId == user.OrganizationId)
+                .Select(w => new { w.Id, w.Name, w.ProjectId })
+                .ToListAsync(ct);
+            foreach (var board in boards)
+            {
+                if (await authorization.CanViewProjectAsync(user, board.ProjectId, ct))
+                {
+                    result[(KnowledgeResourceType.Whiteboard, board.Id)] = new Resolved(board.Name, board.ProjectId);
                 }
             }
         }

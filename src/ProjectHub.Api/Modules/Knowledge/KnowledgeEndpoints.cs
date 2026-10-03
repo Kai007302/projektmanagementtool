@@ -113,7 +113,7 @@ public static class KnowledgeEndpoints
         knowledge.MapDelete("/comments/{id:guid}", async (Guid id, UserContext user, KnowledgeCommentService service, CancellationToken ct) =>
             ApiResults.NoContent(await service.DeleteAsync(user, id, ct)));
 
-        // The other direction of references: knowledge linked to a project, task or team.
+        // The other direction of references: knowledge linked to a project, task, team or whiteboard.
         api.MapGet("/projects/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
             ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Project, id, ct)));
 
@@ -122,6 +122,9 @@ public static class KnowledgeEndpoints
 
         api.MapGet("/teams/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
             ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Team, id, ct)));
+
+        api.MapGet("/whiteboards/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
+            ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Whiteboard, id, ct)));
 
         return api;
     }

@@ -11,6 +11,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `005_kanban_column_status.sql`: `kanban_column.task_status`. Jede Spalte steht für einen Task-Status; die Spalte einer Karte ergibt sich aus Status, `task.kanban_column_id` und `task.board_position` (Kanban bleibt eine Ansicht auf Tasks)
 - `006_knowledge_visibility_search.sql`: `knowledge_article.visibility` (`organization`/`restricted`, DEC-020), `knowledge_article.search_text` (Klartext des aktuellen Inhalts) und ein GIN-Index für die Volltextsuche (`german`) über Titel, Zusammenfassung und `search_text`
 - `007_notification_unread.sql`: Teilindex auf ungelesene Benachrichtigungen je Person (Zähler der Glocke)
+- `008_whiteboard_updates.sql`: `whiteboard_update` (angenommene Yjs-Updates seit dem letzten Snapshot) und Indizes für Whiteboards je Projekt und Verweise je Aufgabe
 
 ## Regeln
 
@@ -158,6 +159,16 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 - `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` bleibt bis Phase 9 ungenutzt.
 - Zustellung und Mail siehe ADR 0008.
 
+## Whiteboard
+
+Whiteboards sind Yjs-Dokumente (ADR 0004, ADR 0009). Die Tabellen halten den Inhalt nur binär, nie als Kopie von Geschäftsdaten:
+
+- `whiteboard`: Name je Projekt, versioniert; `collaboration_document_id` ist die Kennung des Yjs-Dokuments.
+- `whiteboard_update`: jedes angenommene Update mit fortlaufender `sequence_number` je Whiteboard, `created_by` und Zeitpunkt.
+- `whiteboard_snapshot`: zusammengeführter Stand bis einschließlich `sequence_number`; die Bytes liegen unter `storage_key` im Snapshot-Speicher (Development: `.data/whiteboards`). Die letzten zwei bleiben erhalten.
+- `whiteboard_reference`: welche Aufgabe auf welchem Objekt liegt. Wird bei der Compaction aus dem Dokument abgeleitet; nur aktive Aufgaben desselben Projekts.
+- Im Dokument: Root-Map `objects`, je Objekt eine Map mit `type` (`sticky`, `rect`, `ellipse`, `text`, `arrow`, `task`), `x`, `y`, `w`, `h` (Pfeile: `x2`, `y2`), `color`, `text` und bei Aufgabenkarten nur `taskId`.
+
 ## Cross-domain references
 
 Knowledge kann referenzieren:
@@ -167,7 +178,7 @@ Knowledge kann referenzieren:
 - Team
 - Whiteboard
 
-Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State. Whiteboard-Verweise folgen mit dem Whiteboard-Modul (DEC-022).
+Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State. Ein Verweis ist nur sichtbar, wer das Ziel sehen darf; Verweise auf gelöschte Whiteboards bleiben verborgen.
 
 
 # Identity & Organization (Migration 003)

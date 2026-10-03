@@ -6,15 +6,16 @@ import { KanbanBoard } from '../kanban/KanbanBoard'
 import { ProjectKnowledge } from '../knowledge/ProjectKnowledge'
 import { useProjectEvents } from '../realtime/projectEvents'
 import { TaskBoard } from '../tasks/TaskBoard'
+import { WhiteboardPanel } from '../whiteboard/WhiteboardPanel'
 import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
-type View = 'board' | 'list' | 'gantt'
+type View = 'board' | 'list' | 'gantt' | 'whiteboard'
 
-const viewText: Record<View, string> = { board: 'Board', list: 'Liste', gantt: 'Gantt' }
+const viewText: Record<View, string> = { board: 'Board', list: 'Liste', gantt: 'Gantt', whiteboard: 'Whiteboard' }
 
 export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskId = null }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
@@ -89,6 +90,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
             {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={initialTaskId} />}
             {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
             {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
+            {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} />}
             <aside className="project-side">
               <MembersPanel project={project} onChanged={changed} />
               <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />

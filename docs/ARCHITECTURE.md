@@ -97,6 +97,8 @@ Whiteboard nutzt CRDT/Yjs. Kein vollständiger Canvas-State-Broadcast bei jeder 
 
 Persistenz: Updates + Snapshots/Compaction.
 
+Umsetzung (ADR 0009): eigener SignalR-Hub im API-Server, Updates werden geprüft, in `whiteboard_update` gespeichert und dann über Redis an die anderen Instanzen verteilt. Ein Hintergrunddienst fasst ruhige Whiteboards zu Snapshots zusammen. Yjs-Dekodierung (yrs) läuft nur in einem isolierten Kindprozess, weil manche fehlerhaften Updates den Prozess beenden. Presence ist flüchtig und wird nie gespeichert.
+
 ## Horizontal Scaling
 
 API-Instanzen müssen stateless sein.

@@ -98,6 +98,20 @@ public static class DevelopmentSeedData
         (Guid.Parse("01920000-0000-7000-8000-000000000651"), IntranetProject, "Go-live Intranet", 21),
     ];
 
+    public static readonly Guid IdeasWhiteboardId = Guid.Parse("01920000-0000-7000-8000-000000000701");
+
+    /// <summary>Whiteboards with their initial objects (see the whiteboard document structure in ADR 0009).</summary>
+    public static readonly IReadOnlyList<(Guid Id, SeedProject Project, string Name, IReadOnlyDictionary<string, IReadOnlyDictionary<string, object>> Objects)> Whiteboards =
+    [
+        (IdeasWhiteboardId, IntranetProject, "Ideen Startseite", new Dictionary<string, IReadOnlyDictionary<string, object>>
+        {
+            ["seed-sticky-1"] = new Dictionary<string, object> { ["type"] = "sticky", ["x"] = 40, ["y"] = 40, ["w"] = 180, ["h"] = 120, ["color"] = "yellow", ["text"] = "Suche ganz oben" },
+            ["seed-sticky-2"] = new Dictionary<string, object> { ["type"] = "sticky", ["x"] = 260, ["y"] = 40, ["w"] = 180, ["h"] = 120, ["color"] = "green", ["text"] = "News der Teams zuerst" },
+            ["seed-task-1"] = new Dictionary<string, object> { ["type"] = "task", ["x"] = 40, ["y"] = 220, ["w"] = 220, ["h"] = 90, ["taskId"] = StartPageTask.Id.ToString() },
+            ["seed-arrow-1"] = new Dictionary<string, object> { ["type"] = "arrow", ["x"] = 130, ["y"] = 160, ["x2"] = 150, ["y2"] = 220, ["color"] = "gray" },
+        }),
+    ];
+
     public static readonly SeedSpace PlatformSpace = new(
         Guid.Parse("01920000-0000-7000-8000-000000000601"), Contoso.Id, "IT & Plattform", "Betrieb, Werkzeuge und Richtlinien der Plattform");
 

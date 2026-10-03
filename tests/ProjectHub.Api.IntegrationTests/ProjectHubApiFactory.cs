@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Identity.Development;
+using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.IntegrationTests;
 
@@ -22,6 +23,10 @@ public sealed class ProjectHubApiFactory(
         builder.UseSetting(ProjectHubSettings.ApplyMigrationsOnStartupKey, applyMigrations.ToString());
         builder.UseSetting(ProjectHubSettings.SeedDevelopmentDataKey, applyMigrations.ToString());
         builder.UseSetting(AttachmentOptions.DirectoryKey, AttachmentDirectory);
+        builder.UseSetting(WhiteboardOptions.DirectoryKey, Path.Combine(AttachmentDirectory, "whiteboards"));
+
+        // Tests compact explicitly; the background service would make them depend on timing.
+        builder.UseSetting(WhiteboardOptions.CompactionIntervalKey, "0");
         configure?.Invoke(builder);
     }
 
