@@ -34,7 +34,9 @@ Systemmails vorzugsweise über dediziertes Funktionspostfach. Application Permis
 
 ## Webex
 
-OAuth-Tokens verschlüsselt speichern. Webhooks validieren, deduplizieren und idempotent verarbeiten.
+Ein zentraler Bot (ADR 0011). `WEBEX_BOT_TOKEN` und `WEBEX_WEBHOOK_SECRET` kommen nur aus dem Secret Store, nie in den Browser und nie ins Log; Fehlermeldungen tragen nur den HTTP-Status. ProjectHub speichert keine persönlichen Webex-Tokens. Falls später OAuth je Person dazukommt: Tokens verschlüsselt speichern.
+
+Webhooks validieren (HMAC-SHA1-Signatur, Vergleich in konstanter Zeit, ohne Secret wird nichts angenommen), deduplizieren und idempotent verarbeiten. Meeting- und Raum-Links nur als `https` auf `webex.com`.
 
 ## Logging
 

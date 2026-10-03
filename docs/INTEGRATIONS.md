@@ -37,22 +37,32 @@ Umgesetzt (Phase 8, Vorschlag DEC-028) ohne Graph-Berechtigung:
 
 ## Webex
 
+Umgesetzt (Phase 9, ADR 0011) über **einen zentralen Bot**. Personen verbinden kein eigenes Webex-Konto. Einrichtung: `docs/integrations/webex-setup.md`.
+
+Der Transport wird mit `PROJECTHUB_WEBEX_TRANSPORT` gewählt: `off` (Standard außerhalb von Development, Webex ist in der Oberfläche ausgeblendet), `fake` (Standard in Development, Nachrichten unter `GET /dev/webex`) oder `bot`.
+
 ### Meetings
 
-Projekt kann ein Webex Meeting referenzieren.
+Projekt kann ein Webex Meeting referenzieren: Titel und Link (`https`, nur `webex.com` und Subdomains). ProjectHub plant keine Meetings.
 
 ### Spaces
 
-Projekt kann einen Webex Space referenzieren.
+Projekt kann einen Webex Space referenzieren, als Link oder als vom Bot angelegter Projektraum: Der Bot legt einen Raum mit dem Projektnamen an, lädt die aktiven Projektmitglieder per Mailadresse ein und postet einen Link ins Projekt. Höchstens ein aktiver Projektraum je Projekt. Spätere Änderungen an den Projektmitgliedern werden nicht übertragen.
+
+### Benachrichtigungen
+
+Wer „Per Webex“ einschaltet, bekommt Benachrichtigungen zusätzlich als Direktnachricht des Bots (nur Titel und Link). Zustellung über dieselbe Outbox wie Mails (`mail_outbox.channel = 'webex'`) mit Wiederholung; ein Webex-Ausfall verzögert nur diese Nachrichten.
 
 ### Webhooks
 
-Incoming webhooks werden:
+Incoming webhooks (`POST /api/v1/integrations/webex/webhook`) werden:
 
-- validiert
-- dedupliziert
-- idempotent verarbeitet
+- validiert (`X-Spark-Signature`, HMAC-SHA1 mit `WEBEX_WEBHOOK_SECRET`, höchstens 64 KB)
+- dedupliziert (`webhook_event`, Schlüssel `resource:event:data.id`)
+- idempotent verarbeitet (nur Zustände setzen, in derselben Transaktion)
 - mit Correlation ID geloggt
+
+Ausgewertet wird bisher `memberships:deleted` für den Bot: Der Projektraum gilt dann als getrennt. Registriert wird der Webhook von einem Organisations-Admin (`POST /admin/webex/webhook`).
 
 ### Future
 

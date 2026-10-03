@@ -111,6 +111,15 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Der Realtime-Hub `/api/v1/hubs/notifications` stellt nur an die angemeldete Person zu und überträgt nur den Zähler.
 - Den Zustand der Mail-Warteschlange (`/admin/mail-outbox`) sehen nur Organisations-Admins, und nur für ihre Organisation. Antworten enthalten weder Adressen noch Betreff. Erneutes Versenden einer fehlgeschlagenen Mail steht im `audit_log`.
 
+## Webex
+
+- Webex-Links eines Projekts sieht, wer das Projekt sehen darf (View). Links hinzufügen, entfernen und einen Projektraum anlegen braucht Edit.
+- Entfernen löscht nur den Link; ein Raum in Webex bleibt bestehen.
+- Der Bot lädt nur aktive Mitglieder des Projekts aus derselben Organisation ein.
+- Webex-Nachrichten enthalten wie Mails nur Titel und Link.
+- Den Webex-Zustand (`/admin/webex`) sehen und den Webhook registrieren (`/admin/webex/webhook`) nur Organisations-Admins; die Registrierung steht im `audit_log`.
+- Der Webhook-Endpunkt hat keinen Benutzer, nimmt aber nur Anfragen mit gültiger Signatur an (sonst 401).
+
 ## Kalender
 
 - Kalenderdateien für Aufgaben und Meilensteine bekommt, wer das Projekt sehen darf (View). Sonst „nicht gefunden“ (404).

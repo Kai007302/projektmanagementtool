@@ -20,6 +20,7 @@ public static class AuditActions
     public const string MilestoneDeleted = "MilestoneDeleted";
     public const string WhiteboardDeleted = "WhiteboardDeleted";
     public const string MailRetried = "MailRetried";
+    public const string WebexWebhookRegistered = "WebexWebhookRegistered";
     public const string KnowledgeSpaceCreated = "KnowledgeSpaceCreated";
     public const string KnowledgeArticleCreated = "KnowledgeArticleCreated";
     public const string KnowledgeStatusChanged = "KnowledgeStatusChanged";

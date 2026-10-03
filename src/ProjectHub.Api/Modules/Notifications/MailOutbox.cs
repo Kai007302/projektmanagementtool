@@ -13,12 +13,19 @@ public sealed class MailOutboxEntry
     public required string ToAddress { get; init; }
     public required string Subject { get; init; }
     public required string Body { get; init; }
+    public string Channel { get; init; } = MailOutboxChannel.Email;
     public string Status { get; init; } = MailOutboxStatus.Pending;
     public int Attempts { get; init; }
     public DateTimeOffset NextAttemptAt { get; init; }
     public string? LastError { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? SentAt { get; init; }
+}
+
+public static class MailOutboxChannel
+{
+    public const string Email = "email";
+    public const string Webex = "webex";
 }
 
 public static class MailOutboxStatus
@@ -70,7 +77,8 @@ public sealed class MailOutboxSignal
 /// (<c>FOR UPDATE SKIP LOCKED</c>), so several instances never send the same row at the same time, and sent
 /// outside the reserving transaction. A crash while sending means the lease runs out and the mail is tried again.
 /// </summary>
-public sealed class MailOutbox(IServiceScopeFactory scopes, IEmailSender sender, TimeProvider clock, ILogger<MailOutbox> logger)
+public sealed class MailOutbox(
+    IServiceScopeFactory scopes, IEmailSender sender, IWebexMessageSender webex, TimeProvider clock, ILogger<MailOutbox> logger)
 {
     public const int BatchSize = 20;
     public const int MaxAttempts = 8;
@@ -147,7 +155,8 @@ public sealed class MailOutbox(IServiceScopeFactory scopes, IEmailSender sender,
         TimeSpan? retryAfter = null;
         try
         {
-            await sender.SendAsync(new EmailMessage(mail.OrganizationId, mail.RecipientId, mail.ToAddress, mail.Subject, mail.Body), ct);
+            var message = new EmailMessage(mail.OrganizationId, mail.RecipientId, mail.ToAddress, mail.Subject, mail.Body);
+            await (mail.Channel == MailOutboxChannel.Webex ? webex.SendAsync(message, ct) : sender.SendAsync(message, ct));
             error = null;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -155,7 +164,7 @@ public sealed class MailOutbox(IServiceScopeFactory scopes, IEmailSender sender,
             // Shutting down: the lease runs out and the mail is tried again.
             return;
         }
-        catch (EmailDeliveryException ex)
+        catch (MessageDeliveryException ex)
         {
             (error, transient, retryAfter) = (ex.Code, ex.Transient, ex.RetryAfter);
         }
@@ -175,7 +184,7 @@ public sealed class MailOutbox(IServiceScopeFactory scopes, IEmailSender sender,
                 .SetProperty(m => m.Status, MailOutboxStatus.Sent)
                 .SetProperty(m => m.SentAt, now)
                 .SetProperty(m => m.LastError, (string?)null), CancellationToken.None);
-            logger.LogInformation("Mail {MailId} for user {RecipientId} sent", mail.Id, mail.RecipientId);
+            logger.LogInformation("{Channel} message {MailId} for user {RecipientId} sent", mail.Channel, mail.Id, mail.RecipientId);
             return;
         }
 
@@ -184,12 +193,12 @@ public sealed class MailOutbox(IServiceScopeFactory scopes, IEmailSender sender,
         {
             var next = now + RetryDelay(mail.Attempts, retryAfter);
             await rows.ExecuteUpdateAsync(s => s.SetProperty(m => m.NextAttemptAt, next).SetProperty(m => m.LastError, error), CancellationToken.None);
-            logger.LogWarning("Mail {MailId} not sent ({Error}), attempt {Attempt}; retrying at {Next}", mail.Id, error, mail.Attempts, next);
+            logger.LogWarning("{Channel} message {MailId} not sent ({Error}), attempt {Attempt}; retrying at {Next}", mail.Channel, mail.Id, error, mail.Attempts, next);
         }
         else
         {
             await rows.ExecuteUpdateAsync(s => s.SetProperty(m => m.Status, MailOutboxStatus.Failed).SetProperty(m => m.LastError, error), CancellationToken.None);
-            logger.LogError("Mail {MailId} for user {RecipientId} failed permanently ({Error}) after {Attempts} attempts", mail.Id, mail.RecipientId, error, mail.Attempts);
+            logger.LogError("{Channel} message {MailId} for user {RecipientId} failed permanently ({Error}) after {Attempts} attempts", mail.Channel, mail.Id, mail.RecipientId, error, mail.Attempts);
         }
     }
 }

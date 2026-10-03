@@ -101,7 +101,7 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
         var project = await CreateTeamProjectAsync();
         try
         {
-            Assert.Equal(new NotificationPreferencesResponse(true, true), await As(David).GetFromJsonAsync<NotificationPreferencesResponse>("/api/v1/me/notification-preferences"));
+            Assert.Equal(new NotificationPreferencesResponse(true, true, false, true), await As(David).GetFromJsonAsync<NotificationPreferencesResponse>("/api/v1/me/notification-preferences"));
 
             await SetPreferencesAsync(David, inApp: true, email: false);
             var quiet = await CreateTaskAsync(Ben, project.Id, NewTask("Ohne Mail", assigneeId: David.Id));
@@ -112,7 +112,7 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
             Assert.DoesNotContain(await OutboxAsync(David), m => m.Message.Subject.Contains("Ohne Mail"));
             Assert.Empty(await ForAsync(David, mailOnly.Id));
             Assert.Contains(await OutboxAsync(David), m => m.Message.Subject.Contains("Nur Mail"));
-            Assert.Equal(new NotificationPreferencesResponse(false, true), await As(David).GetFromJsonAsync<NotificationPreferencesResponse>("/api/v1/me/notification-preferences"));
+            Assert.Equal(new NotificationPreferencesResponse(false, true, false, true), await As(David).GetFromJsonAsync<NotificationPreferencesResponse>("/api/v1/me/notification-preferences"));
 
             var invalid = await As(David).PutAsJsonAsync("/api/v1/me/notification-preferences", new { inAppEnabled = true });
             Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

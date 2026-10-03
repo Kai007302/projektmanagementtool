@@ -194,6 +194,12 @@ function PreferencesForm() {
         />
         Per Mail
       </label>
+      {preferences?.webexAvailable && (
+        <label>
+          <input type="checkbox" checked={preferences.webexEnabled} onChange={(event) => void change({ webexEnabled: event.target.checked })} />
+          Per Webex
+        </label>
+      )}
       {message && (
         <p className="muted" role="status">
           {message}

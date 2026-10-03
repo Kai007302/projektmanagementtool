@@ -21,12 +21,14 @@ public sealed record NotificationResponse(
 
 public sealed record UnreadCountResponse(int Count);
 
-public sealed record NotificationPreferencesResponse(bool InAppEnabled, bool EmailEnabled);
+/// <summary>Channels of a person. <c>WebexAvailable</c> says whether Webex is set up at all (ADR 0011).</summary>
+public sealed record NotificationPreferencesResponse(bool InAppEnabled, bool EmailEnabled, bool WebexEnabled, bool WebexAvailable);
 
-public sealed record UpdatePreferencesRequest(bool? InAppEnabled, bool? EmailEnabled);
+/// <summary>Without <c>WebexEnabled</c> the Webex setting stays as it is.</summary>
+public sealed record UpdatePreferencesRequest(bool? InAppEnabled, bool? EmailEnabled, bool? WebexEnabled = null);
 
 /// <summary>A person's own notifications and settings. Nobody else's are ever reachable.</summary>
-public sealed class NotificationService(ProjectHubDbContext db, NotificationDispatcher dispatcher, TimeProvider clock)
+public sealed class NotificationService(ProjectHubDbContext db, NotificationDispatcher dispatcher, NotificationChannelOptions channels, TimeProvider clock)
 {
     public async Task<List<NotificationResponse>> ListAsync(UserContext user, bool unreadOnly, Paging paging, CancellationToken ct)
     {
@@ -85,7 +87,7 @@ public sealed class NotificationService(ProjectHubDbContext db, NotificationDisp
     {
         var preference = await db.Set<NotificationPreference>().AsNoTracking()
             .SingleOrDefaultAsync(p => p.OrganizationId == user.OrganizationId && p.UserId == user.UserId, ct) ?? new NotificationPreference();
-        return new NotificationPreferencesResponse(preference.InAppEnabled, preference.EmailEnabled);
+        return new NotificationPreferencesResponse(preference.InAppEnabled, preference.EmailEnabled, preference.WebexEnabled, channels.WebexAvailable);
     }
 
     public async Task<ServiceResult<NotificationPreferencesResponse>> UpdatePreferencesAsync(UserContext user, UpdatePreferencesRequest request, CancellationToken ct)
@@ -102,15 +104,17 @@ public sealed class NotificationService(ProjectHubDbContext db, NotificationDisp
 
         // Upsert: two tabs saving at once must not fail on the primary key.
         var now = clock.GetUtcNow();
+        var webex = request.WebexEnabled;
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
-             insert into notification_preference (organization_id, user_id, in_app_enabled, email_enabled, updated_at)
-             values ({user.OrganizationId}, {user.UserId}, {inApp}, {email}, {now})
+             insert into notification_preference (organization_id, user_id, in_app_enabled, email_enabled, webex_enabled, updated_at)
+             values ({user.OrganizationId}, {user.UserId}, {inApp}, {email}, coalesce({webex}, false), {now})
              on conflict (organization_id, user_id)
-             do update set in_app_enabled = excluded.in_app_enabled, email_enabled = excluded.email_enabled, updated_at = excluded.updated_at
+             do update set in_app_enabled = excluded.in_app_enabled, email_enabled = excluded.email_enabled,
+                 webex_enabled = coalesce({webex}, notification_preference.webex_enabled), updated_at = excluded.updated_at
              """,
             ct);
-        return new NotificationPreferencesResponse(inApp, email);
+        return await PreferencesAsync(user, ct);
     }
 
     private IQueryable<Notification> Own(UserContext user) =>

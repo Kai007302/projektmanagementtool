@@ -12,7 +12,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-006 | erlaubte Dateitypen | offen | Security/IT Vorgabe |
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
 | DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
-| DEC-009 | Webex OAuth App Ownership | offen | zentrale Unternehmens-App-Registrierung |
+| DEC-009 | Webex OAuth App Ownership | entschieden (Kai, 2026-10-03) | ein zentraler Bot der Organisation, kein OAuth je Person (ADR 0011) |
 | DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel |
 | DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
 | DEC-012 | Mail als Benutzer | offen | zunächst nein; nur System-Mailbox |

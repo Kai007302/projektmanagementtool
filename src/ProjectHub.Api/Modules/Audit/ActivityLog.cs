@@ -56,6 +56,9 @@ public static class ActivityActions
     public const string WhiteboardCreated = "WhiteboardCreated";
     public const string WhiteboardRenamed = "WhiteboardRenamed";
     public const string WhiteboardDeleted = "WhiteboardDeleted";
+    public const string WebexLinkAdded = "WebexLinkAdded";
+    public const string WebexLinkRemoved = "WebexLinkRemoved";
+    public const string WebexSpaceCreated = "WebexSpaceCreated";
     public const string CommentAdded = "CommentAdded";
     public const string AttachmentAdded = "AttachmentAdded";
     public const string AttachmentDeleted = "AttachmentDeleted";

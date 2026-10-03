@@ -25,6 +25,7 @@ public static class ApiResults
         ServiceError.Forbidden => Forbidden(result.Message ?? "Not allowed."),
         ServiceError.Validation => Validation(result.Field ?? "request", result.Message ?? "Invalid."),
         ServiceError.Conflict => Conflict(result.Message ?? "Conflict."),
+        ServiceError.Unavailable => Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "Bad Gateway", detail: result.Message),
         _ => throw new InvalidOperationException($"Unknown error {result.Error}."),
     };
 

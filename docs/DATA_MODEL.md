@@ -157,9 +157,17 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 ## Notifications
 
 - `notification`: eine Nachricht für genau eine Person (`user_id`) mit `type` (`task_assigned`, `task_comment_mention`, `knowledge_comment_mention`, `project_member_added`), Titel, optionalem Auszug (höchstens 200 Zeichen), Verweis auf die Ressource (`task`, `knowledge_article`, `project`) und `read_at`.
-- `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` bleibt bis Phase 9 ungenutzt.
-- `mail_outbox`: eine Mail an eine Person mit Adresse, Betreff und Text (nur Titel und Link), `status` (`pending`, `sent`, `failed`), `attempts`, `next_attempt_at` (nächster Versuch bzw. Ende der Sperrfrist während des Versands) und `last_error` (nur HTTP-Status und Graph-Fehlercode). Verschickte Zeilen werden nach 7 Tagen gelöscht, fehlgeschlagene nach 30 Tagen.
-- Zustellung und Mail siehe ADR 0008 und ADR 0010.
+- `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` schaltet Direktnachrichten des Webex-Bots ein (Standard aus).
+- `mail_outbox`: eine ausgehende Benachrichtigung an eine Person über `channel` (`email`, `webex`; Migration 010) mit Adresse, Betreff und Text (nur Titel und Link), `status` (`pending`, `sent`, `failed`), `attempts`, `next_attempt_at` (nächster Versuch bzw. Ende der Sperrfrist während des Versands) und `last_error` (nur HTTP-Status und Graph-Fehlercode). Verschickte Zeilen werden nach 7 Tagen gelöscht, fehlgeschlagene nach 30 Tagen.
+- Zustellung und Mail siehe ADR 0008 und ADR 0010, Webex ADR 0011.
+
+## Webex
+
+Migration 010 (ADR 0011):
+
+- `project_webex_link`: Meeting- oder Raum-Link eines Projekts mit `kind` (`meeting`, `space`), `title` (1–200), `url` (höchstens 2000), `status` (`active`, `disconnected`) und `created_by`. Vom Bot angelegte Räume tragen `room_id`; je Projekt höchstens ein aktiver Raum mit `room_id`.
+- `webhook_event`: angenommene Webhook-Zustellungen mit `provider`, `event_key` (eindeutig je Provider), `resource`, `event`, `correlation_id`, `received_at`. Nach 30 Tagen gelöscht.
+- Die vorhandenen Tabellen `integration` und `webhook_subscription` halten die Webex-Integration der Organisation und die registrierten Webhooks (`last_event_at`).
 
 ## Whiteboard
 

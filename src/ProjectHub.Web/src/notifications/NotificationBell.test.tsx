@@ -34,7 +34,7 @@ function routes(unread = 1) {
   return {
     'GET /api/v1/me/notifications/unread-count': () => json({ count: unread }),
     'GET /api/v1/me/notifications?limit=30': () => json({ items: [assigned, mentioned], nextOffset: null }),
-    'GET /api/v1/me/notification-preferences': () => json({ inAppEnabled: true, emailEnabled: true }),
+    'GET /api/v1/me/notification-preferences': () => json({ inAppEnabled: true, emailEnabled: true, webexEnabled: false, webexAvailable: false }),
     'POST /api/v1/notifications/n-1/read': () => new Response(null, { status: 204 }),
     'POST /api/v1/me/notifications/read-all': () => new Response(null, { status: 204 }),
     'PUT /api/v1/me/notification-preferences': (init: RequestInit | undefined) => json(JSON.parse(String(init?.body))),
@@ -114,7 +114,24 @@ describe('NotificationBell', () => {
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'PUT /api/v1/me/notification-preferences')?.init?.body))).toEqual({
       inAppEnabled: true,
       emailEnabled: false,
+      webexEnabled: false,
     })
     expect(mail).not.toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Per Webex' })).not.toBeInTheDocument()
+  })
+
+  it('offers Webex when it is set up', async () => {
+    const api = fakeApi({
+      ...routes(),
+      'GET /api/v1/me/notification-preferences': () => json({ inAppEnabled: true, emailEnabled: true, webexEnabled: false, webexAvailable: true }),
+    })
+    render(<NotificationBell onOpen={vi.fn()} />)
+
+    await userEvent.click(await bell())
+    const webex = await screen.findByRole('checkbox', { name: 'Per Webex' })
+    await userEvent.click(webex)
+
+    expect(await screen.findByText('Gespeichert.')).toBeInTheDocument()
+    expect(JSON.parse(String(api.calls.find((c) => c.key === 'PUT /api/v1/me/notification-preferences')?.init?.body))).toMatchObject({ webexEnabled: true })
   })
 })

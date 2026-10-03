@@ -10,7 +10,7 @@ namespace ProjectHub.Api.Modules.Notifications;
 public sealed record MailOutboxStatusResponse(
     int Pending, int Retrying, int Failed, int SentLast24Hours, DateTimeOffset? OldestPendingAt, IReadOnlyList<MailProblemResponse> Problems);
 
-public sealed record MailProblemResponse(Guid Id, Guid RecipientId, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAt, DateTimeOffset NextAttemptAt);
+public sealed record MailProblemResponse(Guid Id, Guid RecipientId, string Channel, string Status, int Attempts, string? LastError, DateTimeOffset CreatedAt, DateTimeOffset NextAttemptAt);
 
 public sealed class MailOutboxAdminService(ProjectHubDbContext db, IAuditLog audit, MailOutboxSignal signal, TimeProvider clock)
 {
@@ -40,7 +40,7 @@ public sealed class MailOutboxAdminService(ProjectHubDbContext db, IAuditLog aud
             .Where(m => m.Status == MailOutboxStatus.Failed || (m.Status == MailOutboxStatus.Pending && m.LastError != null))
             .OrderByDescending(m => m.CreatedAt)
             .Take(MaxProblems)
-            .Select(m => new MailProblemResponse(m.Id, m.RecipientId, m.Status, m.Attempts, m.LastError, m.CreatedAt, m.NextAttemptAt))
+            .Select(m => new MailProblemResponse(m.Id, m.RecipientId, m.Channel, m.Status, m.Attempts, m.LastError, m.CreatedAt, m.NextAttemptAt))
             .ToListAsync(ct);
 
         return new MailOutboxStatusResponse(
