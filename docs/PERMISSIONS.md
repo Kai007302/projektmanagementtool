@@ -109,6 +109,12 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Über eigene Aktionen gibt es keine Benachrichtigung.
 - Mails enthalten nur Titel und Link, keine Kommentartexte (ADR 0008).
 - Der Realtime-Hub `/api/v1/hubs/notifications` stellt nur an die angemeldete Person zu und überträgt nur den Zähler.
+- Den Zustand der Mail-Warteschlange (`/admin/mail-outbox`) sehen nur Organisations-Admins, und nur für ihre Organisation. Antworten enthalten weder Adressen noch Betreff. Erneutes Versenden einer fehlgeschlagenen Mail steht im `audit_log`.
+
+## Kalender
+
+- Kalenderdateien für Aufgaben und Meilensteine bekommt, wer das Projekt sehen darf (View). Sonst „nicht gefunden“ (404).
+- Sie enthalten nur Titel, Datum und einen Link in die App.
 
 ## Identität
 

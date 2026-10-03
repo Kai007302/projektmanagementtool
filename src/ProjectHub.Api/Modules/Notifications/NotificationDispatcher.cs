@@ -16,10 +16,11 @@ public sealed record NotificationOptions(string AppUrl)
 /// <summary>
 /// Delivers notifications on the channels each recipient wants. Runs after the change that caused them
 /// was committed, in its own unit of work: a failure here is logged and never undoes or fails that change.
+/// Mails go to the outbox in the same transaction as the in-app notifications (ADR 0010).
 /// </summary>
 public sealed class NotificationDispatcher(
     IServiceScopeFactory scopes,
-    IEmailSender email,
+    MailOutboxSignal outbox,
     IHubContext<NotificationsHub, INotificationsClient> hub,
     NotificationOptions options,
     TimeProvider clock,
@@ -53,7 +54,7 @@ public sealed class NotificationDispatcher(
                 .ToDictionaryAsync(p => p.UserId, ct);
 
             var now = clock.GetUtcNow();
-            var mails = new List<EmailMessage>();
+            var mails = 0;
             var inApp = new HashSet<Guid>();
             foreach (var draft in drafts.Where(d => recipients.ContainsKey(d.RecipientId)))
             {
@@ -78,16 +79,25 @@ public sealed class NotificationDispatcher(
                 if (preference.EmailEnabled)
                 {
                     // Mails carry no content beyond the title, so mailboxes never keep what access rules may later hide.
-                    mails.Add(new EmailMessage(
-                        organizationId, draft.RecipientId, recipients[draft.RecipientId].Email, draft.Title,
-                        $"{draft.Title}\n\nIn ProjectHub öffnen: {options.AppUrl}"));
+                    db.Set<MailOutboxEntry>().Add(new MailOutboxEntry
+                    {
+                        Id = Guid.CreateVersion7(),
+                        OrganizationId = organizationId,
+                        RecipientId = draft.RecipientId,
+                        ToAddress = recipients[draft.RecipientId].Email,
+                        Subject = draft.Title,
+                        Body = $"{draft.Title}\n\nIn ProjectHub öffnen: {options.AppUrl}",
+                        NextAttemptAt = now,
+                        CreatedAt = now,
+                    });
+                    mails++;
                 }
             }
 
             await db.SaveChangesAsync(ct);
-            foreach (var mail in mails)
+            if (mails > 0)
             {
-                await email.SendAsync(mail, ct);
+                outbox.Notify();
             }
 
             foreach (var userId in inApp)

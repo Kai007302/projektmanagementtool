@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
 using static ProjectHub.Api.Modules.Identity.Development.DevelopmentSeedData;
@@ -29,6 +31,15 @@ public abstract class ApiTestBase(InfrastructureFixture infrastructure) : IAsync
         new(Infrastructure.Postgres.GetConnectionString(), Infrastructure.Redis.GetConnectionString());
 
     protected HttpClient As(SeedUser user) => Factory.CreateClientFor(user);
+
+    /// <summary>Sends everything due in the mail outbox (the background worker is off in tests).</summary>
+    protected async Task DeliverMailsAsync()
+    {
+        var outbox = Factory.Services.GetRequiredService<MailOutbox>();
+        while (await outbox.SendDueAsync(CancellationToken.None) == MailOutbox.BatchSize)
+        {
+        }
+    }
 
     /// <summary>Creates a project owned by <paramref name="owner"/> with the given additional members.</summary>
     protected async Task<ProjectSummary> CreateProjectAsync(SeedUser owner, params (SeedUser User, string Role)[] members)

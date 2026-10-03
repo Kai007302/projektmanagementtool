@@ -31,6 +31,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-025 | Einstellungen für Benachrichtigungen | offen | je Kanal (In-App, Mail), nicht je Ereignistyp; Standard: beides an |
 | DEC-026 | Worüber benachrichtigt wird | offen | Zuweisung einer Aufgabe, `@`-Erwähnung (Aufgaben- und Wissenskommentare), Aufnahme in ein Projekt; nie über eigene Aktionen. Fälligkeitserinnerungen folgen später (brauchen einen Hintergrundjob) |
 | DEC-027 | Wer Whiteboards pflegt | offen | ansehen: View; zeichnen: Contribute (wie Aufgaben); anlegen, umbenennen, löschen: Edit |
+| DEC-028 | Outlook-Termine aus Aufgaben und Meilensteinen | offen | ohne Graph-Berechtigung: `.ics`-Datei und Outlook-Deeplink im Browser. Delegiertes `Calendars.ReadWrite` (Termin ohne eigenen Klick in Outlook) erst bei konkretem Bedarf |
+| DEC-029 | Mail-Warteschlange bis Azure | entschieden (Kai, 2026-10-03) | Tabelle `mail_outbox` in PostgreSQL mit Hintergrund-Worker (ADR 0010); Service Bus später dahinter |
 
 
 ## Knowledge / AI

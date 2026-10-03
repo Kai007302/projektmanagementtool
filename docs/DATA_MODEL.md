@@ -12,6 +12,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `006_knowledge_visibility_search.sql`: `knowledge_article.visibility` (`organization`/`restricted`, DEC-020), `knowledge_article.search_text` (Klartext des aktuellen Inhalts) und ein GIN-Index für die Volltextsuche (`german`) über Titel, Zusammenfassung und `search_text`
 - `007_notification_unread.sql`: Teilindex auf ungelesene Benachrichtigungen je Person (Zähler der Glocke)
 - `008_whiteboard_updates.sql`: `whiteboard_update` (angenommene Yjs-Updates seit dem letzten Snapshot) und Indizes für Whiteboards je Projekt und Verweise je Aufgabe
+- `009_mail_outbox.sql`: `mail_outbox` (Benachrichtigungsmails bis zum Versand, ADR 0010)
 
 ## Regeln
 
@@ -157,7 +158,8 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 
 - `notification`: eine Nachricht für genau eine Person (`user_id`) mit `type` (`task_assigned`, `task_comment_mention`, `knowledge_comment_mention`, `project_member_added`), Titel, optionalem Auszug (höchstens 200 Zeichen), Verweis auf die Ressource (`task`, `knowledge_article`, `project`) und `read_at`.
 - `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` bleibt bis Phase 9 ungenutzt.
-- Zustellung und Mail siehe ADR 0008.
+- `mail_outbox`: eine Mail an eine Person mit Adresse, Betreff und Text (nur Titel und Link), `status` (`pending`, `sent`, `failed`), `attempts`, `next_attempt_at` (nächster Versuch bzw. Ende der Sperrfrist während des Versands) und `last_error` (nur HTTP-Status und Graph-Fehlercode). Verschickte Zeilen werden nach 7 Tagen gelöscht, fehlgeschlagene nach 30 Tagen.
+- Zustellung und Mail siehe ADR 0008 und ADR 0010.
 
 ## Whiteboard
 

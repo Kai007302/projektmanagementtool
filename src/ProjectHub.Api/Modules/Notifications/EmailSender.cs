@@ -6,10 +6,27 @@ public sealed record EmailMessage(Guid OrganizationId, Guid RecipientId, string 
 
 public sealed record SentEmail(Guid Id, EmailMessage Message, DateTimeOffset SentAt);
 
-/// <summary>Sends notification mails. Phase 8 replaces the fake with Microsoft Graph behind this interface.</summary>
+/// <summary>
+/// Hands a notification mail to the mail system (port, ADR 0010). Only the outbox worker calls this; modules write
+/// to the outbox. Throws <see cref="EmailDeliveryException"/> when the mail was not accepted.
+/// </summary>
 public interface IEmailSender
 {
     Task SendAsync(EmailMessage message, CancellationToken ct);
+}
+
+/// <summary>
+/// The mail system did not accept a mail. <paramref name="Code"/> names the cause without addresses or content
+/// (for example "429 ApplicationThrottled"); transient failures are retried, permanent ones are not.
+/// </summary>
+public sealed class EmailDeliveryException(string code, bool transient, TimeSpan? retryAfter = null, Exception? inner = null)
+    : Exception($"Mail delivery failed: {code}", inner)
+{
+    public string Code { get; } = code;
+
+    public bool Transient { get; } = transient;
+
+    public TimeSpan? RetryAfter { get; } = retryAfter;
 }
 
 /// <summary>

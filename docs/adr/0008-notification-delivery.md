@@ -19,5 +19,6 @@ Phase 6 bringt Benachrichtigungen in der App und per Mail. `docs/INTEGRATIONS.md
 ## Konsequenzen
 
 - Zustellung ist derzeit „höchstens einmal“: stürzt der Prozess zwischen Commit und Zustellung ab, fehlt die Benachrichtigung. Mit Phase 8 wandert der Mailversand hinter Service Bus (Outbox), damit Graph-Ausfälle nachgeholt werden.
+- Nachtrag Phase 8: Mails laufen über die Outbox in PostgreSQL (ADR 0010) und werden zusammen mit den In-App-Benachrichtigungen gespeichert.
 - Titel der Benachrichtigung sind Momentaufnahmen (z. B. Aufgabentitel zum Zeitpunkt der Zuweisung). Öffnen prüft die Rechte wie immer über die API.
 - Einstellungen gibt es je Kanal, nicht je Typ (DEC-025).

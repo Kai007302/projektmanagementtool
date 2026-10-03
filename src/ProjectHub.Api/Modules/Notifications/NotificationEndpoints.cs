@@ -15,8 +15,12 @@ public static class NotificationEndpoints
     public static IServiceCollection AddNotificationsModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton(new NotificationOptions(configuration[NotificationOptions.AppUrlKey] ?? "http://localhost:5173"));
-        services.AddSingleton<FakeEmailSender>();
-        services.AddSingleton<IEmailSender>(sp => sp.GetRequiredService<FakeEmailSender>());
+        // IEmailSender (fake or Microsoft Graph) is chosen by AddMailTransport.
+        services.AddSingleton(MailOutboxOptions.FromConfiguration(configuration));
+        services.AddSingleton<MailOutboxSignal>();
+        services.AddSingleton<MailOutbox>();
+        services.AddHostedService<MailOutboxWorker>();
+        services.AddScoped<MailOutboxAdminService>();
         services.AddSingleton<NotificationDispatcher>();
         services.AddScoped<NotificationService>();
         services.AddScoped<NotificationHandlers>();
@@ -50,6 +54,12 @@ public static class NotificationEndpoints
             await service.MarkAllReadAsync(user, ct);
             return Results.NoContent();
         });
+
+        api.MapGet("/admin/mail-outbox", async (UserContext user, MailOutboxAdminService service, CancellationToken ct) =>
+            ApiResults.Ok(await service.StatusAsync(user, ct)));
+
+        api.MapPost("/admin/mail-outbox/{id:guid}/retry", async (Guid id, UserContext user, MailOutboxAdminService service, CancellationToken ct) =>
+            ApiResults.NoContent(await service.RetryAsync(user, id, ct)));
 
         api.MapGet("/me/notification-preferences", async (UserContext user, NotificationService service, CancellationToken ct) =>
             Results.Ok(await service.PreferencesAsync(user, ct)));

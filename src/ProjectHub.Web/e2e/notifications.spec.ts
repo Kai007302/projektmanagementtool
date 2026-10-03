@@ -50,8 +50,9 @@ test('an assignment shows up live in the bell, opens the task and respects the m
     await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: second, assigneeId: clara })
     await expect(bell).toHaveAccessibleName('Benachrichtigungen, 1 ungelesen')
 
+    // Mails leave through the outbox in the background (ADR 0010), right after the notification is stored.
+    await expect.poll(async () => (await api<Mail[]>(request, 'dev-clara', 'GET', '/dev/outbox')).some((m) => m.subject.includes(task))).toBe(true)
     const outbox = await api<Mail[]>(request, 'dev-clara', 'GET', '/dev/outbox')
-    expect(outbox.some((m) => m.subject.includes(task))).toBe(true)
     expect(outbox.some((m) => m.subject.includes(second))).toBe(false)
     expect(outbox.find((m) => m.subject.includes(task))?.body).not.toContain('Kommentar')
     await expectAlertFree(page)
