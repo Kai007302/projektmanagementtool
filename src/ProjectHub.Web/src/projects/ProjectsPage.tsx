@@ -3,7 +3,7 @@ import type { Me } from '../identity/api'
 import { createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
 import { ProjectView } from './ProjectView'
 
-export function ProjectsPage({ me }: { me: Me }) {
+export function ProjectsPage({ me, onOpenArticle }: { me: Me; onOpenArticle?: (id: string) => void }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -23,6 +23,7 @@ export function ProjectsPage({ me }: { me: Me }) {
         key={selected}
         projectId={selected}
         me={me}
+        onOpenArticle={onOpenArticle}
         onBack={() => {
           setSelected(null)
           load()

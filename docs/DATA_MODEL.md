@@ -9,6 +9,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `003_identity_organization.sql`: `organization.entra_tenant_id`, `app_user.organization_role`
 - `004_project_soft_delete.sql`: `project.deleted_at` (Projekte werden nur weich gelöscht)
 - `005_kanban_column_status.sql`: `kanban_column.task_status`. Jede Spalte steht für einen Task-Status; die Spalte einer Karte ergibt sich aus Status, `task.kanban_column_id` und `task.board_position` (Kanban bleibt eine Ansicht auf Tasks)
+- `006_knowledge_visibility_search.sql`: `knowledge_article.visibility` (`organization`/`restricted`, DEC-020), `knowledge_article.search_text` (Klartext des aktuellen Inhalts) und ein GIN-Index für die Volltextsuche (`german`) über Titel, Zusammenfassung und `search_text`
 
 ## Regeln
 
@@ -88,6 +89,25 @@ change_note
 
 `content_json` beschreibt Block-Inhalte des Editors. Keine business-kritische Information wird ausschließlich als unstrukturiertes HTML persistiert.
 
+Format (`BlockContent` im Backend prüft und normalisiert, unbekannte Felder werden verworfen):
+
+```json
+{ "blocks": [ { "id": "…", "type": "paragraph", "text": "…" } ] }
+```
+
+| Typ | Felder |
+|---|---|
+| `heading` | `level` (1–3), `text` |
+| `paragraph`, `quote` | `text` |
+| `callout` | `tone` (`info`/`warning`/`success`), `text` |
+| `code` | `language` (optional), `code` |
+| `bullet_list`, `numbered_list` | `items` (Texte) |
+| `checklist` | `items` (`text`, `checked`) |
+| `image` / `file` / `link` | `url` (nur `http(s)` oder Pfad mit `/`), `alt` / `name` / `label` |
+| `task_reference` / `project_reference` / `knowledge_reference` | `taskId` / `projectId` / `articleId` |
+
+Jede Speicherung erzeugt eine neue Version (`version_number` fortlaufend); Wiederherstellen speichert den alten Inhalt als neue Version. `knowledge_article.search_text` hält den Klartext der aktuellen Version für die Suche.
+
 ## KnowledgeRelation
 
 ```text
@@ -120,7 +140,7 @@ Kommentare auf Knowledge Articles. @Mentions verwenden die bestehende Notificati
 
 ## KnowledgePermission
 
-Knowledge kann auf Organization-, Team- oder expliziter User-Ebene sichtbar gemacht werden. Backend-Authorization ist verbindlich.
+Knowledge kann auf Organization-, Team- oder expliziter User-Ebene sichtbar gemacht werden. Backend-Authorization ist verbindlich. Regeln: `docs/PERMISSIONS.md` (Abschnitt Wissen).
 
 ## Cross-domain references
 
@@ -131,7 +151,7 @@ Knowledge kann referenzieren:
 - Team
 - Whiteboard
 
-Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State.
+Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State. Whiteboard-Verweise folgen mit dem Whiteboard-Modul (DEC-022).
 
 
 # Identity & Organization (Migration 003)

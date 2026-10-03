@@ -10,6 +10,11 @@ Read first:
 - `docs/OPEN_DECISIONS.md`
 - `database/migrations/002_knowledge.sql`
 
+## Umsetzung in zwei Teilen
+
+- Teil 1: Domäne, Rechte (DEC-020/021), Versionen, Suche, Block-Editor, Beziehungen, Verweise, Kommentare, Wissen im Projekt. Verweise auf Whiteboards folgen mit Phase 7 (DEC-022).
+- Teil 2: Knowledge Galaxy (Renderer-Bewertung mit mehreren hundert Knoten) und die E2E-Tests für den Artikel-Ablauf und die Galaxy-Navigation.
+
 ## Goal
 
 Implement the Knowledge Hub as a first-class domain module.

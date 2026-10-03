@@ -63,6 +63,38 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 
 Team-Anlage und Mitgliederänderungen werden im `audit_log` protokolliert (`TeamCreated`, `TeamMemberAdded`, `TeamMemberRemoved`).
 
+## Wissen (Knowledge Hub)
+
+Rechte je Artikel: Lesen, Bearbeiten, Verwalten. Sie ergeben sich aus (das höchste gilt):
+
+| Quelle | Recht |
+|---|---|
+| Organisations-Admin | Verwalten (alle Artikel der Organisation) |
+| verantwortliche Person (`owner_id`, beim Anlegen die anlegende Person) | Verwalten |
+| Freigabe für die Person oder eines ihrer Teams (`knowledge_permission`: `view`/`edit`/`admin`) | Lesen/Bearbeiten/Verwalten |
+| Artikel ist veröffentlicht oder archiviert und hat die Sichtbarkeit `organization` | Lesen (DEC-020) |
+
+Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte hat. Artikel mit Sichtbarkeit `restricted` sind ausschließlich über Freigaben sichtbar.
+
+| Aktion | benötigtes Recht |
+|---|---|
+| Artikel anlegen | jeder aktive Benutzer der Organisation; wird verantwortliche Person |
+| Artikel, Versionen, Beziehungen, Verweise, Kommentare lesen | Lesen |
+| Kommentieren | Lesen |
+| Inhalt speichern (neue Version), Metadaten, Tags, Beziehungen, Verweise ändern, Version wiederherstellen | Bearbeiten |
+| Entwurf ⇄ In Prüfung | Bearbeiten |
+| Veröffentlichen, Archivieren, Veröffentlichtes zurück in Entwurf | Verwalten (DEC-021) |
+| Sichtbarkeit ändern, Freigaben verwalten, Artikel löschen | Verwalten |
+| Kommentar bearbeiten | nur die Autorin/der Autor |
+| Kommentar löschen | Autorin/Autor oder Verwalten |
+| Erwähnen (`@`) | nur Personen, die den Artikel lesen dürfen |
+| Wissensbereiche anlegen und ändern | Organisations-Admin |
+
+- Nicht sichtbare Artikel sind „nicht gefunden“ (404), sichtbare ohne ausreichendes Recht „verboten“ (403).
+- Beziehungen und Verweise zeigen nur Ziele, die die lesende Person selbst sehen darf. Neue Beziehungen und Verweise (auch Verweis-Blöcke im Inhalt) brauchen ein sichtbares Ziel.
+- Suche und alle späteren AI-Schnittstellen (`IKnowledgeSearch`, `IKnowledgeSemanticSearch`, `IKnowledgeAnswerService`) bekommen den `KnowledgeReader` und filtern in der Datenbankabfrage; nicht lesbare Inhalte verlassen die Datenbank nicht.
+- Statuswechsel, Sichtbarkeit, Freigaben, Anlage und Löschung werden im `audit_log` protokolliert.
+
 ## Identität
 
 - Außerhalb von Development: Microsoft Entra ID. Die API validiert Bearer-Tokens gegen `https://login.microsoftonline.com/{ENTRA_TENANT_ID}/v2.0` mit Audience `ENTRA_CLIENT_ID`. Die App-Registrierung selbst ist ein Human Review Gate; ohne sie ist kein Login möglich (401). Der Login-Flow im Frontend (MSAL) folgt, sobald die Registrierung existiert.

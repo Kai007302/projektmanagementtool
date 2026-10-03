@@ -23,6 +23,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-017 | Ablage von Dateianhängen | offen | lokal hinter `IAttachmentStorage` (Development); produktiv Azure Blob Storage mit Virenscan, Umsetzung mit Azure-Anbindung |
 | DEC-018 | WIP-Limit im Kanban | offen | nur Hinweis (Spalte wird rot markiert), kein Sperren beim Verschieben |
 | DEC-019 | Was das Board zeigt | offen | Aufgaben der obersten Ebene; Unteraufgaben als Zähler auf der Karte |
+| DEC-020 | Sichtbarkeit veröffentlichten Wissens | entschieden (Kai, 2026-10-03) | veröffentlichte und archivierte Artikel lesen alle in der Organisation; einzelne Artikel können auf „eingeschränkt“ gestellt werden und sind dann nur über Freigaben sichtbar. Entwürfe und Artikel in Prüfung sind nie organisationsweit sichtbar |
+| DEC-021 | Wer Wissensartikel veröffentlicht | offen | Artikel-Admins: Organisations-Admins, die verantwortliche Person (Owner) und Personen/Teams mit Freigabe „Verwalten“. Zur Prüfung geben darf, wer bearbeiten darf |
+| DEC-022 | Verweise von Wissen auf Whiteboards | offen | erst mit dem Whiteboard-Modul (Phase 7); bis dahin lehnt die API `whiteboard` als Verweisziel ab |
 
 
 ## Knowledge / AI
@@ -38,6 +41,6 @@ Status: open
 Choose between enterprise-approved Azure OpenAI / another approved provider. No external provider is assumed until company security/privacy approval.
 
 ### Knowledge visibility model
-Status: open
+Status: decided (DEC-020)
 
-Confirm whether published Knowledge defaults to organization-wide visibility or requires explicit permissions.
+Published knowledge is organization-wide by default; single articles can be restricted to explicit user/team permissions.

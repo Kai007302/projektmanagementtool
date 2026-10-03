@@ -2,19 +2,20 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import { KanbanBoard } from '../kanban/KanbanBoard'
+import { ProjectKnowledge } from '../knowledge/ProjectKnowledge'
 import { useProjectEvents } from '../realtime/projectEvents'
 import { TaskBoard } from '../tasks/TaskBoard'
 import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 
-type Props = { projectId: string; me: Me; onBack: () => void }
+type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void }
 
 type View = 'board' | 'list'
 
 const viewText: Record<View, string> = { board: 'Board', list: 'Liste' }
 
-export function ProjectView({ projectId, me, onBack }: Props) {
+export function ProjectView({ projectId, me, onBack, onOpenArticle }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
@@ -91,6 +92,7 @@ export function ProjectView({ projectId, me, onBack }: Props) {
             )}
             <aside className="project-side">
               <MembersPanel project={project} onChanged={changed} />
+              <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />
               <ActivityFeed projectId={project.id} revision={revision} />
             </aside>
           </div>

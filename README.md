@@ -79,6 +79,7 @@ Fachliche Endpunkte unter `/api/v1` (Auszug):
 | Kommentare | `GET/POST /tasks/{id}/comments`, `PATCH/DELETE /comments/{id}` |
 | Dateien | `GET/POST /tasks/{id}/attachments`, `GET /attachments/{id}/content`, `DELETE /attachments/{id}` |
 | Kanban | `GET /projects/{id}/board`, `POST /projects/{id}/board/columns`, `PATCH/DELETE /board-columns/{id}`, `POST /board-columns/{id}/move`, `POST /tasks/{id}/move` |
+| Wissen | `GET/POST /knowledge/spaces`, `PATCH /knowledge/spaces/{id}`, `GET/POST /knowledge/articles` (Suche `q`, Filter `type`, `status`, `spaceId`, `tag`), `GET/PATCH/DELETE /knowledge/articles/{id}`, `PUT /knowledge/articles/{id}/content`, `POST /knowledge/articles/{id}/status`, `GET /knowledge/articles/{id}/versions[/{n}]`, `POST /knowledge/articles/{id}/versions/{n}/restore`, `PUT /knowledge/articles/{id}/tags`, `GET /knowledge/tags`, `GET/PUT /knowledge/articles/{id}/permissions`, `POST /knowledge/articles/{id}/relations`, `DELETE /knowledge/relations/{id}`, `POST /knowledge/articles/{id}/references`, `DELETE /knowledge/references/{id}`, `GET/POST /knowledge/articles/{id}/comments`, `PATCH/DELETE /knowledge/comments/{id}`, `GET /projects/{id}/knowledge`, `GET /tasks/{id}/knowledge`, `GET /teams/{id}/knowledge` |
 | Realtime | SignalR-Hub `/api/v1/hubs/projects` (Methode `JoinProject`, Nachricht `ProjectChanged`), Fan-out über Redis |
 
 Listen sind seitenweise (`limit` bis 100, `offset`). `PATCH` erwartet die aktuelle `version` und antwortet bei veralteter Version mit 409.
