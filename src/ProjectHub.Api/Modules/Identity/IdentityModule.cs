@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Identity.Development;
 
 namespace ProjectHub.Api.Modules.Identity;
@@ -9,6 +10,8 @@ public static class IdentityModule
     {
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+        services.AddScoped(provider => UserContextMiddleware.FromHttpContext(provider.GetRequiredService<IHttpContextAccessor>()));
+        services.AddScoped<IProjectHubAuthorization, ProjectHubAuthorization>();
 
         if (environment.IsDevelopment())
         {
@@ -16,8 +19,7 @@ public static class IdentityModule
         }
         else
         {
-            // Entra ID / OIDC is wired up in phase 1. Until then nothing outside Development can authenticate.
-            services.AddAuthentication();
+            services.AddEntraIdAuthentication(configuration);
         }
 
         // Secure by default: every endpoint requires an authenticated user unless it opts out explicitly.
@@ -26,4 +28,15 @@ public static class IdentityModule
 
         return services;
     }
+
+    public const string ApiV1Prefix = "/api/v1";
+
+    /// <summary>Resolves the <see cref="UserContext"/> for /api/v1. Must run after UseAuthorization.</summary>
+    public static IApplicationBuilder UseUserContext(this IApplicationBuilder app) =>
+        app.UseWhen(
+            context => context.Request.Path.StartsWithSegments(ApiV1Prefix),
+            branch => branch.UseMiddleware<UserContextMiddleware>());
+
+    public static RouteGroupBuilder MapApiV1(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGroup(ApiV1Prefix);
 }

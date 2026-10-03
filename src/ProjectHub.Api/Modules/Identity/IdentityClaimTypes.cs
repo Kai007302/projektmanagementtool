@@ -4,6 +4,7 @@ namespace ProjectHub.Api.Modules.Identity;
 public static class IdentityClaimTypes
 {
     public const string ObjectId = "oid";
+    public const string TenantId = "tid";
     public const string Name = "name";
     public const string Email = "preferred_username";
 }

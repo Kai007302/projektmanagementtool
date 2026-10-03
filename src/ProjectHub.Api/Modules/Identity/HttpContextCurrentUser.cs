@@ -10,6 +10,8 @@ internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcc
 
     public string? EntraObjectId => Principal?.FindFirstValue(IdentityClaimTypes.ObjectId);
 
+    public string? TenantId => Principal?.FindFirstValue(IdentityClaimTypes.TenantId);
+
     public string? DisplayName => Principal?.FindFirstValue(IdentityClaimTypes.Name);
 
     public string? Email => Principal?.FindFirstValue(IdentityClaimTypes.Email);

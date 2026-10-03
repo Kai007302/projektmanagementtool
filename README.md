@@ -83,7 +83,7 @@ npm run dev
 
 Die Variablen aus `.env.example` werden als Umgebungsvariablen gelesen. Für die lokale Entwicklung stehen dieselben Werte bereits in `src/ProjectHub.Api/appsettings.Development.json`; gesetzte Umgebungsvariablen haben Vorrang.
 
-Im Development-Modus meldet ein gekapselter Development-Identity-Provider jede Anfrage als synthetischen Benutzer an (`DevelopmentIdentity` in `appsettings.Development.json`). Außerhalb von Development startet die API mit diesem Provider nicht. Alle Endpunkte verlangen standardmäßig einen angemeldeten Benutzer; Ausnahmen wie die Health-Checks sind explizit markiert.
+Im Development-Modus legt die API beim Start synthetische Testdaten an (zwei Organisationen, Benutzer mit allen Rollen, Teams, Projekte; siehe `DevelopmentSeedData.cs`). Ein gekapselter Development-Identity-Provider meldet jede Anfrage als einen dieser Benutzer an: Standard ist `dev-ada` (Organisations-Admin), ein anderer lässt sich über den Header `X-Dev-User` bzw. im Frontend über „Dev-Anmeldung als“ wählen. Außerhalb von Development startet die API mit diesem Provider nicht. Alle Endpunkte verlangen standardmäßig einen angemeldeten Benutzer; Ausnahmen wie die Health-Checks sind explizit markiert. Rollen und Rechte: `docs/PERMISSIONS.md`.
 
 Für Microsoft/Webex werden in der lokalen Entwicklung Mock-/Fake-Provider eingesetzt. Produktive Zugangsdaten werden nie aus dem Repository geladen.
 
@@ -120,7 +120,7 @@ Vor jeder Implementierung zuerst lesen:
 1. `AGENTS.md`
 2. `docs/PRODUCT.md`
 3. `docs/ARCHITECTURE.md`
-4. `docs/SECURITY.md`
+4. `docs/SECURITY.md` und `docs/PERMISSIONS.md`
 5. `docs/DATA_MODEL.md`
 6. `docs/OPEN_DECISIONS.md`
 7. den relevanten Sprint-Prompt unter `ai/prompts/`
