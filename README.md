@@ -68,6 +68,19 @@ dotnet run --project src/ProjectHub.Api --launch-profile http
 - `GET /health/ready` → 200, wenn PostgreSQL und Redis erreichbar sind, sonst 503
 - OpenAPI (nur Development): http://localhost:5080/openapi/v1.json
 
+Fachliche Endpunkte unter `/api/v1` (Auszug):
+
+| Bereich | Endpunkte |
+|---|---|
+| Identität | `GET /me`, `GET /organization`, `GET /users` |
+| Teams | `GET/POST /teams`, `GET /teams/{id}`, `POST /teams/{id}/members`, `DELETE /teams/{id}/members/{userId}` |
+| Projekte | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST /projects/{id}/members`, `PATCH/DELETE /projects/{id}/members/{userId}`, `GET /projects/{id}/activity` |
+| Aufgaben | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` |
+| Kommentare | `GET/POST /tasks/{id}/comments`, `PATCH/DELETE /comments/{id}` |
+| Dateien | `GET/POST /tasks/{id}/attachments`, `GET /attachments/{id}/content`, `DELETE /attachments/{id}` |
+
+Listen sind seitenweise (`limit` bis 100, `offset`). `PATCH` erwartet die aktuelle `version` und antwortet bei veralteter Version mit 409.
+
 ### 3. Frontend
 
 ```bash

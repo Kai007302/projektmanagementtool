@@ -19,7 +19,16 @@ public interface IProjectHubAuthorization
     Task<bool> CanManageProjectAsync(UserContext user, Guid projectId, CancellationToken ct) =>
         HasProjectPermissionAsync(user, projectId, ProjectPermission.Manage, ct);
 
+    /// <summary>
+    /// Whether a user may be assigned tasks in a project: an active user of the organization
+    /// who holds <see cref="ProjectPermission.Contribute"/> on it.
+    /// </summary>
+    Task<bool> CanBeAssignedAsync(Guid organizationId, Guid projectId, Guid userId, CancellationToken ct);
+
     bool CanCreateTeam(UserContext user);
+
+    /// <summary>Every active user of an organization may create projects and becomes their admin (DEC-016).</summary>
+    bool CanCreateProject(UserContext user) => true;
 
     /// <summary>Organization admins and owners of the team. False for teams of other organizations.</summary>
     Task<bool> CanManageTeamAsync(UserContext user, Guid teamId, CancellationToken ct);

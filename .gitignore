@@ -13,3 +13,4 @@ obj/
 coverage/
 TestResults/
 .DS_Store
+.data/

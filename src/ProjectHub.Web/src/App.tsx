@@ -3,6 +3,7 @@ import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { getDevUser, setDevUser } from './identity/devUser'
+import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import './App.css'
 
@@ -19,11 +20,16 @@ const roleText: Record<Me['organizationRole'], string> = {
 
 type Session = { me: Me; organization: Organization }
 
+type Tab = 'projects' | 'teams'
+
+const tabText: Record<Tab, string> = { projects: 'Projekte', teams: 'Teams' }
+
 function App() {
   const [status, setStatus] = useState<ApiStatus>('checking')
   const [devUser, setDevUserState] = useState<string | null>(getDevUser)
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('projects')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -67,7 +73,28 @@ function App() {
       </header>
       <main className="content">
         {error && <p role="alert">{error}</p>}
-        {session && <TeamsPage key={session.me.id} me={session.me} />}
+        {session && (
+          <>
+            <nav className="tabs" aria-label="Bereiche">
+              {(Object.keys(tabText) as Tab[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={value === tab ? 'tab active' : 'tab'}
+                  aria-current={value === tab ? 'page' : undefined}
+                  onClick={() => setTab(value)}
+                >
+                  {tabText[value]}
+                </button>
+              ))}
+            </nav>
+            {tab === 'projects' ? (
+              <ProjectsPage key={session.me.id} me={session.me} />
+            ) : (
+              <TeamsPage key={session.me.id} me={session.me} />
+            )}
+          </>
+        )}
       </main>
       <footer className="app-footer">
         <span className={`status status-${status}`} role="status">

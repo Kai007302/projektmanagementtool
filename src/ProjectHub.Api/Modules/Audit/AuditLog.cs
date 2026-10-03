@@ -10,6 +10,12 @@ public static class AuditActions
     public const string TeamCreated = "TeamCreated";
     public const string TeamMemberAdded = "TeamMemberAdded";
     public const string TeamMemberRemoved = "TeamMemberRemoved";
+    public const string ProjectCreated = "ProjectCreated";
+    public const string ProjectDeleted = "ProjectDeleted";
+    public const string ProjectMemberAdded = "ProjectMemberAdded";
+    public const string ProjectMemberRoleChanged = "ProjectMemberRoleChanged";
+    public const string ProjectMemberRemoved = "ProjectMemberRemoved";
+    public const string TaskDeleted = "TaskDeleted";
 }
 
 public interface IAuditLog
@@ -41,5 +47,7 @@ internal sealed class AuditLog(ProjectHubDbContext db, TimeProvider clock) : IAu
 public static class AuditModule
 {
     public static IServiceCollection AddAuditModule(this IServiceCollection services) =>
-        services.AddScoped<IAuditLog, AuditLog>();
+        services
+            .AddScoped<IAuditLog, AuditLog>()
+            .AddScoped<IActivityLog, ActivityLog>();
 }

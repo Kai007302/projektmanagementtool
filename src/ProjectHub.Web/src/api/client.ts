@@ -20,10 +20,9 @@ function messageOf(problem: ProblemDetails | null, status: number): string {
   return validation ?? problem?.detail ?? problem?.title ?? `Anfrage fehlgeschlagen (${status})`
 }
 
-/** Calls the ProjectHub API. In development the selected synthetic user is sent along. */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers)
-  if (init.body !== undefined) headers.set('Content-Type', 'application/json')
+  if (init.body !== undefined && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const devUser = import.meta.env.DEV ? getDevUser() : null
   if (devUser) headers.set('X-Dev-User', devUser)
 
@@ -33,8 +32,27 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     throw new ApiError(response.status, messageOf(problem, response.status))
   }
 
+  return response
+}
+
+/** Calls the ProjectHub API. In development the selected synthetic user is sent along. */
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await send(path, init)
   if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
+
+/** Downloads a file through the API (with the same authentication) and hands it to the browser. */
+export async function apiDownload(path: string, fileName: string): Promise<void> {
+  const blob = await (await send(path, {})).blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export const jsonBody = (value: unknown) => JSON.stringify(value)
 
 export type Paged<T> = { items: T[]; nextOffset: number | null }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Npgsql;
 using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Modules.Users;
 using static ProjectHub.Api.Modules.Identity.Development.DevelopmentSeedData;
 

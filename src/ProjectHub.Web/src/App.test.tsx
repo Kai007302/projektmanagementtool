@@ -21,7 +21,12 @@ function baseRoutes(me = ada) {
       json(headers.get('X-Dev-User') === 'dev-eva' ? eva : me),
     'GET /api/v1/organization': () => json(org),
     'GET /api/v1/teams?limit=100': () => json({ items: [platform], nextOffset: null }),
+    'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }),
   }
+}
+
+async function openTeams() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Teams' }))
 }
 
 describe('App', () => {
@@ -48,6 +53,7 @@ describe('App', () => {
   it('lists the teams of the organization', async () => {
     fakeApi(baseRoutes())
     render(<App />)
+    await openTeams()
 
     expect(await screen.findByRole('button', { name: /Plattform/ })).toBeInTheDocument()
   })
@@ -55,6 +61,7 @@ describe('App', () => {
   it('offers team creation to organization admins only', async () => {
     fakeApi(baseRoutes(eva))
     render(<App />)
+    await openTeams()
 
     await screen.findByRole('button', { name: /Plattform/ })
     expect(screen.queryByRole('button', { name: 'Team anlegen' })).not.toBeInTheDocument()
@@ -73,6 +80,7 @@ describe('App', () => {
       },
     })
     render(<App />)
+    await openTeams()
 
     await userEvent.type(await screen.findByLabelText('Teamname'), 'Vertrieb')
     await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
@@ -87,6 +95,7 @@ describe('App', () => {
       'POST /api/v1/teams': () => json({ title: 'Conflict', detail: 'A team with this name already exists.' }, 409),
     })
     render(<App />)
+    await openTeams()
 
     await userEvent.type(await screen.findByLabelText('Teamname'), 'Plattform')
     await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
@@ -114,6 +123,7 @@ describe('App', () => {
       },
     })
     render(<App />)
+    await openTeams()
 
     await userEvent.click(await screen.findByRole('button', { name: /Plattform/ }))
     const details = await screen.findByRole('heading', { name: 'Plattform' }).then((h) => h.parentElement!)
@@ -135,6 +145,7 @@ describe('App', () => {
         json({ ...platform, canManage: false, members: [{ userId: 'u-ben', displayName: 'Ben', email: 'b', role: 'owner' }] }),
     })
     render(<App />)
+    await openTeams()
 
     await userEvent.click(await screen.findByRole('button', { name: /Plattform/ }))
     await screen.findByRole('heading', { name: 'Plattform' })
