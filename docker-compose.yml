@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: projecthub-postgres
+    environment:
+      POSTGRES_DB: projecthub
+      POSTGRES_USER: projecthub
+      POSTGRES_PASSWORD: projecthub_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - projecthub-postgres:/var/lib/postgresql/data
+      - ./database/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U projecthub -d projecthub"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    container_name: projecthub-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  projecthub-postgres:

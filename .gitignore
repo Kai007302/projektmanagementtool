@@ -1,0 +1,15 @@
+node_modules/
+dist/
+bin/
+obj/
+.vscode/
+.idea/
+*.user
+*.suo
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+TestResults/
+.DS_Store

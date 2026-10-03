@@ -1,0 +1,100 @@
+# ProjectHub AI Starter Workspace
+
+Enterprise Project Management & Collaboration Platform für ca. 6.000 Mitarbeitende.
+
+## Zweck
+
+Dieses Repository ist die verbindliche technische Ausgangsbasis für die Entwicklung mit einem AI Coding Agent.
+
+Enthalten sind:
+
+- Produkt- und Architekturregeln
+- AI-Agent-Vertrag
+- Sicherheitsregeln
+- Datenmodell und ER-Diagramm
+- initiales PostgreSQL-Schema
+- lokale Entwicklungsumgebung
+- CI-Grundlage
+- Prompts für Phase 0–2
+- ADRs für zentrale Architekturentscheidungen
+
+## Architektur in einem Satz
+
+**Ein modularer Monolith für Projekte/Tasks/Kanban/Gantt/Notifications/Audit plus ein dedizierter Collaboration-Layer für Whiteboard-Realtime; Microsoft 365 und Webex bleiben externe Integrationen.**
+
+## Technologie-Baseline
+
+- Frontend: React 19.3 + TypeScript + Vite
+- Backend: .NET 10 / ASP.NET Core
+- Datenbank: PostgreSQL 18
+- Realtime: SignalR/WebSockets + Redis für ephemeres Cross-Instance-Fan-out
+- Durable Messaging: Azure Service Bus
+- Whiteboard: Yjs/CRDT-basierter Collaboration Layer
+- Storage: Azure Blob Storage
+- Identity: Microsoft Entra ID
+- Microsoft Integration: Microsoft Graph
+- Webex: Webex REST API + Webhooks
+- Hosting: Azure
+
+Die Versionen wurden am 25.09.2026 gegen die offiziellen Quellen überprüft. Details und Links stehen in `docs/REFERENCES.md`.
+
+## Lokaler Start
+
+Voraussetzungen:
+
+- Docker Desktop / Docker Engine
+- Node.js LTS
+- .NET 10 SDK
+- Git
+
+Infrastruktur starten:
+
+```bash
+docker compose up -d
+```
+
+PostgreSQL:
+
+```text
+postgresql://projecthub:projecthub_dev@localhost:5432/projecthub
+```
+
+Redis:
+
+```text
+redis://localhost:6379
+```
+
+Für Microsoft/Webex werden in der lokalen Entwicklung Mock-/Fake-Provider eingesetzt. Produktive Zugangsdaten werden nie aus dem Repository geladen.
+
+## Verbindliche Dokumentation
+
+Vor jeder Implementierung zuerst lesen:
+
+1. `AGENTS.md`
+2. `docs/PRODUCT.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/SECURITY.md`
+5. `docs/DATA_MODEL.md`
+6. `docs/OPEN_DECISIONS.md`
+7. den relevanten Sprint-Prompt unter `ai/prompts/`
+
+## Entwicklungsreihenfolge
+
+```text
+Phase 0  Foundation
+Phase 1  Identity & Organization
+Phase 2  Projects & Tasks
+Phase 3  Knowledge Hub & Knowledge Galaxy
+Phase 4  Kanban
+Phase 5  Gantt
+Phase 6  Notifications
+Phase 7  Whiteboard
+Phase 8  Microsoft 365
+Phase 9  Webex
+Phase 10 Enterprise Hardening
+```
+
+## Grundregel
+
+Nicht alles auf einmal bauen. Nach jedem vertikalen Schritt müssen Build, Tests und Dokumentation funktionieren und der Git-Stand konsistent sein.

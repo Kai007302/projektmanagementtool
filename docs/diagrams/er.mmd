@@ -1,0 +1,51 @@
+erDiagram
+  ORGANIZATION ||--o{ APP_USER : contains
+  ORGANIZATION ||--o{ TEAM : contains
+  TEAM ||--o{ TEAM_MEMBER : has
+  APP_USER ||--o{ TEAM_MEMBER : joins
+
+  ORGANIZATION ||--o{ PROJECT : contains
+  PROJECT ||--o{ PROJECT_MEMBER : has
+  APP_USER ||--o{ PROJECT_MEMBER : joins
+
+  PROJECT ||--o{ TASK : contains
+  APP_USER ||--o{ TASK : creates
+  APP_USER ||--o{ TASK : assigned
+  TASK ||--o{ TASK : parent
+
+  TASK ||--o{ TASK_COMMENT : has
+  APP_USER ||--o{ TASK_COMMENT : writes
+  TASK ||--o{ TASK_ATTACHMENT : has
+  TASK ||--o{ TASK_DEPENDENCY : source
+  TASK ||--o{ TASK_DEPENDENCY : target
+
+  PROJECT ||--|| KANBAN_BOARD : has
+  KANBAN_BOARD ||--o{ KANBAN_COLUMN : has
+  KANBAN_COLUMN ||--o{ TASK : contains
+
+  PROJECT ||--o{ GANTT_MILESTONE : has
+
+  PROJECT ||--o{ WHITEBOARD : has
+  WHITEBOARD ||--o{ WHITEBOARD_REFERENCE : references
+  TASK ||--o{ WHITEBOARD_REFERENCE : referenced_by
+
+  APP_USER ||--o{ NOTIFICATION : receives
+  APP_USER ||--o{ AUDIT_LOG : acts
+  ORGANIZATION ||--o{ AUDIT_LOG : owns
+
+  ORGANIZATION ||--o{ INTEGRATION : configures
+  INTEGRATION ||--o{ INTEGRATION_ACCOUNT : has
+  INTEGRATION ||--o{ WEBHOOK_SUBSCRIPTION : owns
+
+  ORGANIZATION ||--o{ KNOWLEDGE_SPACE : contains
+  KNOWLEDGE_SPACE ||--o{ KNOWLEDGE_ARTICLE : contains
+  APP_USER ||--o{ KNOWLEDGE_ARTICLE : owns
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_VERSION : versions
+  APP_USER ||--o{ KNOWLEDGE_VERSION : creates
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_RELATION : source
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_RELATION : target
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_ARTICLE_TAG : tagged
+  KNOWLEDGE_TAG ||--o{ KNOWLEDGE_ARTICLE_TAG : labels
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_COMMENT : has
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_REFERENCE : references
+  KNOWLEDGE_ARTICLE ||--o{ KNOWLEDGE_PERMISSION : secures
