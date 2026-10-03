@@ -710,3 +710,233 @@ fieldset.block-fields {
 .legend li {
   font-size: 0.875rem;
 }
+
+/* Gantt */
+.gantt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gantt-toolbar h3 {
+  margin: 0;
+}
+
+.gantt-toolbar button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.gantt-hint {
+  font-size: 0.875rem;
+}
+
+.gantt-warnings {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--danger);
+  background: #fbe7e7;
+}
+
+.gantt-warnings p,
+.gantt-warnings ul {
+  margin: 0.25rem 0;
+}
+
+.gantt-chart {
+  display: grid;
+  grid-template-columns: minmax(8rem, 16rem) minmax(0, 1fr);
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.gantt-labels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-right: 1px solid var(--border);
+}
+
+.gantt-label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.5rem;
+  border-bottom: 1px solid #eef1f5;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.gantt-label .link-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.gantt-label .link-button.selected {
+  font-weight: 600;
+}
+
+.gantt-label-spacer {
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.gantt-scroll {
+  overflow-x: auto;
+}
+
+.gantt-svg {
+  display: block;
+  font-size: 0.75rem;
+  user-select: none;
+}
+
+.gantt-header rect {
+  fill: #f7f8fa;
+  stroke: var(--border);
+}
+
+.gantt-header text {
+  fill: var(--muted);
+}
+
+.gantt-weekend {
+  fill: #f2f4f7;
+}
+
+.gantt-row-line {
+  stroke: #eef1f5;
+}
+
+.gantt-today {
+  stroke: var(--danger);
+  stroke-width: 2;
+}
+
+.gantt-milestone path {
+  fill: #b7791f;
+}
+
+.gantt-milestone line {
+  stroke: #b7791f;
+  stroke-dasharray: 4 3;
+}
+
+.gantt-milestone text {
+  fill: #6b4a12;
+}
+
+.gantt-dependency {
+  fill: none;
+  stroke: #7a8594;
+  stroke-width: 1.5;
+}
+
+.gantt-dependency.violated {
+  stroke: var(--danger);
+  stroke-dasharray: 5 3;
+}
+
+.gantt-arrowhead {
+  fill: #7a8594;
+}
+
+.gantt-arrowhead.violated {
+  fill: var(--danger);
+}
+
+.gantt-bar {
+  cursor: pointer;
+  outline: none;
+}
+
+.gantt-bar.movable {
+  cursor: grab;
+}
+
+.gantt-bar.dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+}
+
+.gantt-bar-track {
+  fill: #c9d6f5;
+  stroke: var(--accent);
+}
+
+.gantt-bar-progress {
+  fill: var(--accent);
+}
+
+.gantt-bar.status-done .gantt-bar-track {
+  fill: #cde9d7;
+  stroke: #1f7a44;
+}
+
+.gantt-bar.status-done .gantt-bar-progress {
+  fill: #1f7a44;
+}
+
+.gantt-bar.selected .gantt-bar-track,
+.gantt-bar:focus-visible .gantt-bar-track {
+  stroke: #1c2430;
+  stroke-width: 2.5;
+}
+
+.gantt-handle {
+  fill: transparent;
+  cursor: ew-resize;
+}
+
+.gantt-details,
+.gantt-milestones {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.gantt-details header {
+  justify-content: space-between;
+}
+
+.gantt-details h4,
+.gantt-details h5,
+.gantt-milestones h4 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.gantt-dependency-list,
+.gantt-milestones ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.gantt-dependency-list li.violated {
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gantt-bar rect {
+    transition: x 120ms ease-out, width 120ms ease-out;
+  }
+}
+
+.gantt-milestone-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}

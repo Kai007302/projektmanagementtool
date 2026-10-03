@@ -39,6 +39,18 @@ public sealed class RealtimeTests(InfrastructureFixture infrastructure) : ApiTes
         Assert.Equal(new ProjectChangedMessage(project.Id, "board"), await david.NextAsync());
     }
 
+    [Fact]
+    public async Task Gantt_changes_are_announced_to_the_group()
+    {
+        var project = await CreateTeamProjectAsync();
+        await using var eva = await ConnectAsync(Eva);
+        await eva.Connection.InvokeAsync("JoinProject", project.Id);
+
+        await As(Clara).PostAsJsonAsync($"/api/v1/projects/{project.Id}/gantt/milestones", new { name = "Abnahme", date = "2026-11-02" });
+
+        Assert.Equal(new ProjectChangedMessage(project.Id, "gantt"), await eva.NextAsync());
+    }
+
     [Theory]
     [InlineData("dev-felix")]
     [InlineData("dev-fritz")]

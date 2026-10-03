@@ -61,14 +61,35 @@ public static class DevelopmentSeeder
             }
         }
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        object Day(int? offset) => offset is { } days ? today.AddDays(days) : DBNull.Value;
         foreach (var task in DevelopmentSeedData.Tasks)
         {
             await ExecuteAsync(connection, """
-                insert into task (id, organization_id, project_id, parent_task_id, title, status, priority, assignee_id, creator_id)
-                values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                insert into task (id, organization_id, project_id, parent_task_id, title, status, priority, assignee_id, creator_id,
+                                  start_date, due_date, progress)
+                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 on conflict do nothing
                 """, ct, task.Id, task.Project.OrganizationId, task.Project.Id, (object?)task.ParentTaskId ?? DBNull.Value,
-                task.Title, task.Status, task.Priority, (object?)task.AssigneeId ?? DBNull.Value, task.CreatorId);
+                task.Title, task.Status, task.Priority, (object?)task.AssigneeId ?? DBNull.Value, task.CreatorId,
+                Day(task.StartDay), Day(task.DueDay), task.Progress);
+        }
+
+        foreach (var (id, source, target, type) in DevelopmentSeedData.Dependencies)
+        {
+            await ExecuteAsync(connection, """
+                insert into task_dependency (id, organization_id, source_task_id, target_task_id, dependency_type)
+                values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, id, source.Project.OrganizationId, source.Id, target.Id, type);
+        }
+
+        foreach (var (id, project, name, day) in DevelopmentSeedData.Milestones)
+        {
+            await ExecuteAsync(connection, """
+                insert into gantt_milestone (id, organization_id, project_id, name, milestone_date) values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, id, project.OrganizationId, project.Id, name, today.AddDays(day));
         }
 
         await SeedKnowledgeAsync(connection, ct);

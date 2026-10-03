@@ -15,7 +15,10 @@ public static class DevelopmentSeedData
 
     public sealed record SeedTeam(Guid Id, Guid OrganizationId, string Name, string Description, IReadOnlyList<(Guid UserId, string Role)> Members);
 
-    public sealed record SeedTask(Guid Id, SeedProject Project, Guid? ParentTaskId, string Title, string Status, string Priority, Guid? AssigneeId, Guid CreatorId);
+    /// <summary>A task; <see cref="StartDay"/> and <see cref="DueDay"/> count days from the day of seeding.</summary>
+    public sealed record SeedTask(
+        Guid Id, SeedProject Project, Guid? ParentTaskId, string Title, string Status, string Priority, Guid? AssigneeId, Guid CreatorId,
+        int? StartDay = null, int? DueDay = null, short Progress = 0);
 
     public sealed record SeedSpace(Guid Id, Guid OrganizationId, string Name, string Description);
 
@@ -73,14 +76,27 @@ public static class DevelopmentSeedData
 
     public static readonly IReadOnlyList<SeedProject> Projects = [IntranetProject, FabrikamProject];
 
-    public static readonly SeedTask ConceptTask = Task(1, IntranetProject, null, "Konzept abstimmen", "done", "high", Ben.Id, Ben.Id);
-    public static readonly SeedTask DesignTask = Task(2, IntranetProject, null, "Design erstellen", "in_progress", "normal", Clara.Id, Ben.Id);
-    public static readonly SeedTask StartPageTask = Task(3, IntranetProject, DesignTask.Id, "Startseite gestalten", "in_progress", "normal", Clara.Id, Clara.Id);
-    public static readonly SeedTask NavigationTask = Task(4, IntranetProject, DesignTask.Id, "Navigation entwerfen", "todo", "low", David.Id, Clara.Id);
+    public static readonly SeedTask ConceptTask = Task(1, IntranetProject, null, "Konzept abstimmen", "done", "high", Ben.Id, Ben.Id) with { StartDay = -14, DueDay = -5, Progress = 100 };
+    public static readonly SeedTask DesignTask = Task(2, IntranetProject, null, "Design erstellen", "in_progress", "normal", Clara.Id, Ben.Id) with { StartDay = -4, DueDay = 10, Progress = 30 };
+    public static readonly SeedTask StartPageTask = Task(3, IntranetProject, DesignTask.Id, "Startseite gestalten", "in_progress", "normal", Clara.Id, Clara.Id) with { StartDay = -4, DueDay = 3, Progress = 50 };
+    public static readonly SeedTask NavigationTask = Task(4, IntranetProject, DesignTask.Id, "Navigation entwerfen", "todo", "low", David.Id, Clara.Id) with { StartDay = 4, DueDay = 10 };
     public static readonly SeedTask ContentTask = Task(5, IntranetProject, null, "Inhalte migrieren", "todo", "urgent", null, Ben.Id);
     public static readonly SeedTask FabrikamTask = Task(6, FabrikamProject, null, "Portal planen", "todo", "normal", Fritz.Id, Fritz.Id);
 
     public static readonly IReadOnlyList<SeedTask> Tasks = [ConceptTask, DesignTask, StartPageTask, NavigationTask, ContentTask, FabrikamTask];
+
+    /// <summary>Gantt dependencies (source, target, type) of the synthetic tasks.</summary>
+    public static readonly IReadOnlyList<(Guid Id, SeedTask Source, SeedTask Target, string Type)> Dependencies =
+    [
+        (Guid.Parse("01920000-0000-7000-8000-000000000601"), ConceptTask, DesignTask, "finish_to_start"),
+        (Guid.Parse("01920000-0000-7000-8000-000000000602"), StartPageTask, NavigationTask, "finish_to_start"),
+    ];
+
+    /// <summary>Gantt milestones; <c>Day</c> counts days from the day of seeding.</summary>
+    public static readonly IReadOnlyList<(Guid Id, SeedProject Project, string Name, int Day)> Milestones =
+    [
+        (Guid.Parse("01920000-0000-7000-8000-000000000651"), IntranetProject, "Go-live Intranet", 21),
+    ];
 
     public static readonly SeedSpace PlatformSpace = new(
         Guid.Parse("01920000-0000-7000-8000-000000000601"), Contoso.Id, "IT & Plattform", "Betrieb, Werkzeuge und Richtlinien der Plattform");

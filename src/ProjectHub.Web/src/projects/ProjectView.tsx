@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
+import { GanttChart } from '../gantt/GanttChart'
 import { KanbanBoard } from '../kanban/KanbanBoard'
 import { ProjectKnowledge } from '../knowledge/ProjectKnowledge'
 import { useProjectEvents } from '../realtime/projectEvents'
@@ -11,9 +12,9 @@ import { MembersPanel } from './MembersPanel'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void }
 
-type View = 'board' | 'list'
+type View = 'board' | 'list' | 'gantt'
 
-const viewText: Record<View, string> = { board: 'Board', list: 'Liste' }
+const viewText: Record<View, string> = { board: 'Board', list: 'Liste', gantt: 'Gantt' }
 
 export function ProjectView({ projectId, me, onBack, onOpenArticle }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
@@ -84,12 +85,10 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle }: Props) {
               </button>
             ))}
           </nav>
-          <div className={view === 'board' ? 'project-layout wide' : 'project-layout'}>
-            {view === 'board' ? (
-              <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} />
-            ) : (
-              <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />
-            )}
+          <div className={view === 'list' ? 'project-layout' : 'project-layout wide'}>
+            {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} />}
+            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
+            {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
             <aside className="project-side">
               <MembersPanel project={project} onChanged={changed} />
               <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />

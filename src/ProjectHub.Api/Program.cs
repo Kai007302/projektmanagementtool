@@ -5,6 +5,7 @@ using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
 using ProjectHub.Api.Modules.Comments;
+using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Kanban;
@@ -34,6 +35,7 @@ builder.Services.AddProjectsModule();
 builder.Services.AddTasksModule();
 builder.Services.AddCommentsModule();
 builder.Services.AddKanbanModule();
+builder.Services.AddGanttModule();
 builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
@@ -74,6 +76,7 @@ app.MapApiV1()
     .MapCommentEndpoints()
     .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>())
     .MapKanbanEndpoints()
+    .MapGanttEndpoints()
     .MapKnowledgeEndpoints();
 
 app.MapRealtimeEndpoints();
