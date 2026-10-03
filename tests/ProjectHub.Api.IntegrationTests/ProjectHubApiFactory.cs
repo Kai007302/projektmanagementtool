@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Identity.Development;
+using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.IntegrationTests;
@@ -27,6 +28,7 @@ public sealed class ProjectHubApiFactory(
 
         // Tests compact explicitly; the background service would make them depend on timing.
         builder.UseSetting(WhiteboardOptions.CompactionIntervalKey, "0");
+        builder.UseSetting(MailOutboxOptions.PollSecondsKey, "0");
         configure?.Invoke(builder);
     }
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { ApiError } from '../api/client'
+import { CalendarActions } from '../calendar/CalendarActions'
+import { downloadMilestoneCalendar } from '../calendar/calendar'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { taskStatuses, updateTask } from '../tasks/api'
@@ -647,6 +649,13 @@ function MilestoneItem({ milestone, canEdit, onUpdate, onDelete }: MilestoneItem
       <span>
         ◆ {milestone.name} · {displayDay(parseDay(milestone.date))}
       </span>
+      <CalendarActions
+        title={milestone.name}
+        firstDay={milestone.date}
+        lastDay={milestone.date}
+        kind="Meilenstein"
+        onDownload={() => downloadMilestoneCalendar(milestone.id, milestone.name)}
+      />
       {canEdit && (
         <>
           <button type="button" className="link-button" aria-label={`Meilenstein „${milestone.name}“ bearbeiten`} onClick={() => setEditing(true)}>

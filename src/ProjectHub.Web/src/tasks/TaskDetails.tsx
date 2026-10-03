@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails, ProjectMember } from '../projects/api'
+import { CalendarActions } from '../calendar/CalendarActions'
+import { downloadTaskCalendar } from '../calendar/calendar'
 import { fetchTaskWhiteboards, type TaskWhiteboard } from '../whiteboard/api'
 import {
   addComment,
@@ -97,6 +99,7 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted }: Props
           {task.dueDate && ` · fällig ${task.dueDate}`}
         </p>
       )}
+      <TaskCalendar task={task} />
       {canContribute && (
         <NewTaskForm
           label="Unteraufgabe"
@@ -110,6 +113,18 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted }: Props
       <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
       <TaskWhiteboards taskId={task.id} />
     </article>
+  )
+}
+
+/** Puts a task with a start or due date into the person's own calendar (DEC-028). */
+function TaskCalendar({ task }: { task: Task }) {
+  const firstDay = task.startDate ?? task.dueDate
+  const lastDay = task.dueDate ?? task.startDate
+  if (!firstDay || !lastDay) return null
+  return (
+    <p className="muted">
+      Kalender: <CalendarActions title={task.title} firstDay={firstDay} lastDay={lastDay} kind="Aufgabe" onDownload={() => downloadTaskCalendar(task.id, task.title)} />
+    </p>
   )
 }
 

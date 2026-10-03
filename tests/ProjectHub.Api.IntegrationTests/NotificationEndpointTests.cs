@@ -64,7 +64,7 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
         Assert.Equal(NotificationDispatcher.MaxBodyLength, notification.Body!.Length);
         Assert.Empty(await ForAsync(Clara, task.Id));
 
-        var mail = Assert.Single(Outbox(Eva), m => m.Message.Subject == notification.Title);
+        var mail = Assert.Single(await OutboxAsync(Eva), m => m.Message.Subject == notification.Title);
         Assert.Equal(Eva.Email, mail.Message.To);
         Assert.DoesNotContain("Bitte prüfen", mail.Message.Body);
     }
@@ -109,9 +109,9 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
             var mailOnly = await CreateTaskAsync(Ben, project.Id, NewTask("Nur Mail", assigneeId: David.Id));
 
             Assert.Single(await ForAsync(David, quiet.Id));
-            Assert.DoesNotContain(Outbox(David), m => m.Message.Subject.Contains("Ohne Mail"));
+            Assert.DoesNotContain(await OutboxAsync(David), m => m.Message.Subject.Contains("Ohne Mail"));
             Assert.Empty(await ForAsync(David, mailOnly.Id));
-            Assert.Contains(Outbox(David), m => m.Message.Subject.Contains("Nur Mail"));
+            Assert.Contains(await OutboxAsync(David), m => m.Message.Subject.Contains("Nur Mail"));
             Assert.Equal(new NotificationPreferencesResponse(false, true), await As(David).GetFromJsonAsync<NotificationPreferencesResponse>("/api/v1/me/notification-preferences"));
 
             var invalid = await As(David).PutAsJsonAsync("/api/v1/me/notification-preferences", new { inAppEnabled = true });
@@ -159,6 +159,7 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Empty(await ForAsync(other, task.Id));
         Assert.Null(Assert.Single(await ForAsync(Clara, task.Id)).ReadAt);
+        await DeliverMailsAsync();
         Assert.DoesNotContain(await As(other).GetFromJsonAsync<OutboxMail[]>("/api/v1/dev/outbox") ?? [], m => m.Subject.Contains("Privat"));
     }
 
@@ -195,8 +196,11 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
     private async Task<int> UnreadAsync(SeedUser user) =>
         (await As(user).GetFromJsonAsync<UnreadCountResponse>("/api/v1/me/notifications/unread-count"))!.Count;
 
-    private IReadOnlyList<SentEmail> Outbox(SeedUser user) =>
-        Factory.Services.GetRequiredService<FakeEmailSender>().Outbox.Where(m => m.Message.RecipientId == user.Id).ToList();
+    private async Task<IReadOnlyList<SentEmail>> OutboxAsync(SeedUser user)
+    {
+        await DeliverMailsAsync();
+        return Factory.Services.GetRequiredService<FakeEmailSender>().Outbox.Where(m => m.Message.RecipientId == user.Id).ToList();
+    }
 
     private async Task SetPreferencesAsync(SeedUser user, bool inApp, bool email)
     {

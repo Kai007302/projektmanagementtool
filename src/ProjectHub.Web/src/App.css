@@ -941,6 +941,14 @@ fieldset.block-fields {
   gap: 0.75rem;
 }
 
+/* Calendar (phase 8) */
+.calendar-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 /* Notifications */
 .account-row {
   display: flex;

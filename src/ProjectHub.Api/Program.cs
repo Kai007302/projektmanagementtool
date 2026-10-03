@@ -4,10 +4,12 @@ using ProjectHub.Api.Infrastructure.Health;
 using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
+using ProjectHub.Api.Modules.Calendar;
 using ProjectHub.Api.Modules.Comments;
 using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
+using ProjectHub.Api.Modules.Integrations.Microsoft;
 using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Notifications;
@@ -46,6 +48,8 @@ builder.Services.AddCommentsModule();
 builder.Services.AddKanbanModule();
 builder.Services.AddGanttModule();
 builder.Services.AddNotificationsModule(builder.Configuration);
+builder.Services.AddMailTransport(builder.Configuration);
+builder.Services.AddCalendarModule();
 builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
@@ -89,6 +93,7 @@ app.MapApiV1()
     .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>())
     .MapKanbanEndpoints()
     .MapGanttEndpoints()
+    .MapCalendarEndpoints()
     .MapNotificationEndpoints()
     .MapWhiteboardEndpoints()
     .MapKnowledgeEndpoints();
