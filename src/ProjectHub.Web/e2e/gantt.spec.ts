@@ -65,9 +65,12 @@ test('tasks are planned, linked and moved on the Gantt chart while a viewer watc
   await expect(viewer.getByRole('region', { name: 'Verletzte Abhängigkeiten' })).toBeVisible()
 
   // Moving the bar with the keyboard resolves it: two days later it starts after "Analyse" ends.
+  // The next key press needs the reloaded chart (new task version), not just the saved dates.
+  const reloaded = ben.waitForResponse((r) => r.request().method() === 'GET' && r.url().endsWith(`/projects/${project.id}/gantt`))
   await bar(ben, 'Umsetzung').focus()
   await ben.keyboard.press('ArrowRight')
   await expect.poll(async () => (await implementation()).startDate).toBe(day(3))
+  await reloaded
   await bar(ben, 'Umsetzung').focus()
   await ben.keyboard.press('ArrowRight')
   await expect.poll(async () => (await implementation()).startDate).toBe(day(4))
