@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using ProjectHub.Api.Infrastructure.Database;
+using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Audit;
@@ -35,6 +36,7 @@ public sealed class ProjectService(
     ProjectAccess access,
     IAuditLog audit,
     IActivityLog activity,
+    IDomainEventPublisher events,
     TimeProvider clock)
 {
     public const int MaxNameLength = 200;
@@ -222,13 +224,15 @@ public sealed class ProjectService(
         try
         {
             await db.SaveChangesAsync(ct);
-            return Done.Value;
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             db.ChangeTracker.Clear();
             return ServiceFailure.Conflict("The user is already a member of this project.");
         }
+
+        await events.PublishAsync(new ProjectMemberAdded(user.OrganizationId, projectId, memberId.Value, user.UserId, role), ct);
+        return Done.Value;
     }
 
     public async Task<ServiceResult<Done>> ChangeMemberRoleAsync(UserContext user, Guid projectId, Guid memberId, string? role, CancellationToken ct)

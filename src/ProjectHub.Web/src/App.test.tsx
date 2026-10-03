@@ -22,6 +22,7 @@ function baseRoutes(me = ada) {
     'GET /api/v1/organization': () => json(org),
     'GET /api/v1/teams?limit=100': () => json({ items: [platform], nextOffset: null }),
     'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }),
+    'GET /api/v1/me/notifications/unread-count': () => json({ count: 0 }),
   }
 }
 

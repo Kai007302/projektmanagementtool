@@ -10,6 +10,7 @@ using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Knowledge;
+using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Organizations;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Realtime;
@@ -36,6 +37,7 @@ builder.Services.AddTasksModule();
 builder.Services.AddCommentsModule();
 builder.Services.AddKanbanModule();
 builder.Services.AddGanttModule();
+builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
@@ -63,6 +65,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapDevelopmentIdentityEndpoints(app.Environment);
+    app.MapApiV1().MapNotificationDevelopmentEndpoints();
 }
 
 app.MapProjectHubHealthChecks();
@@ -77,9 +80,11 @@ app.MapApiV1()
     .MapAttachmentEndpoints(app.Services.GetRequiredService<AttachmentOptions>())
     .MapKanbanEndpoints()
     .MapGanttEndpoints()
+    .MapNotificationEndpoints()
     .MapKnowledgeEndpoints();
 
 app.MapRealtimeEndpoints();
+app.MapNotificationHub();
 
 app.Run();
 

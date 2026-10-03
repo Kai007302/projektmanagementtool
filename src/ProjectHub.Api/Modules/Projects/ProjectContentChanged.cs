@@ -12,3 +12,6 @@ public sealed record ProjectContentChanged(Guid ProjectId, string Area) : IDomai
     public const string Board = "board";
     public const string Gantt = "gantt";
 }
+
+/// <summary>Raised after someone was added to a project.</summary>
+public sealed record ProjectMemberAdded(Guid OrganizationId, Guid ProjectId, Guid UserId, Guid ActorId, string Role) : IDomainEvent;

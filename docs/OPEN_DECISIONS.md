@@ -28,6 +28,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-022 | Verweise von Wissen auf Whiteboards | offen | erst mit dem Whiteboard-Modul (Phase 7); bis dahin lehnt die API `whiteboard` als Verweisziel ab |
 | DEC-023 | Abhängigkeiten im Gantt | offen | nur Warnung: verletzte Abhängigkeiten werden markiert, Nachfolger werden nicht automatisch verschoben. Nur innerhalb eines Projekts, höchstens eine Abhängigkeit je Aufgabenpaar, keine Kreise |
 | DEC-024 | Wer Gantt-Termine und Meilensteine pflegt | offen | Termine verschieben und Abhängigkeiten pflegen: Contribute (wie Aufgaben ändern); Meilensteine: Edit (Projektstruktur) |
+| DEC-025 | Einstellungen für Benachrichtigungen | offen | je Kanal (In-App, Mail), nicht je Ereignistyp; Standard: beides an |
+| DEC-026 | Worüber benachrichtigt wird | offen | Zuweisung einer Aufgabe, `@`-Erwähnung (Aufgaben- und Wissenskommentare), Aufnahme in ein Projekt; nie über eigene Aktionen. Fälligkeitserinnerungen folgen später (brauchen einen Hintergrundjob) |
 
 
 ## Knowledge / AI

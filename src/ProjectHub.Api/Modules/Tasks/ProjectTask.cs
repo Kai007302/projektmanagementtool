@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ProjectHub.Api.Infrastructure.Database;
+using ProjectHub.Api.Infrastructure.Events;
 
 namespace ProjectHub.Api.Modules.Tasks;
 
@@ -30,6 +31,9 @@ public sealed class ProjectTask : IVersioned
     public DateTimeOffset UpdatedAt { get; set; }
     public long Version { get; set; }
 }
+
+/// <summary>Raised after a task was assigned to someone (on creation or by a change of the assignee).</summary>
+public sealed record TaskAssigned(Guid OrganizationId, Guid ProjectId, Guid TaskId, Guid AssigneeId, Guid ActorId) : IDomainEvent;
 
 public static class TaskStatus
 {

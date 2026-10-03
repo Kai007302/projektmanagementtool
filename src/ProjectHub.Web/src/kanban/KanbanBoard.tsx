@@ -17,7 +17,7 @@ import {
   type KanbanColumn,
 } from './api'
 
-type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
+type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
 
 type DropTarget = { columnId: string; index: number }
 
@@ -36,12 +36,12 @@ function withCardMoved(board: Board, card: KanbanCard, target: DropTarget): Boar
   return { ...board, columns }
 }
 
-export function KanbanBoard({ project, me, revision, onChanged }: Props) {
+export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = null }: Props) {
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState<KanbanCard | null>(null)
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialTaskId)
   const { canContribute, canEdit } = project.capabilities
 
   const load = useCallback(() => {
