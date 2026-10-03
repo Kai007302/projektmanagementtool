@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
+import { KanbanBoard } from '../kanban/KanbanBoard'
+import { useProjectEvents } from '../realtime/projectEvents'
 import { TaskBoard } from '../tasks/TaskBoard'
 import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
 import { ActivityFeed } from './ActivityFeed'
@@ -8,10 +10,15 @@ import { MembersPanel } from './MembersPanel'
 
 type Props = { projectId: string; me: Me; onBack: () => void }
 
+type View = 'board' | 'list'
+
+const viewText: Record<View, string> = { board: 'Board', list: 'Liste' }
+
 export function ProjectView({ projectId, me, onBack }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
+  const [view, setView] = useState<View>('board')
 
   const load = useCallback(() => {
     fetchProject(projectId).then(setProject, (e: Error) => setError(e.message))
@@ -24,6 +31,9 @@ export function ProjectView({ projectId, me, onBack }: Props) {
     load()
     setRevision((r) => r + 1)
   }, [load])
+
+  // Changes by others arrive in realtime and reload what is shown.
+  useProjectEvents(projectId, changed)
 
   async function remove() {
     if (!project || !window.confirm(`Projekt „${project.name}“ wirklich löschen?`)) return
@@ -60,8 +70,25 @@ export function ProjectView({ projectId, me, onBack }: Props) {
             )}
           </header>
           {project.capabilities.canEdit && <ProjectEditForm project={project} onSaved={changed} />}
-          <div className="project-layout">
-            <TaskBoard project={project} me={me} onChanged={changed} />
+          <nav className="tabs" aria-label="Ansicht">
+            {(Object.keys(viewText) as View[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={value === view ? 'tab active' : 'tab'}
+                aria-current={value === view ? 'page' : undefined}
+                onClick={() => setView(value)}
+              >
+                {viewText[value]}
+              </button>
+            ))}
+          </nav>
+          <div className={view === 'board' ? 'project-layout wide' : 'project-layout'}>
+            {view === 'board' ? (
+              <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} />
+            ) : (
+              <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />
+            )}
             <aside className="project-side">
               <MembersPanel project={project} onChanged={changed} />
               <ActivityFeed projectId={project.id} revision={revision} />

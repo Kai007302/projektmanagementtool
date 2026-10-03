@@ -78,6 +78,8 @@ Fachliche Endpunkte unter `/api/v1` (Auszug):
 | Aufgaben | `GET/POST /projects/{id}/tasks`, `GET/PATCH/DELETE /tasks/{id}` |
 | Kommentare | `GET/POST /tasks/{id}/comments`, `PATCH/DELETE /comments/{id}` |
 | Dateien | `GET/POST /tasks/{id}/attachments`, `GET /attachments/{id}/content`, `DELETE /attachments/{id}` |
+| Kanban | `GET /projects/{id}/board`, `POST /projects/{id}/board/columns`, `PATCH/DELETE /board-columns/{id}`, `POST /board-columns/{id}/move`, `POST /tasks/{id}/move` |
+| Realtime | SignalR-Hub `/api/v1/hubs/projects` (Methode `JoinProject`, Nachricht `ProjectChanged`), Fan-out über Redis |
 
 Listen sind seitenweise (`limit` bis 100, `offset`). `PATCH` erwartet die aktuelle `version` und antwortet bei veralteter Version mit 409.
 
@@ -145,7 +147,7 @@ Phase 0  Foundation
 Phase 1  Identity & Organization
 Phase 2  Projects & Tasks
 Phase 3  Knowledge Hub & Knowledge Galaxy
-Phase 4  Kanban
+Phase 4  Kanban (vor Phase 3 umgesetzt)
 Phase 5  Gantt
 Phase 6  Notifications
 Phase 7  Whiteboard

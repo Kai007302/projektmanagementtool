@@ -8,6 +8,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 
 - `003_identity_organization.sql`: `organization.entra_tenant_id`, `app_user.organization_role`
 - `004_project_soft_delete.sql`: `project.deleted_at` (Projekte werden nur weich gelöscht)
+- `005_kanban_column_status.sql`: `kanban_column.task_status`. Jede Spalte steht für einen Task-Status; die Spalte einer Karte ergibt sich aus Status, `task.kanban_column_id` und `task.board_position` (Kanban bleibt eine Ansicht auf Tasks)
 
 ## Regeln
 

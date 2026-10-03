@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
+using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Audit;
@@ -50,6 +51,7 @@ public sealed class TaskService(
     IProjectHubAuthorization authorization,
     IAuditLog audit,
     IActivityLog activity,
+    IDomainEventPublisher events,
     TimeProvider clock)
 {
     public const int MaxTitleLength = 500;
@@ -144,6 +146,7 @@ public sealed class TaskService(
         db.Set<ProjectTask>().Add(task);
         activity.Record(user, projectId, ActivityActions.TaskCreated, "task", task.Id, new { task.Title, task.ParentTaskId });
         await db.SaveChangesAsync(ct);
+        await events.PublishAsync(new ProjectContentChanged(projectId, ProjectContentChanged.Tasks), ct);
         return await Project(ActiveTasks(user).Where(t => t.Id == task.Id)).SingleAsync(ct);
     }
 
@@ -199,6 +202,8 @@ public sealed class TaskService(
             {
                 return conflict;
             }
+
+            await events.PublishAsync(new ProjectContentChanged(task.ProjectId, ProjectContentChanged.Tasks), ct);
         }
 
         return await Project(ActiveTasks(user).Where(t => t.Id == task.Id)).SingleAsync(ct);
@@ -236,7 +241,13 @@ public sealed class TaskService(
 
         activity.Record(user, task.ProjectId, ActivityActions.TaskDeleted, "task", task.Id, new { task.Title, Subtasks = deleted.Count - 1 });
         audit.Record(user, AuditActions.TaskDeleted, "task", task.Id, new { task.ProjectId, Subtasks = deleted.Count - 1 });
-        return await db.SaveVersionedAsync(task, ct) is { } conflict ? conflict : Done.Value;
+        if (await db.SaveVersionedAsync(task, ct) is { } conflict)
+        {
+            return conflict;
+        }
+
+        await events.PublishAsync(new ProjectContentChanged(task.ProjectId, ProjectContentChanged.Tasks), ct);
+        return Done.Value;
     }
 
     private IQueryable<ProjectTask> ActiveTasks(UserContext user) =>

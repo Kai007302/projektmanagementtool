@@ -16,6 +16,7 @@ public static class AuditActions
     public const string ProjectMemberRoleChanged = "ProjectMemberRoleChanged";
     public const string ProjectMemberRemoved = "ProjectMemberRemoved";
     public const string TaskDeleted = "TaskDeleted";
+    public const string BoardColumnDeleted = "BoardColumnDeleted";
 }
 
 public interface IAuditLog

@@ -43,6 +43,10 @@ internal sealed class UserContextMiddleware(RequestDelegate next)
     }
 
     internal static UserContext FromHttpContext(IHttpContextAccessor accessor) =>
-        accessor.HttpContext?.Items[ItemKey] as UserContext
+        FromHttpContext(accessor.HttpContext)
         ?? throw new InvalidOperationException("UserContext is only available on /api/v1 endpoints.");
+
+    /// <summary>The user resolved for this request (for SignalR: the request that opened the connection).</summary>
+    internal static UserContext? FromHttpContext(HttpContext? httpContext) =>
+        httpContext?.Items[ItemKey] as UserContext;
 }

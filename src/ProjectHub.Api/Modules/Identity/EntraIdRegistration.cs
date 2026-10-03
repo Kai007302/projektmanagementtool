@@ -26,6 +26,21 @@ public static class EntraIdRegistration
 
                 // Keep Entra's short claim names (oid, tid, ...) instead of mapping them to WS-* URIs.
                 options.MapInboundClaims = false;
+
+                // Browsers send the token as query parameter on WebSocket requests to the realtime hubs.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (context.Request.Path.StartsWithSegments(IdentityModule.ApiV1Prefix + "/hubs")
+                            && context.Request.Query["access_token"].FirstOrDefault() is { Length: > 0 } token)
+                        {
+                            context.Token = token;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                };
             });
 
         return services;
