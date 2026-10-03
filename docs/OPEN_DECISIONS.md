@@ -11,7 +11,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-005 | Datenretention | offen | Unternehmensrichtlinie |
 | DEC-006 | erlaubte Dateitypen | offen | Security/IT Vorgabe |
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
-| DEC-008 | Whiteboard Storage | offen | Collaboration Layer + Snapshots |
+| DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
 | DEC-009 | Webex OAuth App Ownership | offen | zentrale Unternehmens-App-Registrierung |
 | DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel |
 | DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
@@ -25,11 +25,12 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-019 | Was das Board zeigt | offen | Aufgaben der obersten Ebene; Unteraufgaben als Zähler auf der Karte |
 | DEC-020 | Sichtbarkeit veröffentlichten Wissens | entschieden (Kai, 2026-10-03) | veröffentlichte und archivierte Artikel lesen alle in der Organisation; einzelne Artikel können auf „eingeschränkt“ gestellt werden und sind dann nur über Freigaben sichtbar. Entwürfe und Artikel in Prüfung sind nie organisationsweit sichtbar |
 | DEC-021 | Wer Wissensartikel veröffentlicht | offen | Artikel-Admins: Organisations-Admins, die verantwortliche Person (Owner) und Personen/Teams mit Freigabe „Verwalten“. Zur Prüfung geben darf, wer bearbeiten darf |
-| DEC-022 | Verweise von Wissen auf Whiteboards | offen | erst mit dem Whiteboard-Modul (Phase 7); bis dahin lehnt die API `whiteboard` als Verweisziel ab |
+| DEC-022 | Verweise von Wissen auf Whiteboards | umgesetzt (Phase 7) | Wissensartikel verweisen auf Whiteboards; sichtbar nur, wer das Whiteboard sehen darf |
 | DEC-023 | Abhängigkeiten im Gantt | offen | nur Warnung: verletzte Abhängigkeiten werden markiert, Nachfolger werden nicht automatisch verschoben. Nur innerhalb eines Projekts, höchstens eine Abhängigkeit je Aufgabenpaar, keine Kreise |
 | DEC-024 | Wer Gantt-Termine und Meilensteine pflegt | offen | Termine verschieben und Abhängigkeiten pflegen: Contribute (wie Aufgaben ändern); Meilensteine: Edit (Projektstruktur) |
 | DEC-025 | Einstellungen für Benachrichtigungen | offen | je Kanal (In-App, Mail), nicht je Ereignistyp; Standard: beides an |
 | DEC-026 | Worüber benachrichtigt wird | offen | Zuweisung einer Aufgabe, `@`-Erwähnung (Aufgaben- und Wissenskommentare), Aufnahme in ein Projekt; nie über eigene Aktionen. Fälligkeitserinnerungen folgen später (brauchen einen Hintergrundjob) |
+| DEC-027 | Wer Whiteboards pflegt | offen | ansehen: View; zeichnen: Contribute (wie Aufgaben); anlegen, umbenennen, löschen: Edit |
 
 
 ## Knowledge / AI

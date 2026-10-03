@@ -92,6 +92,22 @@ public static class DevelopmentSeeder
                 """, ct, id, project.OrganizationId, project.Id, name, today.AddDays(day));
         }
 
+        foreach (var (id, project, name, objects) in DevelopmentSeedData.Whiteboards)
+        {
+            var created = await ExecuteAsync(connection, """
+                insert into whiteboard (id, organization_id, project_id, name, collaboration_document_id) values ($1, $2, $3, $4, $5)
+                on conflict do nothing
+                """, ct, id, project.OrganizationId, project.Id, name, $"yjs:{id:N}");
+            if (created == 1)
+            {
+                // The initial content is one Yjs update; compaction turns it into a snapshot like any other.
+                await ExecuteAsync(connection, """
+                    insert into whiteboard_update (whiteboard_id, sequence_number, organization_id, payload, created_by)
+                    values ($1, 1, $2, $3, $4)
+                    """, ct, id, project.OrganizationId, Whiteboard.WhiteboardDocuments.CreateUpdate(objects), DevelopmentSeedData.Ben.Id);
+            }
+        }
+
         await SeedKnowledgeAsync(connection, ct);
         await transaction.CommitAsync(ct);
     }
@@ -174,7 +190,7 @@ public static class DevelopmentSeeder
         }
     }
 
-    private static async Task ExecuteAsync(NpgsqlConnection connection, string sql, CancellationToken ct, params object[] values)
+    private static async Task<int> ExecuteAsync(NpgsqlConnection connection, string sql, CancellationToken ct, params object[] values)
     {
         await using var command = new NpgsqlCommand(sql, connection);
         foreach (var value in values)
@@ -182,6 +198,6 @@ public static class DevelopmentSeeder
             command.Parameters.Add(new NpgsqlParameter { Value = value });
         }
 
-        await command.ExecuteNonQueryAsync(ct);
+        return await command.ExecuteNonQueryAsync(ct);
     }
 }

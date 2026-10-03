@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Modules.Knowledge;
+using ProjectHub.Api.Modules.Whiteboard;
 using static ProjectHub.Api.Modules.Identity.Development.DevelopmentSeedData;
 
 namespace ProjectHub.Api.IntegrationTests;
@@ -326,7 +327,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     }
 
     [Fact]
-    public async Task References_link_projects_tasks_and_teams_and_work_in_both_directions()
+    public async Task References_link_projects_tasks_teams_and_whiteboards_and_work_in_both_directions()
     {
         var project = await CreateTeamProjectAsync();
         var task = await CreateTaskAsync(Ben, project.Id);
@@ -337,13 +338,20 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
         var toTask = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("task", task.Id));
         var toTeam = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("team", SalesTeam.Id));
         var toForeign = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("project", FabrikamProject.Id));
-        var toWhiteboard = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("whiteboard", Guid.NewGuid()));
+        var board = (await (await As(Ben).PostAsJsonAsync($"/api/v1/projects/{project.Id}/whiteboards", new CreateWhiteboardRequest("Skizze")))
+            .Content.ReadFromJsonAsync<WhiteboardResponse>())!;
+        var toWhiteboard = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("whiteboard", board.Id));
+        var toUnknownWhiteboard = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("whiteboard", Guid.NewGuid()));
 
         Assert.Equal(HttpStatusCode.Created, toProject.StatusCode);
         Assert.Equal(project.Id, (await toTask.Content.ReadFromJsonAsync<ReferenceResponse>())!.ProjectId);
         Assert.Equal(HttpStatusCode.Created, toTeam.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, toForeign.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, toWhiteboard.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, toWhiteboard.StatusCode);
+        Assert.Equal(("Skizze", project.Id), await toWhiteboard.Content.ReadFromJsonAsync<ReferenceResponse>() is { } r ? (r.Title, r.ProjectId) : default);
+        Assert.Equal(HttpStatusCode.BadRequest, toUnknownWhiteboard.StatusCode);
+        Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/whiteboards/{board.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(Felix).GetAsync($"/api/v1/whiteboards/{board.Id}/knowledge")).StatusCode);
         Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/projects/{project.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
         Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/tasks/{task.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
         Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/teams/{SalesTeam.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);

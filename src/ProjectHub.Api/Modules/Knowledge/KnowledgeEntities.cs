@@ -158,8 +158,7 @@ public static class KnowledgeResourceType
     public const string Team = "team";
     public const string Whiteboard = "whiteboard";
 
-    /// <summary>Whiteboards follow in phase 7; references to them are rejected until then.</summary>
-    public static readonly IReadOnlyList<string> Supported = [Project, Task, Team];
+    public static readonly IReadOnlyList<string> Supported = [Project, Task, Team, Whiteboard];
 }
 
 /// <summary>Levels of an explicit grant; each includes the ones before it.</summary>

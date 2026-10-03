@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails, ProjectMember } from '../projects/api'
+import { fetchTaskWhiteboards, type TaskWhiteboard } from '../whiteboard/api'
 import {
   addComment,
   createTask,
@@ -107,7 +108,23 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted }: Props
       )}
       <CommentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
       <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
+      <TaskWhiteboards taskId={task.id} />
     </article>
+  )
+}
+
+/** Whiteboards that show this task as a card (updated a few seconds after a board changes). */
+function TaskWhiteboards({ taskId }: { taskId: string }) {
+  const [boards, setBoards] = useState<TaskWhiteboard[]>([])
+  useEffect(() => {
+    fetchTaskWhiteboards(taskId).then(setBoards, () => setBoards([]))
+  }, [taskId])
+
+  if (boards.length === 0) return null
+  return (
+    <p className="muted">
+      Auf Whiteboards: {boards.map((board) => board.name).join(', ')}
+    </p>
   )
 }
 

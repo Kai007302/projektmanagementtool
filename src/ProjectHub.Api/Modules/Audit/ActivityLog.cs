@@ -53,6 +53,9 @@ public static class ActivityActions
     public const string MilestoneCreated = "MilestoneCreated";
     public const string MilestoneUpdated = "MilestoneUpdated";
     public const string MilestoneDeleted = "MilestoneDeleted";
+    public const string WhiteboardCreated = "WhiteboardCreated";
+    public const string WhiteboardRenamed = "WhiteboardRenamed";
+    public const string WhiteboardDeleted = "WhiteboardDeleted";
     public const string CommentAdded = "CommentAdded";
     public const string AttachmentAdded = "AttachmentAdded";
     public const string AttachmentDeleted = "AttachmentDeleted";
