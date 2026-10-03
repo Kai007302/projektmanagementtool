@@ -41,3 +41,33 @@ jobs:
         run: npm run build
       - working-directory: src/ProjectHub.Web
         run: npm test -- --run
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/ProjectHub.Web/package-lock.json
+      - name: Start PostgreSQL and Redis
+        run: docker compose up -d --wait
+      - run: dotnet build src/ProjectHub.Api
+      - working-directory: src/ProjectHub.Web
+        run: npm ci
+      - working-directory: src/ProjectHub.Web
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests (API and Vite are started by Playwright)
+        working-directory: src/ProjectHub.Web
+        run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            src/ProjectHub.Web/playwright-report
+            src/ProjectHub.Web/test-results

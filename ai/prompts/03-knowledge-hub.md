@@ -13,7 +13,7 @@ Read first:
 ## Umsetzung in zwei Teilen
 
 - Teil 1: Domäne, Rechte (DEC-020/021), Versionen, Suche, Block-Editor, Beziehungen, Verweise, Kommentare, Wissen im Projekt. Verweise auf Whiteboards folgen mit Phase 7 (DEC-022).
-- Teil 2: Knowledge Galaxy (Renderer-Bewertung mit mehreren hundert Knoten) und die E2E-Tests für den Artikel-Ablauf und die Galaxy-Navigation.
+- Teil 2: Knowledge Galaxy (Renderer-Bewertung mit mehreren hundert Knoten, ADR 0007) und die E2E-Tests für den Artikel-Ablauf und die Galaxy-Navigation (`src/ProjectHub.Web/e2e`, CI-Job `e2e`).
 
 ## Goal
 

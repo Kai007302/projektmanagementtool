@@ -31,9 +31,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 ## Knowledge / AI
 
 ### Knowledge Galaxy renderer
-Status: open
+Status: decided (ADR 0007)
 
-Evaluate React Flow vs D3 Canvas/WebGL using a synthetic graph with at least several hundred nodes.
+Canvas 2D with a d3-force layout in a Web Worker; measured against React Flow with 300, 800 and 2000 nodes.
 
 ### AI provider
 Status: open

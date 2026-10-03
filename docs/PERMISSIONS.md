@@ -89,6 +89,7 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 | Kommentar löschen | Autorin/Autor oder Verwalten |
 | Erwähnen (`@`) | nur Personen, die den Artikel lesen dürfen |
 | Wissensbereiche anlegen und ändern | Organisations-Admin |
+| Knowledge Galaxy | zeigt nur lesbare Artikel und nur Beziehungen zwischen ihnen |
 
 - Nicht sichtbare Artikel sind „nicht gefunden“ (404), sichtbare ohne ausreichendes Recht „verboten“ (403).
 - Beziehungen und Verweise zeigen nur Ziele, die die lesende Person selbst sehen darf. Neue Beziehungen und Verweise (auch Verweis-Blöcke im Inhalt) brauchen ein sichtbares Ziel.

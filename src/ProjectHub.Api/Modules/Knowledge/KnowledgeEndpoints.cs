@@ -12,6 +12,7 @@ public static class KnowledgeEndpoints
             .AddScoped<KnowledgeLinkService>()
             .AddScoped<KnowledgeCommentService>()
             .AddScoped<KnowledgeSpaceService>()
+            .AddScoped<KnowledgeGraphService>()
             .AddScoped<IKnowledgeSearch, PostgresKnowledgeSearch>();
 
     public static RouteGroupBuilder MapKnowledgeEndpoints(this RouteGroupBuilder api)
@@ -40,6 +41,9 @@ public static class KnowledgeEndpoints
             var rows = await search.SearchAsync(reader, new KnowledgeQuery(q, type, status, spaceId, tag), paging, ct);
             return Results.Ok(paging.ToPage(rows));
         });
+
+        knowledge.MapGet("/graph", async (UserContext user, KnowledgeGraphService service, Guid? spaceId, string? type, CancellationToken ct) =>
+            Results.Ok(await service.GetAsync(user, spaceId, type, ct)));
 
         knowledge.MapPost("/articles", async (CreateArticleRequest request, UserContext user, KnowledgeArticleService service, CancellationToken ct) =>
             ApiResults.From(await service.CreateAsync(user, request, ct), article => Results.Created($"/api/v1/knowledge/articles/{article.Article.Id}", article)));

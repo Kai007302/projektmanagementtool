@@ -415,6 +415,38 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
             methods.ArticleCount);
     }
 
+    [Fact]
+    public async Task Galaxy_contains_only_visible_articles_and_relations_between_them()
+    {
+        var article = await CreateAsync(Ada, "Galaxie-Verweis");
+        await As(Ada).PostAsJsonAsync($"/api/v1/knowledge/articles/{article.Article.Id}/relations", new CreateRelationRequest(PricingArticle.Id, "REFERENCES"));
+        await As(Ada).PostAsJsonAsync($"/api/v1/knowledge/articles/{article.Article.Id}/relations", new CreateRelationRequest(KickoffArticle.Id, "RELATED"));
+        await ChangeStatusAsync(Ada, article.Article.Id, article.Article.Version, "published");
+
+        var forAda = (await As(Ada).GetFromJsonAsync<KnowledgeGraph>("/api/v1/knowledge/graph"))!;
+        var forEva = (await As(Eva).GetFromJsonAsync<KnowledgeGraph>("/api/v1/knowledge/graph"))!;
+        var forFritz = (await As(Fritz).GetFromJsonAsync<KnowledgeGraph>("/api/v1/knowledge/graph"))!;
+
+        Assert.Contains(forAda.Nodes, n => n.Id == PricingArticle.Id);
+        Assert.Contains(forAda.Edges, e => e.Source == article.Article.Id && e.Target == PricingArticle.Id);
+        Assert.DoesNotContain(forEva.Nodes, n => n.Id == PricingArticle.Id || n.Id == StyleGuideDraft.Id);
+        Assert.DoesNotContain(forEva.Edges, e => e.Target == PricingArticle.Id);
+        Assert.Contains(forEva.Edges, e => e.Source == article.Article.Id && e.Target == KickoffArticle.Id && e.RelationType == "RELATED");
+        Assert.All(forEva.Edges, e => Assert.True(forEva.Nodes.Any(n => n.Id == e.Source) && forEva.Nodes.Any(n => n.Id == e.Target)));
+        Assert.Equal(1, forEva.Nodes.Single(n => n.Id == article.Article.Id).Degree);
+        Assert.Equal([FabrikamArticle.Id], forFritz.Nodes.Select(n => n.Id));
+        Assert.False(forEva.Truncated);
+    }
+
+    [Fact]
+    public async Task Galaxy_can_be_filtered_by_space_and_type()
+    {
+        var graph = (await As(Eva).GetFromJsonAsync<KnowledgeGraph>($"/api/v1/knowledge/graph?spaceId={PlatformSpace.Id}&type=faq"))!;
+
+        Assert.Equal([IncidentArticle.Id], graph.Nodes.Select(n => n.Id));
+        Assert.Empty(graph.Edges);
+    }
+
     private static JsonObject Paragraph(string text) => new() { ["type"] = "paragraph", ["text"] = text };
 
     private static JsonObject Blocks(params JsonNode[] blocks) => new() { ["blocks"] = new JsonArray(blocks) };

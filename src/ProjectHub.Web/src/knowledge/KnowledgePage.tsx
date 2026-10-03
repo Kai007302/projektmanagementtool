@@ -17,10 +17,13 @@ import {
   type Visibility,
 } from './api'
 import { ArticleView } from './ArticleView'
+import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
 
 type Props = { me: Me; initialArticleId?: string | null }
 
 type Open = { id: string; editing: boolean }
+
+type Mode = 'articles' | 'galaxy'
 
 export function KnowledgePage({ me, initialArticleId = null }: Props) {
   const [open, setOpen] = useState<Open | null>(initialArticleId ? { id: initialArticleId, editing: false } : null)
@@ -29,6 +32,7 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>('articles')
 
   const load = useCallback(() => {
     searchArticles(filter).then(
@@ -70,28 +74,47 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
     <section className="knowledge" aria-labelledby="knowledge-heading">
       <h2 id="knowledge-heading">Wissen</h2>
       {error && <p role="alert">{error}</p>}
-      <SearchForm spaces={spaces} tags={tags} onSearch={setFilter} />
-      <div className="project-layout">
-        <div>
-          {articles === null ? (
-            <p>Artikel werden geladen …</p>
-          ) : articles.length === 0 ? (
-            <p>Keine Artikel gefunden.</p>
-          ) : (
-            <ul className="card-list" aria-label="Artikel">
-              {articles.map((article) => (
-                <li key={article.id}>
-                  <ArticleCard article={article} onOpen={() => openArticle(article.id)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <aside className="project-side">
-          <CreateArticleForm spaces={spaces} onCreated={(id) => setOpen({ id, editing: true })} />
-          <SpacesPanel me={me} spaces={spaces} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
-        </aside>
-      </div>
+      <nav className="tabs" aria-label="Wissen anzeigen als">
+        {(['articles', 'galaxy'] as Mode[]).map((value) => (
+          <button
+            key={value}
+            type="button"
+            className={value === mode ? 'tab active' : 'tab'}
+            aria-current={value === mode ? 'page' : undefined}
+            onClick={() => setMode(value)}
+          >
+            {value === 'articles' ? 'Artikel' : 'Galaxie'}
+          </button>
+        ))}
+      </nav>
+      {mode === 'galaxy' ? (
+        <KnowledgeGalaxy spaces={spaces} onOpenArticle={openArticle} />
+      ) : (
+        <>
+          <SearchForm spaces={spaces} tags={tags} onSearch={setFilter} />
+          <div className="project-layout">
+            <div>
+              {articles === null ? (
+                <p>Artikel werden geladen …</p>
+              ) : articles.length === 0 ? (
+                <p>Keine Artikel gefunden.</p>
+              ) : (
+                <ul className="card-list" aria-label="Artikel">
+                  {articles.map((article) => (
+                    <li key={article.id}>
+                      <ArticleCard article={article} onOpen={() => openArticle(article.id)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <aside className="project-side">
+              <CreateArticleForm spaces={spaces} onCreated={(id) => setOpen({ id, editing: true })} />
+              <SpacesPanel me={me} spaces={spaces} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
+            </aside>
+          </div>
+        </>
+      )}
     </section>
   )
 }
