@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Modules.Comments;
@@ -21,6 +22,7 @@ public static class NotificationEndpoints
         services.AddSingleton<MailOutbox>();
         services.AddHostedService<MailOutboxWorker>();
         services.AddScoped<MailOutboxAdminService>();
+        services.TryAddSingleton(new NotificationChannelOptions(WebexAvailable: false));
         services.AddSingleton<NotificationDispatcher>();
         services.AddScoped<NotificationService>();
         services.AddScoped<NotificationHandlers>();

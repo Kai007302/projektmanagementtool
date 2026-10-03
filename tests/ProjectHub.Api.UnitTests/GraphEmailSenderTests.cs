@@ -44,7 +44,7 @@ public sealed class GraphEmailSenderTests
             return response;
         });
 
-        var error = await Assert.ThrowsAsync<EmailDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<MessageDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
 
         Assert.True(error.Transient);
         Assert.Equal("429 ApplicationThrottled", error.Code);
@@ -62,7 +62,7 @@ public sealed class GraphEmailSenderTests
     {
         var handler = new RecordingHandler(_ => Error(status, "SomeCode"));
 
-        var error = await Assert.ThrowsAsync<EmailDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<MessageDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
 
         Assert.Equal(transient, error.Transient);
         Assert.Equal($"{(int)status} SomeCode", error.Code);
@@ -80,8 +80,8 @@ public sealed class GraphEmailSenderTests
             Content = new StringContent("""{"error":{"code":"clara@contoso.example is invalid","message":"x"}}"""),
         });
 
-        var denied = await Assert.ThrowsAsync<EmailDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
-        var invalid = await Assert.ThrowsAsync<EmailDeliveryException>(() => Sender(odd).SendAsync(Mail, CancellationToken.None));
+        var denied = await Assert.ThrowsAsync<MessageDeliveryException>(() => Sender(handler).SendAsync(Mail, CancellationToken.None));
+        var invalid = await Assert.ThrowsAsync<MessageDeliveryException>(() => Sender(odd).SendAsync(Mail, CancellationToken.None));
 
         Assert.Equal("403 ErrorAccessDenied", denied.Code);
         Assert.Equal("400", invalid.Code);
@@ -92,8 +92,8 @@ public sealed class GraphEmailSenderTests
     {
         var down = new RecordingHandler(_ => throw new HttpRequestException("connection refused"));
 
-        var network = await Assert.ThrowsAsync<EmailDeliveryException>(() => Sender(down).SendAsync(Mail, CancellationToken.None));
-        var token = await Assert.ThrowsAsync<EmailDeliveryException>(() =>
+        var network = await Assert.ThrowsAsync<MessageDeliveryException>(() => Sender(down).SendAsync(Mail, CancellationToken.None));
+        var token = await Assert.ThrowsAsync<MessageDeliveryException>(() =>
             new GraphEmailSender(new Clients(down), new FakeCredential(fail: true), Options).SendAsync(Mail, CancellationToken.None));
 
         Assert.Equal(("network", true), (network.Code, network.Transient));

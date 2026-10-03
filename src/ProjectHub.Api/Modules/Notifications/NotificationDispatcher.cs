@@ -21,6 +21,7 @@ public sealed record NotificationOptions(string AppUrl)
 public sealed class NotificationDispatcher(
     IServiceScopeFactory scopes,
     MailOutboxSignal outbox,
+    NotificationChannelOptions channels,
     IHubContext<NotificationsHub, INotificationsClient> hub,
     NotificationOptions options,
     TimeProvider clock,
@@ -92,6 +93,24 @@ public sealed class NotificationDispatcher(
                     });
                     mails++;
                 }
+
+                if (preference.WebexEnabled && channels.WebexAvailable)
+                {
+                    // Same rule as mails: title and link only (ADR 0011).
+                    db.Set<MailOutboxEntry>().Add(new MailOutboxEntry
+                    {
+                        Id = Guid.CreateVersion7(),
+                        OrganizationId = organizationId,
+                        RecipientId = draft.RecipientId,
+                        Channel = MailOutboxChannel.Webex,
+                        ToAddress = recipients[draft.RecipientId].Email,
+                        Subject = draft.Title,
+                        Body = $"**{WebexMarkdown(draft.Title)}**\n\n[In ProjectHub öffnen]({options.AppUrl})",
+                        NextAttemptAt = now,
+                        CreatedAt = now,
+                    });
+                    mails++;
+                }
             }
 
             await db.SaveChangesAsync(ct);
@@ -123,6 +142,23 @@ public sealed class NotificationDispatcher(
         {
             logger.LogWarning(ex, "Realtime notification for user {UserId} failed", userId);
         }
+    }
+
+    /// <summary>Titles contain user text; Markdown characters are escaped so they cannot add links or formatting.</summary>
+    public static string WebexMarkdown(string text)
+    {
+        var builder = new System.Text.StringBuilder(text.Length);
+        foreach (var c in text)
+        {
+            if ("\\`*_{}[]()<>#+-.!|~".Contains(c, StringComparison.Ordinal))
+            {
+                builder.Append('\\');
+            }
+
+            builder.Append(char.IsControl(c) ? ' ' : c);
+        }
+
+        return builder.ToString();
     }
 
     public static string? Excerpt(string? text)

@@ -38,7 +38,7 @@ public sealed partial class GraphEmailSender(IHttpClientFactory httpClients, Tok
         }
         catch (AuthenticationFailedException ex)
         {
-            throw new EmailDeliveryException("token", transient: true, inner: ex);
+            throw new MessageDeliveryException("token", transient: true, inner: ex);
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"users/{Uri.EscapeDataString(options.SenderMailbox)}/sendMail")
@@ -63,11 +63,11 @@ public sealed partial class GraphEmailSender(IHttpClientFactory httpClients, Tok
         }
         catch (HttpRequestException ex)
         {
-            throw new EmailDeliveryException("network", transient: true, inner: ex);
+            throw new MessageDeliveryException("network", transient: true, inner: ex);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            throw new EmailDeliveryException("timeout", transient: true, inner: ex);
+            throw new MessageDeliveryException("timeout", transient: true, inner: ex);
         }
 
         using (response)
@@ -82,7 +82,7 @@ public sealed partial class GraphEmailSender(IHttpClientFactory httpClients, Tok
 
             // 401 usually means an expired or rotated credential, which an admin fixes without losing mails.
             var transient = status is 401 or 408 or 429 or >= 500;
-            throw new EmailDeliveryException(code is null ? $"{status}" : $"{status} {code}", transient, RetryAfter(response));
+            throw new MessageDeliveryException(code is null ? $"{status}" : $"{status} {code}", transient, RetryAfter(response));
         }
     }
 

@@ -41,7 +41,7 @@ public sealed class MailOutboxTests(InfrastructureFixture infrastructure) : ApiT
     public async Task Transient_failures_are_retried_later()
     {
         var title = Unique("Vorübergehend");
-        sender.Fail(title, new EmailDeliveryException("503", transient: true));
+        sender.Fail(title, new MessageDeliveryException("503", transient: true));
         var project = await CreateTeamProjectAsync();
         await CreateTaskAsync(Ben, project.Id, NewTask(title, assigneeId: David.Id));
 
@@ -65,7 +65,7 @@ public sealed class MailOutboxTests(InfrastructureFixture infrastructure) : ApiT
     public async Task Permanent_failures_stop_and_admins_can_retry()
     {
         var title = Unique("Dauerhaft");
-        sender.Fail(title, new EmailDeliveryException("403 ErrorAccessDenied", transient: false));
+        sender.Fail(title, new MessageDeliveryException("403 ErrorAccessDenied", transient: false));
         var project = await CreateTeamProjectAsync();
         await CreateTaskAsync(Ben, project.Id, NewTask(title, assigneeId: David.Id));
 
@@ -94,7 +94,7 @@ public sealed class MailOutboxTests(InfrastructureFixture infrastructure) : ApiT
     public async Task Transient_failures_end_after_the_last_attempt()
     {
         var title = Unique("Letzter Versuch");
-        sender.Fail(title, new EmailDeliveryException("network", transient: true));
+        sender.Fail(title, new MessageDeliveryException("network", transient: true));
         var project = await CreateTeamProjectAsync();
         await CreateTaskAsync(Ben, project.Id, NewTask(title, assigneeId: David.Id));
         await ScalarAsync("update mail_outbox set attempts = $2 where subject like $1", $"%{title}%", MailOutbox.MaxAttempts - 1);
@@ -185,7 +185,7 @@ public sealed class MailOutboxTests(InfrastructureFixture infrastructure) : ApiT
     public async Task Only_organization_admins_see_the_outbox_and_never_addresses_or_subjects()
     {
         var title = Unique("Geheim");
-        sender.Fail(title, new EmailDeliveryException("404 ErrorInvalidUser", transient: false));
+        sender.Fail(title, new MessageDeliveryException("404 ErrorInvalidUser", transient: false));
         var project = await CreateTeamProjectAsync();
         await CreateTaskAsync(Ben, project.Id, NewTask(title, assigneeId: David.Id));
         await DeliverMailsAsync();

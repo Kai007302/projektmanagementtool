@@ -8,19 +8,28 @@ public sealed record SentEmail(Guid Id, EmailMessage Message, DateTimeOffset Sen
 
 /// <summary>
 /// Hands a notification mail to the mail system (port, ADR 0010). Only the outbox worker calls this; modules write
-/// to the outbox. Throws <see cref="EmailDeliveryException"/> when the mail was not accepted.
+/// to the outbox. Throws <see cref="MessageDeliveryException"/> when the mail was not accepted.
 /// </summary>
 public interface IEmailSender
 {
     Task SendAsync(EmailMessage message, CancellationToken ct);
 }
 
+/// <summary>Delivers Webex notifications from the outbox (port, ADR 0011): a direct message to <see cref="EmailMessage.To"/>.</summary>
+public interface IWebexMessageSender
+{
+    Task SendAsync(EmailMessage message, CancellationToken ct);
+}
+
+/// <summary>Which optional channels are set up. Webex is off unless the Webex module says otherwise.</summary>
+public sealed record NotificationChannelOptions(bool WebexAvailable);
+
 /// <summary>
-/// The mail system did not accept a mail. <paramref name="Code"/> names the cause without addresses or content
-/// (for example "429 ApplicationThrottled"); transient failures are retried, permanent ones are not.
+/// A channel (mail, Webex) did not accept a message. <paramref name="code"/> names the cause without addresses or
+/// content (for example "429 ApplicationThrottled"); transient failures are retried, permanent ones are not.
 /// </summary>
-public sealed class EmailDeliveryException(string code, bool transient, TimeSpan? retryAfter = null, Exception? inner = null)
-    : Exception($"Mail delivery failed: {code}", inner)
+public sealed class MessageDeliveryException(string code, bool transient, TimeSpan? retryAfter = null, Exception? inner = null)
+    : Exception($"Message delivery failed: {code}", inner)
 {
     public string Code { get; } = code;
 

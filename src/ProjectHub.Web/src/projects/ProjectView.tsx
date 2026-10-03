@@ -10,6 +10,7 @@ import { WhiteboardPanel } from '../whiteboard/WhiteboardPanel'
 import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
+import { WebexPanel } from '../webex/WebexPanel'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
@@ -93,6 +94,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
             {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} />}
             <aside className="project-side">
               <MembersPanel project={project} onChanged={changed} />
+              <WebexPanel project={project} revision={revision} onChanged={changed} />
               <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />
               <ActivityFeed projectId={project.id} revision={revision} />
             </aside>

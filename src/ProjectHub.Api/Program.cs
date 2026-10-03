@@ -10,6 +10,7 @@ using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Integrations.Microsoft;
+using ProjectHub.Api.Modules.Integrations.Webex;
 using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Notifications;
@@ -50,6 +51,7 @@ builder.Services.AddGanttModule();
 builder.Services.AddNotificationsModule(builder.Configuration);
 builder.Services.AddMailTransport(builder.Configuration);
 builder.Services.AddCalendarModule();
+builder.Services.AddWebexModule(builder.Configuration, builder.Environment);
 builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
@@ -78,7 +80,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
     app.MapDevelopmentIdentityEndpoints(app.Environment);
-    app.MapApiV1().MapNotificationDevelopmentEndpoints();
+    app.MapApiV1().MapNotificationDevelopmentEndpoints().MapWebexDevelopmentEndpoints();
 }
 
 app.MapProjectHubHealthChecks();
@@ -94,6 +96,7 @@ app.MapApiV1()
     .MapKanbanEndpoints()
     .MapGanttEndpoints()
     .MapCalendarEndpoints()
+    .MapWebexEndpoints()
     .MapNotificationEndpoints()
     .MapWhiteboardEndpoints()
     .MapKnowledgeEndpoints();
@@ -101,6 +104,7 @@ app.MapApiV1()
 app.MapRealtimeEndpoints();
 app.MapNotificationHub();
 app.MapWhiteboardHub();
+app.MapWebexWebhook();
 
 app.Run();
 

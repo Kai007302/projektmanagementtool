@@ -14,7 +14,7 @@ export type Notification = {
   readAt: string | null
 }
 
-export type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean }
+export type NotificationPreferences = { inAppEnabled: boolean; emailEnabled: boolean; webexEnabled: boolean; webexAvailable: boolean }
 
 export const fetchNotifications = () => apiFetch<Paged<Notification>>('/api/v1/me/notifications?limit=30')
 
@@ -26,5 +26,8 @@ export const markAllRead = () => apiFetch<void>('/api/v1/me/notifications/read-a
 
 export const fetchPreferences = () => apiFetch<NotificationPreferences>('/api/v1/me/notification-preferences')
 
-export const savePreferences = (preferences: NotificationPreferences) =>
-  apiFetch<NotificationPreferences>('/api/v1/me/notification-preferences', { method: 'PUT', body: jsonBody(preferences) })
+export const savePreferences = ({ inAppEnabled, emailEnabled, webexEnabled }: NotificationPreferences) =>
+  apiFetch<NotificationPreferences>('/api/v1/me/notification-preferences', {
+    method: 'PUT',
+    body: jsonBody({ inAppEnabled, emailEnabled, webexEnabled }),
+  })

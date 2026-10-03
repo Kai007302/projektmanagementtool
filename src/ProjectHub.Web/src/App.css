@@ -1316,3 +1316,21 @@ fieldset.block-fields {
     margin-left: 0;
   }
 }
+
+/* Webex (phase 9) */
+.webex-links li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.webex-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.warning {
+  color: var(--danger, #b42318);
+}
