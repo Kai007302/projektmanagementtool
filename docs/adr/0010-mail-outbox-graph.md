@@ -9,7 +9,7 @@ ADR 0008 verschickt Benachrichtigungsmails direkt nach dem Commit über einen Fa
 
 ## Entscheidung
 
-- **Transactional Outbox in PostgreSQL:** Mails landen in `mail_outbox` (Migration 009), in derselben Transaktion wie die In-App-Benachrichtigungen. Dadurch gibt es keine Benachrichtigung ohne Mail und umgekehrt.
+- **Transactional Outbox in PostgreSQL** (DEC-029, entschieden von Kai am 2026-10-03): Mails landen in `mail_outbox` (Migration 009), in derselben Transaktion wie die In-App-Benachrichtigungen. Dadurch gibt es keine Benachrichtigung ohne Mail und umgekehrt.
 - **Versand im Hintergrund:** `MailOutboxWorker` läuft in jeder API-Instanz. Er reserviert fällige Zeilen mit `FOR UPDATE SKIP LOCKED` und setzt dabei eine **Sperrfrist** (`next_attempt_at = jetzt + 2 min`). Der Versand selbst läuft außerhalb der Transaktion; danach wird die Zeile `sent`, neu terminiert oder `failed`.
   - Instanzen arbeiten nie an derselben Zeile. Stirbt eine Instanz mitten im Versand, greift nach der Sperrfrist eine andere zu. Zustellung ist damit „mindestens einmal“; eine doppelte Mail ist im Ausnahmefall möglich und wird hingenommen (Graph `sendMail` ist nicht idempotent).
   - Neue Mails wecken den Worker derselben Instanz sofort; sonst schaut er alle 15 Sekunden nach.
