@@ -24,17 +24,17 @@ export function fetchGraph(filter: { spaceId?: string; type?: string }) {
   return apiFetch<KnowledgeGraph>(`/api/v1/knowledge/graph${suffix}`)
 }
 
-/** Colors per article type: the categories of the galaxy (legend in the view). Vivid, to glow on the dark space. */
+/** Colors per article type: the categories of the galaxy (legend in the view). Muted tones that read as planets on the dark space. */
 export const typeColors: Record<ArticleType, string> = {
-  article: '#6366f1',
-  how_to: '#06b6d4',
-  best_practice: '#10b981',
-  process: '#a855f7',
-  policy: '#f43f5e',
-  faq: '#f59e0b',
-  template: '#f97316',
-  checklist: '#ec4899',
-  glossary: '#94a3b8',
+  article: '#7c83db',
+  how_to: '#5fb0c2',
+  best_practice: '#6fb897',
+  process: '#a38bd8',
+  policy: '#d27a8c',
+  faq: '#d6ad6a',
+  template: '#d39070',
+  checklist: '#cc86b0',
+  glossary: '#9aa3b8',
 }
 
 export type Point = { x: number; y: number }

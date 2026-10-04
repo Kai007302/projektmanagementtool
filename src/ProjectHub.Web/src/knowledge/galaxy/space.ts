@@ -89,9 +89,58 @@ export function drawSpace(ctx: CanvasRenderingContext2D, space: Space, width: nu
     ctx.arc(p.x, p.y, 1.3, 0, Math.PI * 2)
     ctx.fill()
   }
+
+  drawShootingStars(ctx, width, height, time)
 }
 
 const wrap = (value: number) => ((value % 1) + 1) % 1
+
+/** Shooting stars: two independent schedules, so one crosses the sky every few seconds. */
+export function drawShootingStars(ctx: CanvasRenderingContext2D, width: number, height: number, time: number) {
+  if (time === 0) return
+  for (const [period, offset] of [
+    [7000, 0],
+    [11000, 4200],
+  ] as const) {
+    const t = time + offset
+    const cycle = Math.floor(t / period)
+    const local = t - cycle * period
+    const duration = 1200
+    if (local > duration) continue
+    const next = random(cycle * 7919 + period)
+    const fromLeft = next() < 0.5
+    const angle = Math.PI / 7 + next() * (Math.PI / 9)
+    const dx = Math.cos(angle) * (fromLeft ? 1 : -1)
+    const dy = Math.sin(angle)
+    const startX = width * (fromLeft ? 0.05 + next() * 0.5 : 0.45 + next() * 0.5)
+    const startY = height * next() * 0.35
+    const progress = local / duration
+    const travel = Math.max(width, height) * 0.45 * (1 - (1 - progress) ** 2)
+    const headX = startX + dx * travel
+    const headY = startY + dy * travel
+    const tail = 220 * (1 - progress * 0.4)
+    const alpha = Math.sin(progress * Math.PI)
+    const streak = ctx.createLinearGradient(headX - dx * tail, headY - dy * tail, headX, headY)
+    streak.addColorStop(0, 'rgba(255, 255, 255, 0)')
+    streak.addColorStop(0.7, `rgba(251, 207, 232, ${0.5 * alpha})`)
+    streak.addColorStop(1, `rgba(255, 255, 255, ${alpha})`)
+    ctx.strokeStyle = streak
+    ctx.lineWidth = 2.4
+    ctx.lineCap = 'round'
+    ctx.beginPath()
+    ctx.moveTo(headX - dx * tail, headY - dy * tail)
+    ctx.lineTo(headX, headY)
+    ctx.stroke()
+    ctx.lineCap = 'butt'
+    const head = ctx.createRadialGradient(headX, headY, 0, headX, headY, 6)
+    head.addColorStop(0, `rgba(255, 255, 255, ${alpha})`)
+    head.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    ctx.fillStyle = head
+    ctx.beginPath()
+    ctx.arc(headX, headY, 6, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
 
 /** Gentle floating offset of a bubble in world units; 0 when motion is reduced. */
 export function float(id: string, time: number): { x: number; y: number } {

@@ -30,7 +30,7 @@ export function computeLayout(input: LayoutInput, onProgress: (positions: Positi
   const simulation = forceSimulation(nodes)
     .force('link', forceLink<SimNode, { source: string; target: string }>(links).id((d) => d.id).distance(130).strength(0.4))
     .force('charge', forceManyBody().strength(-250).distanceMax(700))
-    .force('collide', forceCollide<SimNode>((d) => bubbleRadius(d.degree) + 12))
+    .force('collide', forceCollide<SimNode>((d) => bubbleRadius(d.degree) * (d.degree >= 3 ? 1.6 : 1.15) + 12))
     .force('x', forceX<SimNode>((d) => anchor.get(d.group)!.x).strength(0.1))
     .force('y', forceY<SimNode>((d) => anchor.get(d.group)!.y).strength(0.1))
     .force('center', forceCenter(0, 0))
