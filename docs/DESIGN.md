@@ -20,3 +20,4 @@ Alle Farben, Radien und Schatten stehen als CSS-Variablen in `src/ProjectHub.Web
 - **Karten und Panels:** weiß, 1 px Rahmen, großer Radius, sehr leichter Schatten. Überschriften von Seitenpanels klein in Versalien.
 - **Buttons:** primär = Akzentfarbe (`type="submit"`), sonst weiß mit Rahmen; Löschen rot umrandet.
 - **Barrierefreiheit:** Die Playwright-Prüfung `e2e/accessibility.spec.ts` (axe, WCAG 2.1 AA) muss grün bleiben, insbesondere der Farbkontrast.
+- **Wissensgalaxie:** die einzige dunkle Fläche der App. Ein violett-pinker Raum mit Sternen und einem langsam treibenden Netz im Hintergrund (reine Dekoration, `galaxy/space.ts`). Artikel sind leuchtende Kugeln in der Farbe ihrer Art, mit dem Titel darin, die leicht schweben, Beziehungen sind leicht gebogene Lichtfäden. Mit `prefers-reduced-motion` steht alles still.

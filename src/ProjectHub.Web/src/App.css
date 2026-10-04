@@ -868,9 +868,9 @@ fieldset.block-fields {
 
 .galaxy-canvas canvas {
   display: block;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: radial-gradient(circle at 50% 40%, #ffffff 0%, #eef2f8 100%);
+  border-radius: var(--radius-lg);
+  background: #12052a;
+  box-shadow: 0 10px 30px rgb(36 9 63 / 0.35);
   cursor: grab;
   touch-action: none;
 }
@@ -886,20 +886,33 @@ fieldset.block-fields {
 
 .galaxy-controls {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 0.75rem;
+  right: 0.75rem;
   display: flex;
   gap: 0.25rem;
 }
 
+.galaxy-controls button {
+  border-color: rgb(255 255 255 / 0.2);
+  background: rgb(255 255 255 / 0.12);
+  color: #ffffff;
+  backdrop-filter: blur(6px);
+  box-shadow: none;
+}
+
+.galaxy-controls button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.24);
+}
+
 .galaxy-tooltip {
   position: absolute;
-  left: 0.5rem;
-  bottom: 3.5rem;
+  left: 0.75rem;
+  bottom: 4rem;
   max-width: 80%;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  background: rgba(28, 36, 48, 0.9);
+  padding: 0.375rem 0.625rem;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: var(--radius);
+  background: rgb(18 5 42 / 0.85);
   color: #ffffff;
   font-size: 0.875rem;
   pointer-events: none;

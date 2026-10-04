@@ -16,13 +16,16 @@ import {
   type Positions,
   type Transform,
 } from './graph'
+import { createSpace, drawSpace, float, wrapTitle } from './space'
 import { useLayout } from './useLayout'
 
 type Props = { spaces: Space[]; onOpenArticle: (id: string) => void }
 
 type View = 'galaxy' | 'list'
 
-const HEIGHT = 560
+const HEIGHT = 600
+/** Room around the outermost bubbles when the whole galaxy is shown. */
+const FIT_PADDING = 90
 
 function usePrefersReducedMotion() {
   const query = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
@@ -37,7 +40,8 @@ function usePrefersReducedMotion() {
 }
 
 /**
- * Knowledge Galaxy: articles as stars, relations as lines, colored by article type.
+ * Knowledge Galaxy: articles as glowing bubbles with their title, relations as threads of light,
+ * colored by article type, floating in a violet space.
  * Canvas 2D with a d3-force layout (docs/OPEN_DECISIONS.md, Knowledge Galaxy renderer). The list view
  * shows the same graph for keyboard and screen reader users.
  */
@@ -179,95 +183,144 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     return focus ? new Set([focus, ...neighborsOf(graph, focus).map((n) => n.node.id)]) : null
   }, [graph, selectedId, hoverId])
 
-  const draw = useCallback(() => {
-    frame.current = null
-    const element = canvas.current
-    const ctx = element?.getContext('2d')
-    if (!element || !ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const t = transform.current
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, HEIGHT)
-    ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y)
+  const space = useMemo(() => createSpace(), [])
+  const titleCache = useRef(new Map<string, string[]>())
 
-    const incident = (source: string, target: string) => neighborIds !== null && (source === (selectedId ?? hoverId) || target === (selectedId ?? hoverId))
-    ctx.lineWidth = 1 / t.k
-    ctx.strokeStyle = neighborIds ? 'rgba(90, 101, 115, 0.12)' : 'rgba(90, 101, 115, 0.35)'
-    ctx.beginPath()
-    for (const edge of graph.edges) {
-      const a = positions[edge.source]
-      const b = positions[edge.target]
-      if (!a || !b || incident(edge.source, edge.target)) continue
-      ctx.moveTo(a.x, a.y)
-      ctx.lineTo(b.x, b.y)
-    }
-    ctx.stroke()
-    if (neighborIds) {
-      ctx.lineWidth = 2 / t.k
-      ctx.strokeStyle = 'rgba(42, 91, 215, 0.8)'
-      ctx.beginPath()
-      for (const edge of graph.edges) {
-        const a = positions[edge.source]
-        const b = positions[edge.target]
-        if (!a || !b || !incident(edge.source, edge.target)) continue
-        ctx.moveTo(a.x, a.y)
-        ctx.lineTo(b.x, b.y)
+  /** Paints one frame; <paramref name="time"/> drives the floating and twinkling (0 = still). */
+  const draw = useCallback(
+    (time: number) => {
+      frame.current = null
+      const element = canvas.current
+      const ctx = element?.getContext('2d')
+      if (!element || !ctx) return
+      const dpr = window.devicePixelRatio || 1
+      const t = transform.current
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      drawSpace(ctx, space, width, HEIGHT, time, t)
+      ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y)
+
+      const focus = selectedId ?? hoverId
+      const at = (id: string) => {
+        const p = positions[id]
+        if (!p) return null
+        const offset = float(id, time)
+        return { x: p.x + offset.x, y: p.y + offset.y }
       }
-      ctx.stroke()
-    }
 
-    // One path per type and emphasis keeps hundreds of nodes cheap to draw.
-    for (const dimmed of [true, false]) {
-      ctx.globalAlpha = dimmed ? 0.2 : 1
-      for (const type of Object.keys(typeColors) as ArticleType[]) {
-        ctx.fillStyle = typeColors[type]
+      // Relations: softly curved threads of light; the ones of the focused article shine brighter.
+      const glow = graph.nodes.length <= 150
+      for (const highlighted of [false, true]) {
+        if (highlighted && !focus) continue
+        ctx.lineWidth = (highlighted ? 2.5 : 1.4) / t.k
+        ctx.strokeStyle = highlighted ? 'rgba(251, 207, 232, 0.95)' : focus ? 'rgba(244, 170, 255, 0.12)' : 'rgba(244, 170, 255, 0.4)'
+        ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
+        ctx.shadowBlur = highlighted && glow ? 12 : 0
         ctx.beginPath()
-        for (const node of graph.nodes) {
-          const p = positions[node.id]
-          if (!p || node.articleType !== type || (neighborIds !== null && !neighborIds.has(node.id)) !== dimmed) continue
-          const r = nodeRadius(node)
-          ctx.moveTo(p.x + r, p.y)
-          ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+        for (const edge of graph.edges) {
+          const a = at(edge.source)
+          const b = at(edge.target)
+          if (!a || !b || (edge.source === focus || edge.target === focus) !== highlighted) continue
+          const bend = 0.12
+          ctx.moveTo(a.x, a.y)
+          ctx.quadraticCurveTo((a.x + b.x) / 2 - (b.y - a.y) * bend, (a.y + b.y) / 2 + (b.x - a.x) * bend, b.x, b.y)
         }
-        ctx.fill()
+        ctx.stroke()
       }
-    }
-    ctx.globalAlpha = 1
+      ctx.shadowBlur = 0
 
-    for (const [id, color, width] of [
-      [hoverId, '#1c2430', 1.5],
-      [selectedId, '#1c2430', 3],
-    ] as const) {
-      const node = id ? graph.nodes.find((n) => n.id === id) : null
-      const p = node ? positions[node.id] : null
-      if (!node || !p) continue
-      ctx.lineWidth = width / t.k
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, nodeRadius(node) + 3 / t.k, 0, Math.PI * 2)
-      ctx.stroke()
-    }
+      // Bubbles: glowing spheres in the color of their type, the title inside.
+      const showAllLabels = graph.nodes.length <= 40 || t.k >= 1.6
+      for (const node of graph.nodes) {
+        const p = at(node.id)
+        if (!p) continue
+        const r = nodeRadius(node)
+        const sx = p.x * t.k + t.x
+        const sy = p.y * t.k + t.y
+        const sr = r * t.k
+        if (sx < -sr - 200 || sx > width + sr || sy < -sr || sy > HEIGHT + sr) continue
+        const color = typeColors[node.articleType]
+        const dimmed = neighborIds !== null && !neighborIds.has(node.id)
+        ctx.globalAlpha = dimmed ? 0.25 : 1
 
-    // Labels: all when zoomed in or few articles, otherwise only around the focus.
-    const showAll = graph.nodes.length <= 40 || t.k >= 1.6
-    ctx.font = `${12 / t.k}px system-ui, sans-serif`
-    ctx.fillStyle = '#1c2430'
-    for (const node of graph.nodes) {
-      const p = positions[node.id]
-      if (!p || !(showAll || neighborIds?.has(node.id))) continue
-      if (neighborIds && !neighborIds.has(node.id)) continue
-      const sx = p.x * t.k + t.x
-      const sy = p.y * t.k + t.y
-      if (sx < -200 || sx > width + 20 || sy < -20 || sy > HEIGHT + 20) continue
-      ctx.fillText(node.title, p.x + nodeRadius(node) + 4 / t.k, p.y + 4 / t.k)
-    }
-  }, [graph, positions, width, neighborIds, selectedId, hoverId])
+        ctx.shadowColor = color
+        ctx.shadowBlur = glow && !dimmed ? Math.min(40, 18 + sr * 0.3) : 0
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.shadowBlur = 0
 
-  const requestDraw = useCallback(() => {
-    if (frame.current === null) frame.current = requestAnimationFrame(draw)
+        const shine = ctx.createRadialGradient(p.x - r * 0.35, p.y - r * 0.4, r * 0.1, p.x, p.y, r)
+        shine.addColorStop(0, 'rgba(255, 255, 255, 0.5)')
+        shine.addColorStop(0.6, 'rgba(255, 255, 255, 0.06)')
+        shine.addColorStop(1, 'rgba(18, 5, 42, 0.25)')
+        ctx.fillStyle = shine
+        ctx.fill()
+        ctx.lineWidth = 1.2 / t.k
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'
+        ctx.stroke()
+
+        if (node.id === hoverId || node.id === selectedId) {
+          ctx.lineWidth = (node.id === selectedId ? 3 : 1.5) / t.k
+          ctx.strokeStyle = '#ffffff'
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, r + 5 / t.k, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+
+        if (dimmed) continue
+        if (sr >= 22) {
+          const px = Math.min(15, Math.max(9, sr * 0.24))
+          ctx.font = `600 ${px / t.k}px system-ui, sans-serif`
+          const key = `${node.id}:${px.toFixed(1)}:${t.k.toFixed(3)}:${node.title}`
+          let lines = titleCache.current.get(key)
+          if (!lines) {
+            if (titleCache.current.size > 2000) titleCache.current.clear()
+            lines = wrapTitle(ctx, node.title, r * 1.7, sr >= 30 ? 3 : 2)
+            titleCache.current.set(key, lines)
+          }
+          const lineHeight = (px * 1.2) / t.k
+          ctx.fillStyle = '#ffffff'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.shadowColor = 'rgba(18, 5, 42, 0.8)'
+          ctx.shadowBlur = 4
+          lines.forEach((line, i) => ctx.fillText(line, p.x, p.y + (i - (lines.length - 1) / 2) * lineHeight))
+          ctx.shadowBlur = 0
+          ctx.textAlign = 'start'
+          ctx.textBaseline = 'alphabetic'
+        } else if (showAllLabels || neighborIds?.has(node.id)) {
+          ctx.font = `${12 / t.k}px system-ui, sans-serif`
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+          ctx.fillText(node.title, p.x + r + 4 / t.k, p.y + 4 / t.k)
+        }
+      }
+      ctx.globalAlpha = 1
+    },
+    [graph, positions, width, neighborIds, selectedId, hoverId, space],
+  )
+
+  // Without reduced motion a frame loop keeps the bubbles floating; otherwise draw on change only.
+  const drawLatest = useRef(draw)
+  useEffect(() => {
+    drawLatest.current = draw
   }, [draw])
 
-  useEffect(requestDraw, [requestDraw])
+  useEffect(() => {
+    if (reducedMotion) return
+    let id = requestAnimationFrame(function loop(now) {
+      drawLatest.current(now)
+      id = requestAnimationFrame(loop)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [reducedMotion])
+
+  const requestDraw = useCallback(() => {
+    if (reducedMotion && frame.current === null) frame.current = requestAnimationFrame(() => drawLatest.current(0))
+  }, [reducedMotion])
+
+  useEffect(requestDraw, [requestDraw, draw])
+
 
   // Reset the refs as well: StrictMode unmounts and mounts again, and a stale id would block drawing.
   useEffect(
@@ -313,7 +366,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     [reducedMotion, setTransform],
   )
 
-  const fit = useCallback(() => setTransform(fitTransform(Object.values(positions), width, HEIGHT)), [positions, width, setTransform])
+  const fit = useCallback(() => setTransform(fitTransform(Object.values(positions), width, HEIGHT, FIT_PADDING)), [positions, width, setTransform])
 
   // Follow the settling layout until the person moves the view themselves.
   useEffect(() => {
@@ -323,7 +376,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   // Focus the selected article.
   useEffect(() => {
     const p = selectedId ? positions[selectedId] : null
-    if (p && settled) animateTo(focusTransform(p, width, HEIGHT, Math.max(transform.current.k, 1.8)))
+    if (p && settled) animateTo(focusTransform(p, width, HEIGHT, Math.max(transform.current.k, 1.2)))
   }, [selectedId, settled, positions, width, animateTo])
 
   useEffect(() => {
@@ -445,7 +498,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
           type="button"
           onClick={() => {
             userMoved.current = false
-            animateTo(fitTransform(Object.values(positions), width, HEIGHT))
+            animateTo(fitTransform(Object.values(positions), width, HEIGHT, FIT_PADDING))
           }}
         >
           Alles zeigen
@@ -548,7 +601,7 @@ function Legend({ graph }: { graph: KnowledgeGraph }) {
             </li>
           ))}
       </ul>
-      <p className="muted">Größere Sterne haben mehr Beziehungen.</p>
+      <p className="muted">Größere Kugeln haben mehr Beziehungen.</p>
     </section>
   )
 }
