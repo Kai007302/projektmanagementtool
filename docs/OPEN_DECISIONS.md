@@ -16,7 +16,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel; Sicherung, Wiederherstellung und Übung in `docs/OPERATIONS.md` |
 | DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
 | DEC-012 | Mail als Benutzer | offen | zunächst nein; nur System-Mailbox |
-| DEC-013 | Benutzer-Provisionierung | offen | Benutzer werden nicht automatisch beim ersten Login angelegt; Abgleich über Entra Groups/SCIM oder Just-in-Time klären. Bis dahin: unbekannte Benutzer erhalten 403 |
+| DEC-013 | Benutzer-Provisionierung | entschieden (Kai, 2026-10-04) für den eigenen Server | `PROJECTHUB_USER_PROVISIONING=first-sign-in`: Personen des konfigurierten Mandanten werden beim ersten Login angelegt, die erste wird Admin; Einschränkung über „Zuweisung erforderlich“ in Entra (ADR 0014). Standard bleibt `off` (unbekannte Benutzer erhalten 403). SCIM/Gruppen-Abgleich bleibt Option für große Organisationen |
 | DEC-014 | Rolle `member` vs. `editor` im Projekt | offen | `member` arbeitet an Inhalten (Tasks, Kommentare), `editor` ändert zusätzlich Projektdaten und Struktur; mit Fachbereich bestätigen |
 | DEC-015 | Status-Workflow für Aufgaben | offen | feste Status `todo`/`in_progress`/`done`, frei wechselbar; Kanban-Spalten sind frei benennbar und gehören je zu einem Status (Migration 005). Eigene Status je Projekt erst bei Bedarf |
 | DEC-016 | Wer darf Projekte anlegen | offen | jeder aktive Benutzer der Organisation, die anlegende Person wird Projekt-Admin; einschränkbar über `CanCreateProject` |

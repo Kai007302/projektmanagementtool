@@ -134,6 +134,8 @@ PROJECTHUB_E2E_BASE_URL=http://localhost:8080 npm run e2e
 
 `docker compose --profile app up --build` baut und startet API und Web-Container (ADR 0012); die App läuft dann auf http://localhost:8080. Standard ist Development mit den synthetischen Benutzern. Der Web-Container liefert den Produktions-Build mit Sicherheits-Headern aus und leitet `/api` und `/health` an die API weiter, damit der Browser nur eine Adresse kennt. TLS übernimmt im Betrieb der Ingress davor. Konfiguration, Probes, Backup und Restore, Ausfälle und den Lasttest beschreibt `docs/OPERATIONS.md`.
 
+Für den Betrieb auf einem eigenen Server (Anmeldung mit Microsoft Entra ID, TLS über Caddy, Sicherung per Skript) gibt es `docker-compose.prod.yml`; Schritt für Schritt in `docs/SELF_HOSTING.md`.
+
 ### Projektstruktur
 
 ```text
@@ -158,7 +160,7 @@ Vor jeder Implementierung zuerst lesen:
 4. `docs/SECURITY.md` und `docs/PERMISSIONS.md`
 5. `docs/DATA_MODEL.md`
 6. `docs/OPEN_DECISIONS.md`
-7. für Betrieb und Deployment: `docs/OPERATIONS.md`
+7. für Betrieb und Deployment: `docs/OPERATIONS.md`, für einen eigenen Server mit Docker: `docs/SELF_HOSTING.md`
 8. den relevanten Sprint-Prompt unter `ai/prompts/`
 
 ## Entwicklungsreihenfolge
@@ -175,6 +177,7 @@ Phase 7  Whiteboard
 Phase 8  Microsoft 365
 Phase 9  Webex
 Phase 10 Enterprise Hardening
+Phase 11 Eigener Server (Docker, Microsoft-Anmeldung)
 ```
 
 ## Grundregel

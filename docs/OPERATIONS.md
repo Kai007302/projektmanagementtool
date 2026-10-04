@@ -1,6 +1,6 @@
 # Betrieb
 
-Betriebshandbuch für ProjectHub im Pilotbetrieb. Hosting (DEC-002) und Region (DEC-001) sind offen; alles hier gilt für App Service und Container Apps gleichermaßen. Auslieferung und HTTP-Härtung: ADR 0012. Telemetrie, Logs und Migrationssperre: ADR 0013.
+Betriebshandbuch für ProjectHub im Pilotbetrieb. Hosting (DEC-002) und Region (DEC-001) sind offen; alles hier gilt für App Service und Container Apps gleichermaßen. Auslieferung und HTTP-Härtung: ADR 0012. Telemetrie, Logs und Migrationssperre: ADR 0013. Betrieb auf einem einzelnen eigenen Server mit Docker: `docs/SELF_HOSTING.md` (ADR 0014).
 
 ## Aufbau
 

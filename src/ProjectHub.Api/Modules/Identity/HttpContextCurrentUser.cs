@@ -14,5 +14,5 @@ internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcc
 
     public string? DisplayName => Principal?.FindFirstValue(IdentityClaimTypes.Name);
 
-    public string? Email => Principal?.FindFirstValue(IdentityClaimTypes.Email);
+    public string? Email => Principal?.FindFirstValue(IdentityClaimTypes.Email) ?? Principal?.FindFirstValue(IdentityClaimTypes.UserPrincipalName);
 }

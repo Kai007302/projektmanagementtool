@@ -103,6 +103,10 @@ Umsetzung (ADR 0009): eigener SignalR-Hub im API-Server, Updates werden geprüft
 
 Zwei Container (ADR 0012): Nginx liefert die Oberfläche aus und leitet `/api` (einschließlich WebSockets) und `/health` an die API weiter; Browser sprechen nur mit dieser einen Origin. TLS endet am Ingress (Front Door/App Service/Container Apps), die API ist nur intern erreichbar und übernimmt Client-Adresse und Schema aus genau einem Proxy-Eintrag.
 
+## Anmeldung
+
+Außerhalb von Development meldet die Oberfläche Personen per MSAL (Authorization Code mit PKCE, Weiterleitung) bei Entra ID an und schickt das Access Token an die API; Mandant und Client-ID liefert `GET /api/v1/sign-in`. Optional legt die API Personen beim ersten Login an (ADR 0014).
+
 ## Betrieb
 
 Telemetrie per OpenTelemetry/OTLP, sobald `OTEL_EXPORTER_OTLP_ENDPOINT` gesetzt ist; Logs außerhalb von Development als JSON mit Trace-ID; Migrationen beim Start unter einer PostgreSQL-Advisory-Sperre (ADR 0013). Probes, Skalierung, Backup/Restore und Ausfälle: `docs/OPERATIONS.md`.

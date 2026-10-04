@@ -1,6 +1,7 @@
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { useEffect, useRef } from 'react'
 import { devIdentityEnabled, getDevUser } from '../identity/devUser'
+import { hubConnectionOptions } from '../identity/signIn'
 
 const hubPath = '/api/v1/hubs/notifications'
 
@@ -11,7 +12,7 @@ const hubPath = '/api/v1/hubs/notifications'
 export function subscribeToNotifications(onChange: (unreadCount: number | null) => void): () => void {
   const devUser = devIdentityEnabled ? getDevUser() : null
   const url = devUser ? `${hubPath}?devUser=${encodeURIComponent(devUser)}` : hubPath
-  const connection = new HubConnectionBuilder().withUrl(url).withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
+  const connection = new HubConnectionBuilder().withUrl(url, hubConnectionOptions).withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
 
   connection.on('NotificationsChanged', (message: { unreadCount: number }) => onChange(message.unreadCount))
   // After a reconnect we may have missed messages: let the caller reload.

@@ -9,8 +9,10 @@ obj/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 *.log
 coverage/
 TestResults/
 .DS_Store
 .data/
+/backups/
