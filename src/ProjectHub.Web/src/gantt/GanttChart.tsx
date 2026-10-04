@@ -38,6 +38,7 @@ import {
   type DragMode,
   type Zoom,
 } from './timeline'
+import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -78,9 +79,10 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
   const scroller = useRef<HTMLDivElement>(null)
   const { canContribute, canEdit } = project.capabilities
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchGantt(project.id).then(setGantt, (e: Error) => setError(e.message))
-  }, [project.id])
+    latest(fetchGantt(project.id)).then(setGantt, (e: Error) => setError(e.message))
+  }, [latest, project.id])
 
   useEffect(load, [load, revision])
 
@@ -136,11 +138,15 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
     const dueDate = span ? formatDay(span.end) : null
     if (startDate === task.startDate && dueDate === task.dueDate) return
     saving.current = true
-    setGantt((current) =>
-      current && { ...current, tasks: current.tasks.map((t) => (t.id === task.id ? { ...t, startDate, dueDate } : t)) },
-    )
+    const show = (changes: Partial<GanttTask>) => {
+      // Loads still on their way predate this change and must not undo it.
+      latest.invalidate()
+      setGantt((current) => current && { ...current, tasks: current.tasks.map((t) => (t.id === task.id ? { ...t, ...changes } : t)) })
+    }
+    show({ startDate, dueDate })
     try {
-      await run(() => updateTask(task.id, task.version, { startDate, dueDate }))
+      // The new version lets the next change follow right away, before the chart has reloaded.
+      await run(async () => show({ version: (await updateTask(task.id, task.version, { startDate, dueDate })).version }))
     } finally {
       saving.current = false
     }
@@ -379,7 +385,7 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
       </div>
       {selectedTask && (
         <TaskSchedule
-          key={`${selectedTask.id}-${selectedTask.version}`}
+          key={selectedTask.id}
           project={project}
           me={me}
           task={selectedTask}
@@ -423,6 +429,13 @@ type ScheduleProps = {
 function TaskSchedule({ project, me, task, gantt, canContribute, onReschedule, onLink, onUnlink, onChanged, onClose }: ScheduleProps) {
   const [start, setStart] = useState(task.startDate ?? '')
   const [end, setEnd] = useState(task.dueDate ?? '')
+  // Dates changed elsewhere (dragging, others) replace the form's; a chosen predecessor survives reloads.
+  const [shownDates, setShownDates] = useState([task.startDate, task.dueDate])
+  if (shownDates[0] !== task.startDate || shownDates[1] !== task.dueDate) {
+    setShownDates([task.startDate, task.dueDate])
+    setStart(task.startDate ?? '')
+    setEnd(task.dueDate ?? '')
+  }
   const [message, setMessage] = useState<string | null>(null)
   const [source, setSource] = useState('')
   const [type, setType] = useState<DependencyType>('finish_to_start')

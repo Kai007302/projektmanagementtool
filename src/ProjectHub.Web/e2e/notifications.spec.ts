@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { type APIRequestContext } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, signInAs, uniqueTitle } from './helpers'
 
 // Phase 6 acceptance: a notification arrives live, opens its task, and the mail setting is respected.

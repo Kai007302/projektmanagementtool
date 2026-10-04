@@ -31,10 +31,14 @@ public static class IdentityModule
 
     public const string ApiV1Prefix = "/api/v1";
 
-    /// <summary>Resolves the <see cref="UserContext"/> for /api/v1. Must run after UseAuthorization.</summary>
+    /// <summary>
+    /// Resolves the <see cref="UserContext"/> for /api/v1. Must run after UseAuthorization. Anonymous endpoints
+    /// (webhooks, which authenticate by signature) have no user.
+    /// </summary>
     public static IApplicationBuilder UseUserContext(this IApplicationBuilder app) =>
         app.UseWhen(
-            context => context.Request.Path.StartsWithSegments(ApiV1Prefix),
+            context => context.Request.Path.StartsWithSegments(ApiV1Prefix)
+                       && context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is null,
             branch => branch.UseMiddleware<UserContextMiddleware>());
 
     public static RouteGroupBuilder MapApiV1(this IEndpointRouteBuilder endpoints) =>

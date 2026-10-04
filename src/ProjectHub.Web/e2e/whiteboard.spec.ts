@@ -1,4 +1,5 @@
-import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test'
+import { type APIRequestContext, type Browser, type Page } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, signInAs, uniqueTitle } from './helpers'
 
 // Phase 7 acceptance: two people draw on the same whiteboard live, a viewer follows, content survives a reload.

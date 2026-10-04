@@ -10,6 +10,7 @@ import {
   type ProjectWebex,
   type WebexLinkKind,
 } from './api'
+import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; revision: number; onChanged: () => void }
 
@@ -23,9 +24,10 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
   const [url, setUrl] = useState('')
   const { canEdit } = project.capabilities
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchProjectWebex(project.id).then(setWebex, (e: Error) => setError(e.message))
-  }, [project.id])
+    latest(fetchProjectWebex(project.id)).then(setWebex, (e: Error) => setError(e.message))
+  }, [latest, project.id])
 
   useEffect(load, [load, revision])
 

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, searchArticles, signInAs, uniqueTitle } from './helpers'
 
 // Phase 3 acceptance: create, edit and publish an article, with the visibility rules of DEC-020.

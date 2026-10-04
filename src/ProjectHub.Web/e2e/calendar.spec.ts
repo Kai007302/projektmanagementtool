@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { type APIRequestContext } from '@playwright/test'
+import { expect, test } from './fixtures'
 import { expectAlertFree, signInAs, uniqueTitle } from './helpers'
 
 // Phase 8 acceptance: tasks and milestones go into the person's own calendar without Graph permissions.

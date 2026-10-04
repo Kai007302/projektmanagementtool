@@ -1,4 +1,4 @@
-import { getDevUser } from '../identity/devUser'
+import { devIdentityEnabled, getDevUser } from '../identity/devUser'
 
 export class ApiError extends Error {
   readonly status: number
@@ -23,7 +23,7 @@ function messageOf(problem: ProblemDetails | null, status: number): string {
 async function send(path: string, init: RequestInit): Promise<Response> {
   const headers = new Headers(init.headers)
   if (init.body !== undefined && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
-  const devUser = import.meta.env.DEV ? getDevUser() : null
+  const devUser = devIdentityEnabled ? getDevUser() : null
   if (devUser) headers.set('X-Dev-User', devUser)
 
   const response = await fetch(path, { ...init, headers })

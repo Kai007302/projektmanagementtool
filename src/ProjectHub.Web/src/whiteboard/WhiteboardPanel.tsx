@@ -4,6 +4,7 @@ import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { createWhiteboard, deleteWhiteboard, fetchWhiteboards, renameWhiteboard, type Whiteboard } from './api'
 import { BoardEditor } from './BoardEditor'
+import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -15,15 +16,16 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null)
   const { canEdit } = project.capabilities
 
+  const latest = useLatest()
   const load = useCallback(() => {
-    fetchWhiteboards(project.id).then(
+    latest(fetchWhiteboards(project.id)).then(
       (page) => {
         setBoards(page.items)
         setSelectedId((current) => (current && page.items.some((b) => b.id === current) ? current : (page.items[0]?.id ?? null)))
       },
       (e: Error) => setError(e.message),
     )
-  }, [project.id])
+  }, [latest, project.id])
 
   // Reloads when anyone changes the project, so renamed or deleted boards show up for everyone.
   useEffect(load, [load, revision])
