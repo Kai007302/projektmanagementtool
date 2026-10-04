@@ -1,0 +1,118 @@
+# ProjectHub on a single server with Docker (docs/SELF_HOSTING.md, ADR 0014).
+#   cp .env.prod.example .env    # fill in domain, Entra IDs, database password
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Caddy terminates TLS (Let's Encrypt) and is the only service with public ports. Migrations run once in the
+# "migrate" service before the API starts; the API itself never migrates (PROJECTHUB_APPLY_MIGRATIONS=false).
+name: projecthub
+
+x-database: &database
+  PROJECTHUB_DB_CONNECTION: Host=postgres;Port=5432;Database=projecthub;Username=projecthub;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env};GSS Encryption Mode=Disable
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PROJECTHUB_DOMAIN: ${PROJECTHUB_DOMAIN:?PROJECTHUB_DOMAIN fehlt in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+  web:
+    build:
+      context: src/ProjectHub.Web
+      args:
+        VITE_DEV_IDENTITY: "false"
+    image: projecthub-web:local
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: src/ProjectHub.Api/Dockerfile
+    image: projecthub-api:local
+    restart: unless-stopped
+    environment:
+      <<: *database
+      ASPNETCORE_ENVIRONMENT: Production
+      REDIS_CONNECTION: redis:6379
+      PROJECTHUB_APPLY_MIGRATIONS: "false"
+      PROJECTHUB_SEED_DEVELOPMENT_DATA: "false"
+      # Caddy -> web (nginx) -> api: the API sees exactly one forwarding proxy entry, Caddy's.
+      PROJECTHUB_TRUST_FORWARDED_HEADERS: "true"
+      PROJECTHUB_APP_URL: https://${PROJECTHUB_DOMAIN}
+      PROJECTHUB_PUBLIC_API_URL: https://${PROJECTHUB_DOMAIN}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?ENTRA_TENANT_ID fehlt in .env}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:?ENTRA_CLIENT_ID fehlt in .env}
+      ENTRA_API_SCOPE: ${ENTRA_API_SCOPE:-}
+      PROJECTHUB_USER_PROVISIONING: ${PROJECTHUB_USER_PROVISIONING:-first-sign-in}
+      PROJECTHUB_ORGANIZATION_NAME: ${PROJECTHUB_ORGANIZATION_NAME:-ProjectHub}
+      PROJECTHUB_MAIL_TRANSPORT: ${PROJECTHUB_MAIL_TRANSPORT:-fake}
+      MICROSOFT_GRAPH_TENANT_ID: ${MICROSOFT_GRAPH_TENANT_ID:-}
+      MICROSOFT_GRAPH_CLIENT_ID: ${MICROSOFT_GRAPH_CLIENT_ID:-}
+      MICROSOFT_GRAPH_CLIENT_SECRET: ${MICROSOFT_GRAPH_CLIENT_SECRET:-}
+      MICROSOFT_GRAPH_SENDER_MAILBOX: ${MICROSOFT_GRAPH_SENDER_MAILBOX:-}
+      PROJECTHUB_WEBEX_TRANSPORT: ${PROJECTHUB_WEBEX_TRANSPORT:-off}
+      WEBEX_BOT_TOKEN: ${WEBEX_BOT_TOKEN:-}
+      WEBEX_WEBHOOK_SECRET: ${WEBEX_WEBHOOK_SECRET:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    volumes:
+      - projecthub-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  migrate:
+    # Same image as the API (built by the api service); only migrates and exits.
+    image: projecthub-api:local
+    pull_policy: never
+    command: ["--migrate"]
+    restart: "no"
+    environment:
+      <<: *database
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: projecthub
+      POSTGRES_USER: projecthub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U projecthub -d projecthub"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Realtime fan-out only (ADR 0003): nothing to persist.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres:
+  projecthub-data:
+  caddy-data:
+  caddy-config:

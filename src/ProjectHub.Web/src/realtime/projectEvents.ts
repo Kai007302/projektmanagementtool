@@ -1,6 +1,7 @@
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
 import { useEffect, useRef } from 'react'
 import { devIdentityEnabled, getDevUser } from '../identity/devUser'
+import { hubConnectionOptions } from '../identity/signIn'
 
 export type ProjectChange = { projectId: string; area: 'tasks' | 'board' | 'gantt' | 'whiteboards' | 'webex' }
 
@@ -15,7 +16,7 @@ export function subscribeToProject(projectId: string, onChange: (change: Project
   const devUser = devIdentityEnabled ? getDevUser() : null
   const url = devUser ? `${hubPath}?devUser=${encodeURIComponent(devUser)}` : hubPath
   const connection = new HubConnectionBuilder()
-    .withUrl(url)
+    .withUrl(url, hubConnectionOptions)
     .withAutomaticReconnect()
     .configureLogging(LogLevel.Warning)
     .build()

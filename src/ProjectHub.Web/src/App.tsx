@@ -3,6 +3,7 @@ import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
+import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
@@ -89,6 +90,11 @@ function App() {
             </div>
           )}
           {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
+          {signedInWithEntra() && (
+            <button type="button" className="link-button" onClick={() => void signOut()}>
+              Abmelden
+            </button>
+          )}
         </div>
       </header>
       <main className="content">

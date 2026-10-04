@@ -12,6 +12,8 @@ public static class IdentityModule
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped(provider => UserContextMiddleware.FromHttpContext(provider.GetRequiredService<IHttpContextAccessor>()));
         services.AddScoped<IProjectHubAuthorization, ProjectHubAuthorization>();
+        services.AddSingleton(UserProvisioningOptions.FromConfiguration(configuration));
+        services.AddScoped<UserProvisioning>();
 
         if (environment.IsDevelopment())
         {

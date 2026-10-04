@@ -1,4 +1,5 @@
 import { devIdentityEnabled, getDevUser } from '../identity/devUser'
+import { accessToken } from '../identity/signIn'
 
 export class ApiError extends Error {
   readonly status: number
@@ -25,6 +26,8 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   if (init.body !== undefined && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
   const devUser = devIdentityEnabled ? getDevUser() : null
   if (devUser) headers.set('X-Dev-User', devUser)
+  const token = await accessToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
 
   const response = await fetch(path, { ...init, headers })
   if (!response.ok) {
@@ -35,7 +38,7 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   return response
 }
 
-/** Calls the ProjectHub API. In development the selected synthetic user is sent along. */
+/** Calls the ProjectHub API with the Entra ID access token, or in development the selected synthetic user. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await send(path, init)
   if (response.status === 204) return undefined as T

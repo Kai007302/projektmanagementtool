@@ -31,6 +31,13 @@ if (args is [WhiteboardEngineHost.Argument])
     return;
 }
 
+if (args is [DatabaseMigrator.MigrateOnlyArgument])
+{
+    // One-off migration run before the API starts (docker-compose.prod.yml); the API itself never migrates there.
+    DatabaseMigrator.MigrateOnly();
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 builder.AddProjectHubTelemetry();
 
@@ -93,6 +100,7 @@ if (app.Environment.IsDevelopment())
 app.MapProjectHubHealthChecks();
 
 app.MapApiV1()
+    .MapSignInEndpoints(app.Environment, app.Configuration)
     .MapUserEndpoints()
     .MapOrganizationEndpoints()
     .MapTeamEndpoints()

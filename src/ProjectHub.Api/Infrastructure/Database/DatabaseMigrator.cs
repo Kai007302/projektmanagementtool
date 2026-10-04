@@ -11,6 +11,20 @@ public static class DatabaseMigrator
 {
     private const string ScriptPrefix = "ProjectHub.Migrations.";
 
+    /// <summary>Command line argument that only migrates and exits (a failure ends the process with an error).</summary>
+    public const string MigrateOnlyArgument = "--migrate";
+
+    /// <summary>Migrates the database from <see cref="ProjectHubSettings.DatabaseConnectionKey"/> without starting the API.</summary>
+    public static void MigrateOnly()
+    {
+        var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+        var connectionString = configuration[ProjectHubSettings.DatabaseConnectionKey] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"Configuration value '{ProjectHubSettings.DatabaseConnectionKey}' is missing.");
+        using var loggerFactory = LoggerFactory.Create(logging => logging.AddJsonConsole(json => json.UseUtcTimestamp = true));
+        Migrate(connectionString, loggerFactory.CreateLogger("ProjectHub.Migrations"));
+    }
+
     /// <summary>
     /// Several instances may start at once. A session-level advisory lock on its own connection lets one of them
     /// migrate while the others wait and then find nothing left to do.
