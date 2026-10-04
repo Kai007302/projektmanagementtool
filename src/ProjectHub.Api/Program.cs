@@ -2,6 +2,7 @@ using ProjectHub.Api;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Health;
 using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Infrastructure.Observability;
 using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
@@ -31,6 +32,7 @@ if (args is [WhiteboardEngineHost.Argument])
 }
 
 var builder = WebApplication.CreateBuilder(args);
+builder.AddProjectHubTelemetry();
 
 var settings = ProjectHubSettings.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(settings);

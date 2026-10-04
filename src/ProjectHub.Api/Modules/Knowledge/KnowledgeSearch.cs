@@ -86,12 +86,10 @@ internal sealed class PostgresKnowledgeSearch(ProjectHubDbContext db, KnowledgeA
         IQueryable<KnowledgeArticle> ordered;
         if (query.Text is { Length: > 0 } text)
         {
-            // Same expression as the index ix_knowledge_article_search (migration 006).
+            // The stored vector (migration 011) is indexed; neither the match nor the rank recomputes it.
             ordered = articles
-                .Where(a => EF.Functions.ToTsVector(TextSearchConfiguration, a.Title + " " + (a.Summary ?? "") + " " + a.SearchText)
-                    .Matches(EF.Functions.WebSearchToTsQuery(TextSearchConfiguration, text)))
-                .OrderByDescending(a => EF.Functions.ToTsVector(TextSearchConfiguration, a.Title + " " + (a.Summary ?? "") + " " + a.SearchText)
-                    .Rank(EF.Functions.WebSearchToTsQuery(TextSearchConfiguration, text)))
+                .Where(a => a.SearchVector.Matches(EF.Functions.WebSearchToTsQuery(TextSearchConfiguration, text)))
+                .OrderByDescending(a => a.SearchVector.Rank(EF.Functions.WebSearchToTsQuery(TextSearchConfiguration, text)))
                 .ThenByDescending(a => a.UpdatedAt);
         }
         else

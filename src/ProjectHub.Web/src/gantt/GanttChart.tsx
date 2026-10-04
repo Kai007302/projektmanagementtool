@@ -258,7 +258,8 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
             className="gantt-svg"
             width={chartWidth}
             height={chartHeight}
-            role="img"
+            // A group, not an image: the bars inside are buttons, and an image hides its content from assistive technology.
+            role="group"
             aria-label={`Zeitachse von ${displayDay(range.start)} bis ${displayDay(range.end)}`}
           >
             <defs>
