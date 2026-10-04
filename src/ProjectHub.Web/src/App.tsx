@@ -3,6 +3,7 @@ import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
+import { initials } from './identity/initials'
 import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import type { Notification } from './notifications/api'
@@ -155,16 +156,6 @@ function App() {
       </footer>
     </div>
   )
-}
-
-/** Up to two initials for the avatar, e.g. "Ada Admin" → "AA". */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('')
 }
 
 export default App

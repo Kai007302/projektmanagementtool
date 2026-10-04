@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState, type DragEvent, type FormEvent } from
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
-import { createTask, taskPriorities, taskStatuses, type TaskStatus } from '../tasks/api'
+import { initials } from '../identity/initials'
+import { createTask, taskStatuses, type TaskStatus } from '../tasks/api'
+import { DueDate } from '../tasks/DueDate'
+import { PriorityBadge } from '../tasks/PriorityBadge'
 import { NewTaskForm } from '../tasks/TaskBoard'
 import { TaskDetails } from '../tasks/TaskDetails'
 import {
@@ -127,7 +130,10 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
               onDrop={drop}
             >
               <header className="kanban-column-header">
-                <h4>{column.name}</h4>
+                <h4>
+                  <span className={`status-dot status-${column.taskStatus}`} aria-hidden="true" />
+                  {column.name}
+                </h4>
                 <span className={overLimit ? 'wip over' : 'wip'} title="Karten / WIP-Limit">
                   {column.cards.length}
                   {column.wipLimit !== null && ` / ${column.wipLimit}`}
@@ -157,6 +163,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                     key={card.id}
                     className={[
                       'kanban-card',
+                      `priority-${card.priority}`,
                       card.id === selected ? 'selected' : '',
                       card.id === dragging?.id ? 'dragging' : '',
                       dropTarget?.columnId === column.id && dropTarget.index === index ? 'drop-before' : '',
@@ -182,12 +189,35 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                     >
                       {card.title}
                     </button>
-                    <span className="card-meta">
-                      {taskPriorities[card.priority]}
-                      {card.assigneeName && ` · ${card.assigneeName}`}
-                      {card.dueDate && ` · ${card.dueDate}`}
-                      {card.subtaskCount > 0 && ` · ${card.subtaskCount} Unteraufgaben`}
-                    </span>
+                    <div className="kanban-card-meta">
+                      <PriorityBadge priority={card.priority} />
+                      {card.dueDate && <DueDate date={card.dueDate} done={card.status === 'done'} />}
+                      {card.subtaskCount > 0 && (
+                        <span className="task-chip">
+                          <span aria-hidden="true">🧩</span> {card.subtaskCount} Unteraufgaben
+                        </span>
+                      )}
+                    </div>
+                    {card.progress > 0 && (
+                      <div
+                        className="kanban-progress"
+                        role="progressbar"
+                        aria-label={`Fortschritt von „${card.title}“`}
+                        aria-valuenow={card.progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <span style={{ width: `${card.progress}%` }} />
+                      </div>
+                    )}
+                    {card.assigneeName && (
+                      <span className="kanban-assignee">
+                        <span className="avatar small" aria-hidden="true">
+                          {initials(card.assigneeName)}
+                        </span>
+                        {card.assigneeName}
+                      </span>
+                    )}
                     {canContribute && (
                       <select
                         aria-label={`„${card.title}“ verschieben nach`}
@@ -213,6 +243,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                   <li className="drop-placeholder" aria-hidden="true" />
                 )}
               </ol>
+              {column.cards.length === 0 && dropTarget?.columnId !== column.id && <p className="kanban-empty">Noch keine Karten. Zieh eine hierher ✨</p>}
             </section>
           )
         })}
