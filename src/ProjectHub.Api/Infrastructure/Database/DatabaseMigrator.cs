@@ -1,4 +1,5 @@
 using DbUp;
+using Npgsql;
 
 namespace ProjectHub.Api.Infrastructure.Database;
 
@@ -10,7 +11,32 @@ public static class DatabaseMigrator
 {
     private const string ScriptPrefix = "ProjectHub.Migrations.";
 
+    /// <summary>
+    /// Several instances may start at once. A session-level advisory lock on its own connection lets one of them
+    /// migrate while the others wait and then find nothing left to do.
+    /// </summary>
     public static void Migrate(string connectionString, ILogger logger)
+    {
+        using var lockConnection = new NpgsqlConnection(connectionString);
+        lockConnection.Open();
+        Execute(lockConnection, "select pg_advisory_lock(hashtextextended('projecthub:migrations', 0))");
+        try
+        {
+            Upgrade(connectionString, logger);
+        }
+        finally
+        {
+            Execute(lockConnection, "select pg_advisory_unlock(hashtextextended('projecthub:migrations', 0))");
+        }
+    }
+
+    private static void Execute(NpgsqlConnection connection, string sql)
+    {
+        using var command = new NpgsqlCommand(sql, connection);
+        command.ExecuteNonQuery();
+    }
+
+    private static void Upgrade(string connectionString, ILogger logger)
     {
         var upgrader = DeployChanges.To
             .PostgresqlDatabase(connectionString)

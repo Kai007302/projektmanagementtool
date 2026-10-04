@@ -13,7 +13,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
 | DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
 | DEC-009 | Webex OAuth App Ownership | entschieden (Kai, 2026-10-03) | ein zentraler Bot der Organisation, kein OAuth je Person (ADR 0011) |
-| DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel |
+| DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel; Sicherung, Wiederherstellung und Übung in `docs/OPERATIONS.md` |
 | DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
 | DEC-012 | Mail als Benutzer | offen | zunächst nein; nur System-Mailbox |
 | DEC-013 | Benutzer-Provisionierung | offen | Benutzer werden nicht automatisch beim ersten Login angelegt; Abgleich über Entra Groups/SCIM oder Just-in-Time klären. Bis dahin: unbekannte Benutzer erhalten 403 |
@@ -35,6 +35,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-029 | Mail-Warteschlange bis Azure | entschieden (Kai, 2026-10-03) | Tabelle `mail_outbox` in PostgreSQL mit Hintergrund-Worker (ADR 0010); Service Bus später dahinter |
 | DEC-030 | Rate Limits und Größenlimits | offen | je Person und Minute: 600 Anfragen, 30 Uploads; Webex-Webhook 120 je Adresse; Anfragen höchstens 4 MB (Uploads eigenes Limit). Zähler je Instanz, verteilt erst bei Bedarf (ADR 0012) |
 | DEC-031 | Auslieferung der Oberfläche | offen | eigener Web-Container (Nginx) vor der API, eine Origin für Browser, TLS am Ingress (ADR 0012) |
+| DEC-032 | Performance-Ziele | offen | je API-Instanz: 95 % der Lesezugriffe unter 300 ms, unter 1 % Fehler; geprüft mit dem Lasttest `tests/load` (50 gleichzeitige Personen, 1000 Aufgaben, 300 Artikel). Ergebnis in `docs/OPERATIONS.md` |
+| DEC-033 | Redis in der Readiness | offen | heute: Redis nicht erreichbar → Instanz nicht bereit, die App ist weg, obwohl nur Realtime betroffen ist. Vorschlag: Redis nur als „beeinträchtigt“ melden und per Alarm sichtbar machen (`docs/OPERATIONS.md`) |
 
 
 ## Knowledge / AI

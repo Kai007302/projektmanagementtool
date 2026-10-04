@@ -132,7 +132,7 @@ PROJECTHUB_E2E_BASE_URL=http://localhost:8080 npm run e2e
 
 ### Container
 
-`docker compose --profile app up --build` baut und startet API und Web-Container (ADR 0012); die App läuft dann auf http://localhost:8080. Standard ist Development mit den synthetischen Benutzern. Der Web-Container liefert den Produktions-Build mit Sicherheits-Headern aus und leitet `/api` und `/health` an die API weiter, damit der Browser nur eine Adresse kennt. TLS übernimmt im Betrieb der Ingress davor.
+`docker compose --profile app up --build` baut und startet API und Web-Container (ADR 0012); die App läuft dann auf http://localhost:8080. Standard ist Development mit den synthetischen Benutzern. Der Web-Container liefert den Produktions-Build mit Sicherheits-Headern aus und leitet `/api` und `/health` an die API weiter, damit der Browser nur eine Adresse kennt. TLS übernimmt im Betrieb der Ingress davor. Konfiguration, Probes, Backup und Restore, Ausfälle und den Lasttest beschreibt `docs/OPERATIONS.md`.
 
 ### Projektstruktur
 
@@ -158,7 +158,8 @@ Vor jeder Implementierung zuerst lesen:
 4. `docs/SECURITY.md` und `docs/PERMISSIONS.md`
 5. `docs/DATA_MODEL.md`
 6. `docs/OPEN_DECISIONS.md`
-7. den relevanten Sprint-Prompt unter `ai/prompts/`
+7. für Betrieb und Deployment: `docs/OPERATIONS.md`
+8. den relevanten Sprint-Prompt unter `ai/prompts/`
 
 ## Entwicklungsreihenfolge
 

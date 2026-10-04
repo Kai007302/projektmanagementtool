@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using ProjectHub.Api.Infrastructure.Database;
+using ProjectHub.Api.Infrastructure.Observability;
 
 namespace ProjectHub.Api.Modules.Notifications;
 
@@ -185,6 +186,7 @@ public sealed class MailOutbox(
                 .SetProperty(m => m.SentAt, now)
                 .SetProperty(m => m.LastError, (string?)null), CancellationToken.None);
             logger.LogInformation("{Channel} message {MailId} for user {RecipientId} sent", mail.Channel, mail.Id, mail.RecipientId);
+            ProjectHubMetrics.NotificationDelivered(mail.Channel, "sent");
             return;
         }
 
@@ -194,11 +196,13 @@ public sealed class MailOutbox(
             var next = now + RetryDelay(mail.Attempts, retryAfter);
             await rows.ExecuteUpdateAsync(s => s.SetProperty(m => m.NextAttemptAt, next).SetProperty(m => m.LastError, error), CancellationToken.None);
             logger.LogWarning("{Channel} message {MailId} not sent ({Error}), attempt {Attempt}; retrying at {Next}", mail.Channel, mail.Id, error, mail.Attempts, next);
+            ProjectHubMetrics.NotificationDelivered(mail.Channel, "retry");
         }
         else
         {
             await rows.ExecuteUpdateAsync(s => s.SetProperty(m => m.Status, MailOutboxStatus.Failed).SetProperty(m => m.LastError, error), CancellationToken.None);
             logger.LogError("{Channel} message {MailId} for user {RecipientId} failed permanently ({Error}) after {Attempts} attempts", mail.Channel, mail.Id, mail.RecipientId, error, mail.Attempts);
+            ProjectHubMetrics.NotificationDelivered(mail.Channel, "failed");
         }
     }
 }

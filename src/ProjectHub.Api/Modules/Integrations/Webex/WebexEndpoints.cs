@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Infrastructure.Observability;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Notifications;
 
@@ -89,7 +90,9 @@ public static class WebexEndpoints
                     return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
                 }
 
-                return await service.HandleAsync(buffer.ToArray(), request.Headers[WebexWebhookService.SignatureHeader], ct) switch
+                var outcome = await service.HandleAsync(buffer.ToArray(), request.Headers[WebexWebhookService.SignatureHeader], ct);
+                ProjectHubMetrics.WebhookReceived("webex", outcome.ToString().ToLowerInvariant());
+                return outcome switch
                 {
                     WebhookOutcome.Unauthorized => Results.Unauthorized(),
                     WebhookOutcome.Invalid => Results.BadRequest(),
