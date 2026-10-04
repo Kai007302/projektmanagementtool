@@ -1,6 +1,7 @@
 import { HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
 import * as Y from 'yjs'
 import { devIdentityEnabled, getDevUser } from '../identity/devUser'
+import { hubConnectionOptions } from '../identity/signIn'
 
 const hubPath = '/api/v1/hubs/whiteboards'
 
@@ -43,7 +44,7 @@ const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCo
 export function connectWhiteboard(whiteboardId: string, doc: Y.Doc, handlers: SyncHandlers): WhiteboardSync {
   const devUser = devIdentityEnabled ? getDevUser() : null
   const url = devUser ? `${hubPath}?devUser=${encodeURIComponent(devUser)}` : hubPath
-  const connection = new HubConnectionBuilder().withUrl(url).withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
+  const connection = new HubConnectionBuilder().withUrl(url, hubConnectionOptions).withAutomaticReconnect().configureLogging(LogLevel.Warning).build()
 
   let stopped = false
   let joined = false

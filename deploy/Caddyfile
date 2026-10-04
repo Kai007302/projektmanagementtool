@@ -1,0 +1,7 @@
+# TLS for ProjectHub (docker-compose.prod.yml). Caddy gets and renews the Let's Encrypt certificate itself;
+# the domain must point at this server and ports 80 and 443 must be reachable.
+{$PROJECTHUB_DOMAIN} {
+	encode zstd gzip
+	# The web container serves the app and forwards /api (including WebSockets) and /health to the API.
+	reverse_proxy web:8080
+}
