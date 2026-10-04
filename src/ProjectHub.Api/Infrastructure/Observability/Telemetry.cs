@@ -5,6 +5,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using ProjectHub.Api.Modules.Ai;
 
 namespace ProjectHub.Api.Infrastructure.Observability;
 
@@ -74,12 +75,14 @@ public static class Telemetry
                     aspNetCore.EnrichWithHttpRequest = (activity, _) => activity.SetTag("url.query", null);
                 })
                 .AddHttpClientInstrumentation()
-                .AddNpgsql())
+                .AddNpgsql()
+                // GenAI spans of the assistant (model, tokens, tool calls; never prompts) and of the MCP server.
+                .AddSource(AiChatClients.TelemetrySourceName, "Experimental.ModelContextProtocol"))
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
-                .AddMeter("Npgsql", ProjectHubMetrics.MeterName))
+                .AddMeter("Npgsql", ProjectHubMetrics.MeterName, AiChatClients.TelemetrySourceName, "Experimental.ModelContextProtocol"))
             .UseOtlpExporter();
 
         return builder;

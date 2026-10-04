@@ -4,6 +4,7 @@ using ProjectHub.Api.Infrastructure.Health;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Observability;
 using ProjectHub.Api.Infrastructure.Events;
+using ProjectHub.Api.Modules.Ai;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
 using ProjectHub.Api.Modules.Calendar;
@@ -64,6 +65,7 @@ builder.Services.AddMailTransport(builder.Configuration);
 builder.Services.AddCalendarModule();
 builder.Services.AddWebexModule(builder.Configuration, builder.Environment);
 builder.Services.AddKnowledgeModule();
+builder.Services.AddAiModule(builder.Configuration, builder.Environment);
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 builder.Services.AddWhiteboardModule(builder.Configuration, builder.Environment);
@@ -114,12 +116,14 @@ app.MapApiV1()
     .MapWebexEndpoints()
     .MapNotificationEndpoints()
     .MapWhiteboardEndpoints()
-    .MapKnowledgeEndpoints();
+    .MapKnowledgeEndpoints()
+    .MapAiEndpoints();
 
 app.MapRealtimeEndpoints();
 app.MapNotificationHub();
 app.MapWhiteboardHub();
 app.MapWebexWebhook();
+app.MapMcpServer(app.Environment);
 
 app.Run();
 

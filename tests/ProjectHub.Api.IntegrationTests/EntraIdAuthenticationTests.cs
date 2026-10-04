@@ -1,10 +1,13 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using ProjectHub.Api.Infrastructure.Database;
+using ProjectHub.Api.Modules.Ai;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Integrations.Webex;
@@ -31,6 +34,7 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
             builder.UseSetting(EntraIdRegistration.TenantIdKey, "00000000-0000-0000-0000-000000000000");
             builder.UseSetting(EntraIdRegistration.ClientIdKey, "00000000-0000-0000-0000-000000000000");
             builder.UseSetting(WebexOptions.WebhookSecretKey, WebhookSecret);
+            builder.UseSetting(AiOptions.McpKey, "on");
         });
         return Task.CompletedTask;
     }
@@ -44,6 +48,27 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains(response.Headers.WwwAuthenticate, h => h.Scheme == "Bearer");
+    }
+
+    [Fact]
+    public async Task Mcp_clients_without_a_token_learn_where_to_get_one()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync(AiModule.McpPath, new { jsonrpc = "2.0", id = 1, method = "tools/list" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Contains(response.Headers.WwwAuthenticate, h => h.Parameter?.Contains("resource_metadata=") == true);
+    }
+
+    [Fact]
+    public async Task Protected_resource_metadata_names_the_entra_tenant_and_the_api_scope()
+    {
+        var metadata = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/.well-known/oauth-protected-resource" + AiModule.McpPath);
+
+        Assert.Equal(
+            "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0",
+            metadata.GetProperty("authorization_servers")[0].GetString());
+        Assert.Equal("api://00000000-0000-0000-0000-000000000000/access_as_user", metadata.GetProperty("scopes_supported")[0].GetString());
+        Assert.EndsWith(AiModule.McpPath, metadata.GetProperty("resource").GetString());
     }
 
     [Fact]

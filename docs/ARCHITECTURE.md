@@ -181,4 +181,4 @@ LLM
 Answer + Source References
 ```
 
-V1 kann zunächst PostgreSQL Full-Text Search verwenden. Embeddings/vector search werden hinter einem Interface gekapselt und später ergänzt.
+Umsetzung (ADR 0015): Der Assistent (`/api/v1/ai/chat`, gestreamt per Server-Sent Events) spricht über `IChatClient` (Microsoft.Extensions.AI) mit dem konfigurierten Modell, Standard Claude. Das Modell sucht selbst mit Werkzeugen (`ProjectHubTools`), die als die angemeldete Person über die vorhandenen Services laufen; `IKnowledgeRetrieval` liefert Passagen aus der PostgreSQL-Volltextsuche, gefiltert mit `KnowledgeAccess.Visible`. Dieselben Werkzeuge bietet der MCP-Server (`/api/v1/mcp`) externen Agenten an. Embeddings/Vektorsuche kommen bei Bedarf hinter `IKnowledgeRetrieval` dazu (DEC-036).

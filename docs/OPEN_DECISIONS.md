@@ -37,6 +37,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-031 | Auslieferung der Oberfläche | offen | eigener Web-Container (Nginx) vor der API, eine Origin für Browser, TLS am Ingress (ADR 0012) |
 | DEC-032 | Performance-Ziele | offen | je API-Instanz: 95 % der Lesezugriffe unter 300 ms, unter 1 % Fehler; geprüft mit dem Lasttest `tests/load` (50 gleichzeitige Personen, 1000 Aufgaben, 300 Artikel). Ergebnis in `docs/OPERATIONS.md` |
 | DEC-033 | Redis in der Readiness | offen | heute: Redis nicht erreichbar → Instanz nicht bereit, die App ist weg, obwohl nur Realtime betroffen ist. Vorschlag: Redis nur als „beeinträchtigt“ melden und per Alarm sichtbar machen (`docs/OPERATIONS.md`) |
+| DEC-034 | Was KI ändern darf | offen | Der Assistent in der Oberfläche liest nur. Über MCP gibt es `create_task` und `add_task_comment`, aber nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true` (Standard aus); immer mit den Rechten der Person (ADR 0015) |
+| DEC-035 | Gespräche mit dem Assistenten | offen | werden nicht gespeichert: der Verlauf liegt nur im Browser-Tab, Telemetrie ohne Prompts und Antworten (ADR 0015) |
+| DEC-036 | Embeddings für die Wissenssuche | offen | vorerst nicht: Volltextsuche mit agentischem Nachsuchen; pgvector hinter `IKnowledgeRetrieval`, wenn Antworten Umschreibungen nicht finden (ADR 0015) |
 
 
 ## Knowledge / AI
@@ -47,9 +50,9 @@ Status: decided (ADR 0007)
 Canvas 2D with a d3-force layout in a Web Worker; measured against React Flow with 300, 800 and 2000 nodes.
 
 ### AI provider
-Status: open
+Status: proposed (ADR 0015)
 
-Choose between enterprise-approved Azure OpenAI / another approved provider. No external provider is assumed until company security/privacy approval.
+Provider-neutral behind `IChatClient` (Microsoft.Extensions.AI) and chosen per installation in `.env`: `off` by default, `anthropic` (Claude, default model `claude-opus-5-5`) or `openai` (any OpenAI-compatible endpoint, including a local model such as Ollama). An external provider is only switched on with the organization's approval; on Kai's own server Kai decides.
 
 ### Knowledge visibility model
 Status: decided (DEC-020)
