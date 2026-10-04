@@ -45,9 +45,20 @@ public sealed class TelemetryTests(InfrastructureFixture infrastructure)
         };
         ActivitySource.AddActivityListener(listener);
 
-        await factory.CreateClientFor(Ada).GetAsync("/api/v1/projects?limit=5&secret=abc");
+        // The listener sees every test running in parallel; the trace id picks out this request.
+        var traceId = ActivityTraceId.CreateRandom();
+        using var message = new HttpRequestMessage(HttpMethod.Get, "/api/v1/projects?limit=5&secret=abc");
+        message.Headers.Add("traceparent", $"00-{traceId}-{ActivitySpanId.CreateRandom()}-01");
+        await factory.CreateClientFor(Ada).SendAsync(message);
 
-        var request = Assert.Single(stopped, a => (a.GetTagItem("url.path") as string) == "/api/v1/projects");
+        // The server span can stop after the client already has the response.
+        bool Mine(Activity a) => a.TraceId == traceId && a.Kind == ActivityKind.Server;
+        for (var i = 0; i < 50 && !stopped.Any(Mine); i++)
+        {
+            await Task.Delay(100);
+        }
+
+        var request = Assert.Single(stopped, Mine);
         Assert.StartsWith("/api/v1/projects", request.GetTagItem("http.route") as string);
         Assert.Null(request.GetTagItem("url.query"));
     }
