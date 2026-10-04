@@ -1,7 +1,8 @@
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type SimulationNodeDatum } from 'd3-force'
 import type { Positions } from './graph'
 
-export type LayoutInput = { nodes: { id: string; degree: number; group: string }[]; edges: { source: string; target: string }[] }
+/** aspect: width / height the galaxy should roughly fill; below 1 the clusters stack vertically (phones). */
+export type LayoutInput = { nodes: { id: string; degree: number; group: string }[]; edges: { source: string; target: string }[]; aspect?: number }
 
 type SimNode = SimulationNodeDatum & { id: string; degree: number; group: string }
 
@@ -25,13 +26,16 @@ export function computeLayout(input: LayoutInput, onProgress: (positions: Positi
 
   // Articles of the same type drift towards a shared anchor: the categories form clusters.
   const groups = [...new Set(nodes.map((n) => n.group))]
-  const anchor = new Map(groups.map((g, i) => [g, { x: Math.cos((i / groups.length) * Math.PI * 2) * 220, y: Math.sin((i / groups.length) * Math.PI * 2) * 220 }]))
+  const aspect = Math.min(1, Math.max(0.3, input.aspect ?? 1))
+  const anchor = new Map(
+    groups.map((g, i) => [g, { x: Math.cos((i / groups.length) * Math.PI * 2) * 220 * aspect, y: Math.sin((i / groups.length) * Math.PI * 2) * (aspect < 1 ? 320 : 220) }]),
+  )
 
   const simulation = forceSimulation(nodes)
     .force('link', forceLink<SimNode, { source: string; target: string }>(links).id((d) => d.id).distance(130).strength(0.4))
     .force('charge', forceManyBody().strength(-250).distanceMax(700))
     .force('collide', forceCollide<SimNode>((d) => bubbleRadius(d.degree) * (d.degree >= 3 ? 1.6 : 1.15) + 12))
-    .force('x', forceX<SimNode>((d) => anchor.get(d.group)!.x).strength(0.1))
+    .force('x', forceX<SimNode>((d) => anchor.get(d.group)!.x).strength(0.1 / aspect))
     .force('y', forceY<SimNode>((d) => anchor.get(d.group)!.y).strength(0.1))
     .force('center', forceCenter(0, 0))
     .stop()

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import type { KnowledgeGraph, Positions } from './graph'
 import { computeLayout, type LayoutInput } from './layout'
 
-/** Lays out the graph in a Web Worker (synchronously where workers are unavailable, e.g. tests). */
-export function useLayout(graph: KnowledgeGraph | null, animate: boolean) {
+/** Lays out the graph (wide, or tall for aspect < 1) in a Web Worker (synchronously where workers are unavailable, e.g. tests). */
+export function useLayout(graph: KnowledgeGraph | null, animate: boolean, aspect = 1) {
   const [state, setState] = useState<{ graph: KnowledgeGraph | null; positions: Positions; done: boolean }>({ graph: null, positions: {}, done: false })
 
   useEffect(() => {
@@ -11,6 +11,7 @@ export function useLayout(graph: KnowledgeGraph | null, animate: boolean) {
     const input: LayoutInput = {
       nodes: graph.nodes.map((n) => ({ id: n.id, degree: n.degree, group: n.articleType })),
       edges: graph.edges.map((e) => ({ source: e.source, target: e.target })),
+      aspect,
     }
     const progressEvery = animate ? 10 : 0
     let current = true
@@ -30,7 +31,7 @@ export function useLayout(graph: KnowledgeGraph | null, animate: boolean) {
       current = false
       worker.terminate()
     }
-  }, [graph, animate])
+  }, [graph, animate, aspect])
 
   return state.graph === graph ? state : { graph, positions: {} as Positions, done: false }
 }

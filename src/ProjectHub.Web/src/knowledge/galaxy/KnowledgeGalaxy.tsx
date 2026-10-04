@@ -28,16 +28,16 @@ const HEIGHT = 600
 /** Room around the outermost bubbles when the whole galaxy is shown. */
 const FIT_PADDING = 90
 
-function usePrefersReducedMotion() {
-  const query = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
-  const [reduced, setReduced] = useState(query?.matches ?? false)
+function useMediaQuery(media: string) {
+  const query = useMemo(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(media) : null), [media])
+  const [matches, setMatches] = useState(query?.matches ?? false)
   useEffect(() => {
     if (!query) return
-    const update = () => setReduced(query.matches)
+    const update = () => setMatches(query.matches)
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [query])
-  return reduced
+  return matches
 }
 
 /**
@@ -52,7 +52,9 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('galaxy')
-  const reducedMotion = usePrefersReducedMotion()
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  // Phones in portrait get a tall galaxy instead of a wide one, so the planets stay readable.
+  const narrow = useMediaQuery('(max-width: 40rem)')
 
   useEffect(() => {
     let current = true
@@ -69,7 +71,7 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
     }
   }, [filter])
 
-  const layout = useLayout(graph, !reducedMotion)
+  const layout = useLayout(graph, !reducedMotion, narrow ? 0.45 : 1)
   const selected = graph?.nodes.find((n) => n.id === selectedId) ?? null
 
   return (
@@ -176,6 +178,8 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   const transform = useRef<Transform>(identity)
   const userMoved = useRef(false)
   const drag = useRef<{ x: number; y: number; start: Transform; moved: boolean } | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ distance: number; mid: { x: number; y: number }; start: Transform } | null>(null)
   const animation = useRef<number | null>(null)
   const frame = useRef<number | null>(null)
   const [width, setWidth] = useState(800)
@@ -265,7 +269,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
 
         if (dimmed) continue
         if (sr >= 22) {
-          const px = Math.min(15, Math.max(9, sr * 0.24))
+          const px = Math.min(15, Math.max(8, sr * 0.2))
           ctx.font = `600 ${px / t.k}px system-ui, sans-serif`
           const key = `${node.id}:${px.toFixed(1)}:${t.k.toFixed(3)}:${node.title}`
           let lines = titleCache.current.get(key)
@@ -404,13 +408,35 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   }
 
   function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
-    event.currentTarget.setPointerCapture?.(event.pointerId)
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+    } catch {
+      // The pointer is already gone (or synthetic); panning still works without capture.
+    }
     const p = point(event)
+    pointers.current.set(event.pointerId, p)
+    if (pointers.current.size === 2) {
+      // Two fingers: pinch to zoom around their midpoint, move them to pan.
+      const [a, b] = [...pointers.current.values()]
+      pinch.current = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, start: transform.current }
+      drag.current = null
+      return
+    }
     drag.current = { ...p, start: transform.current, moved: false }
   }
 
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
     const p = point(event)
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, p)
+    const zoom = pinch.current
+    if (zoom && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()]
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const zoomed = zoomAt(zoom.start, Math.hypot(a.x - b.x, a.y - b.y) / zoom.distance, zoom.mid.x, zoom.mid.y)
+      userMoved.current = true
+      setTransform({ ...zoomed, x: zoomed.x + mid.x - zoom.mid.x, y: zoomed.y + mid.y - zoom.mid.y })
+      return
+    }
     const current = drag.current
     if (current) {
       const dx = p.x - current.x
@@ -427,6 +453,13 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   }
 
   function pointerUp(event: PointerEvent<HTMLCanvasElement>) {
+    pointers.current.delete(event.pointerId)
+    if (pinch.current) {
+      // A pinch never selects; the remaining finger does not start a drag either.
+      if (pointers.current.size === 0) pinch.current = null
+      drag.current = null
+      return
+    }
     const current = drag.current
     drag.current = null
     if (current && !current.moved) {
@@ -514,6 +547,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
+        onPointerCancel={pointerUp}
         onPointerLeave={() => setHoverId(null)}
         onKeyDown={keyDown}
       />
@@ -561,7 +595,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         </div>
       )}
       <p id="galaxy-help" className="muted">
-        Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad zoomt, Klick wählt einen Artikel. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Esc hebt die Auswahl
+        Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad oder zwei Finger zoomen, Klick oder Tippen wählt einen Artikel. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Esc hebt die Auswahl
         auf bzw. beendet das Vollbild. Die Darstellung „Liste“ zeigt dieselben Inhalte.
       </p>
     </div>
