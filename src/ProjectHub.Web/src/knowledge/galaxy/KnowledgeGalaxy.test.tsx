@@ -78,4 +78,17 @@ describe('KnowledgeGalaxy', () => {
     expect(api.calls.map((c) => c.key)).toContain('GET /api/v1/knowledge/graph?spaceId=s-1&type=faq')
     expect(screen.getByRole('region', { name: 'Auswahl' })).toBeInTheDocument()
   })
+
+  it('opens the galaxy in full screen and leaves it with Escape', async () => {
+    fakeApi({ 'GET /api/v1/knowledge/graph': () => json(graph) })
+    render(<KnowledgeGalaxy spaces={spaces} onOpenArticle={() => {}} />)
+
+    const canvas = await screen.findByRole('img', { name: /Wissensgalaxie/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Vollbild' }))
+    expect(canvas.parentElement).toHaveClass('fullscreen')
+    expect(screen.getByRole('button', { name: 'Vollbild beenden' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.keyboard('{Escape}')
+    expect(canvas.parentElement).not.toHaveClass('fullscreen')
+  })
 })
