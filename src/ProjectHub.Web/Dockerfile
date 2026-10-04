@@ -1,6 +1,6 @@
 # ProjectHub web app: production build served by nginx without root (ADR 0012).
 # Build from src/ProjectHub.Web: docker build -t projecthub-web .
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /web
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
