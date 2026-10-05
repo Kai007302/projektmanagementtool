@@ -102,6 +102,40 @@ describe('WhiteboardPanel', () => {
     expect(readObjects(current().doc)).toHaveLength(1)
   })
 
+  it('edits text right on the canvas with a double click or Enter, and resizes with Alt and the arrow keys', async () => {
+    fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
+    const { container } = render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    await connect(true)
+    act(() => void addObject(current().doc, 'sticky', { x: 0, y: 0 }))
+    const note = () => container.querySelector('[data-object-id] rect')!
+
+    expect(screen.queryByLabelText('Text')).not.toBeInTheDocument()
+    expect(screen.queryByText('Position und Größe')).not.toBeInTheDocument()
+    fireEvent.pointerDown(note(), { button: 0 })
+    fireEvent.pointerUp(note())
+    fireEvent.pointerDown(note(), { button: 0 })
+    const field = screen.getByLabelText('Text')
+    expect(field).toHaveFocus()
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Neu{ArrowLeft}{Delete}')
+    expect(readObjects(current().doc)[0].text).toBe('Ne')
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByLabelText('Text')).not.toBeInTheDocument()
+    expect(screen.getByRole('application')).toHaveFocus()
+    expect(readObjects(current().doc)).toHaveLength(1)
+
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByLabelText('Text')).toHaveFocus()
+    await userEvent.type(screen.getByLabelText('Text'), 'u')
+    expect(readObjects(current().doc)[0].text).toBe('Neu')
+    await userEvent.keyboard('{Control>}{Enter}{/Control}')
+
+    const before = readObjects(current().doc)[0]
+    await userEvent.keyboard('{Alt>}{ArrowRight}{ArrowDown}{/Alt}')
+    expect(readObjects(current().doc)[0]).toMatchObject({ x: before.x, y: before.y, w: before.w + 10, h: before.h + 10 })
+  })
+
   it('inserts a template as one undo step and offers it on an empty board', async () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
@@ -214,9 +248,9 @@ describe('WhiteboardPanel', () => {
     expect(screen.getByText(/Nur ansehen/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Notiz: Neue Notiz' }))
-    expect(screen.getByLabelText('Text')).toBeDisabled()
     screen.getByRole('application').focus()
-    await userEvent.keyboard('{Delete}')
+    await userEvent.keyboard('{Enter}{Delete}')
+    expect(screen.queryByLabelText('Text')).not.toBeInTheDocument()
     expect(readObjects(current().doc)).toHaveLength(1)
   })
 

@@ -100,12 +100,13 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false })
   const [showTemplates, setShowTemplates] = useState(false)
   const [stickyColor, setStickyColor] = useState<Color>(rememberedStickyColor)
-  const [focusTextOf, setFocusTextOf] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const docRef = useRef<Y.Doc | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
   const syncRef = useRef<WhiteboardSync | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const lastPresence = useRef(0)
+  const lastDown = useRef({ id: '', time: 0 })
 
   const canEdit = serverCanEdit && project.capabilities.canContribute
 
@@ -192,8 +193,21 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function select(id: string | null) {
     setSelectedId(id)
-    setFocusTextOf(null)
+    setEditingId((current) => (current === id ? current : null))
     syncRef.current?.sendPresence(null, null, id)
+  }
+
+  /** Opens the text of an object for typing right on the canvas, like a double click in Miro. */
+  function startEditing(id: string) {
+    select(id)
+    setEditingId(id)
+  }
+
+  /** Ends typing in one object; a blur from a new note opening elsewhere leaves that note open. */
+  function stopEditing(id: string, backToCanvas: boolean) {
+    undoRef.current?.stopCapturing()
+    setEditingId((current) => (current === id ? null : current))
+    if (backToCanvas) svgRef.current?.focus()
   }
 
   function add(type: ObjectType, taskId?: string) {
@@ -261,16 +275,14 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     }
     const { ids } = addObjects(doc(), [{ type: 'sticky', x: 0, y: 0, color, text: '' }], at)
     undoRef.current?.stopCapturing()
-    select(ids[0])
-    setFocusTextOf(ids[0])
+    startEditing(ids[0])
   }
 
   function addStickyNextTo(object: BoardObject, direction: 'right' | 'below') {
     undoRef.current?.stopCapturing()
     const id = addNextTo(doc(), object, direction)
     undoRef.current?.stopCapturing()
-    select(id)
-    setFocusTextOf(id)
+    startEditing(id)
   }
 
   function change(id: string, changes: Changes) {
@@ -292,6 +304,16 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function onObjectDown(event: PointerEvent, object: BoardObject) {
     if (event.button !== 0) return
+    // Pointer capture sends the second click to the canvas, so a double click is two quick presses on one object.
+    const now = event.timeStamp
+    const second = lastDown.current.id === object.id && now - lastDown.current.time < 400
+    lastDown.current = { id: object.id, time: second ? 0 : now }
+    if (second && canEdit && hasText(object)) {
+      event.stopPropagation()
+      event.preventDefault()
+      startEditing(object.id)
+      return
+    }
     select(object.id)
     svgRef.current?.focus()
     if (canEdit) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
@@ -371,12 +393,21 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       remove(selected.id)
       return
     }
+    if ((event.key === 'Enter' || event.key === 'F2') && hasText(selected)) {
+      event.preventDefault()
+      startEditing(selected.id)
+      return
+    }
     const step = event.shiftKey ? 1 : 10
     const deltas: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
     const delta = deltas[event.key]
     if (delta) {
       event.preventDefault()
-      change(selected.id, moveBy(selected, delta[0], delta[1]))
+      const [dx, dy] = delta
+      // Alt with the arrow keys resizes, so the keyboard can do everything the handles do.
+      if (!event.altKey) change(selected.id, moveBy(selected, dx, dy))
+      else if (selected.type === 'arrow') change(selected.id, { x2: selected.x2 + dx, y2: selected.y2 + dy })
+      else change(selected.id, { w: selected.w + dx, h: selected.h + dy })
     }
   }
 
@@ -418,7 +449,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             className={drag?.kind === 'pan' ? 'board-canvas panning' : 'board-canvas'}
             role="application"
             aria-roledescription="Whiteboard"
-            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen. Pfeiltasten verschieben, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Die Objektliste daneben bietet dasselbe per Formular.`}
+            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Doppelklick oder Enter bearbeitet den Text. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig.`}
             tabIndex={0}
             onPointerDown={onBackgroundDown}
             onPointerMove={onPointerMove}
@@ -453,10 +484,13 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
                   selected={object.id === selectedId}
                   peerSelected={peerList.find((p) => p.selectedObjectId === object.id)}
                   editable={canEdit}
+                  editing={object.id === editingId && canEdit}
                   markerId={`arrow-head-${board.id}`}
                   onDown={(event) => onObjectDown(event, object)}
                   onHandleDown={(event, kind) => onHandleDown(event, object, kind)}
                   onAddNext={(direction) => addStickyNextTo(object, direction)}
+                  onText={(text) => change(object.id, { text })}
+                  onStopEditing={(backToCanvas) => stopEditing(object.id, backToCanvas)}
                 />
               ))}
               {peerList.map((peer) =>
@@ -523,7 +557,6 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
               object={selected}
               task={selected.taskId ? tasks.get(selected.taskId) : undefined}
               editable={canEdit}
-              focusText={focusTextOf === selected.id}
               project={project}
               me={me}
               onChange={(changes) => {
@@ -649,11 +682,17 @@ type ShapeProps = {
   selected: boolean
   peerSelected: Peer | undefined
   editable: boolean
+  editing: boolean
   markerId: string
   onDown: (event: PointerEvent) => void
   onHandleDown: (event: PointerEvent, kind: 'resize' | 'start' | 'end') => void
   onAddNext: (direction: 'right' | 'below') => void
+  onText: (text: string) => void
+  onStopEditing: (backToCanvas: boolean) => void
 }
+
+/** Notes, shapes and text boxes carry text; arrows and task cards do not. */
+const hasText = (object: BoardObject) => object.type !== 'arrow' && object.type !== 'task'
 
 const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   sticky: 'board-text',
@@ -663,7 +702,7 @@ const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   text: 'board-text large',
 }
 
-function ObjectShape({ object, task, selected, peerSelected, editable, markerId, onDown, onHandleDown, onAddNext }: ShapeProps) {
+function ObjectShape({ object, task, selected, peerSelected, editable, editing, markerId, onDown, onHandleDown, onAddNext, onText, onStopEditing }: ShapeProps) {
   const { x, y, w, h } = object
   const fill = fills[object.color]
   const stroke = strokes[object.color]
@@ -707,7 +746,7 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
   return (
     <g className="board-object" data-object-id={object.id} onPointerDown={onDown}>
       {shape}
-      <foreignObject x={x} y={y} width={w} height={h} pointerEvents="none">
+      <foreignObject x={x} y={y} width={w} height={h} pointerEvents={editing ? undefined : 'none'}>
         {object.type === 'task' ? (
           <div className="board-task">
             {task ? (
@@ -720,6 +759,27 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
               <span className="muted">Aufgabe nicht verfügbar</span>
             )}
           </div>
+        ) : editing ? (
+          <textarea
+            className={`${textClass[object.type]} board-text-input`}
+            style={object.type === 'text' ? undefined : { color: textColor(object.color) }}
+            aria-label="Text"
+            value={object.text}
+            maxLength={2000}
+            autoFocus
+            onFocus={(event) => event.currentTarget.setSelectionRange(object.text.length, object.text.length)}
+            onChange={(event) => onText(event.target.value)}
+            onBlur={() => onStopEditing(false)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              // Typing stays in the note: Delete, N or the arrow keys must not reach the canvas shortcuts.
+              event.stopPropagation()
+              if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+                event.preventDefault()
+                onStopEditing(true)
+              }
+            }}
+          />
         ) : (
           <div className={textClass[object.type]} style={object.type === 'text' ? undefined : { color: textColor(object.color) }}>
             {object.text}
@@ -816,7 +876,6 @@ type FormProps = {
   object: BoardObject
   task: WhiteboardTask | undefined
   editable: boolean
-  focusText: boolean
   project: ProjectDetails
   me: Me
   onChange: (changes: Changes) => void
@@ -825,24 +884,8 @@ type FormProps = {
   onChanged: () => void
 }
 
-function ObjectForm({ object, task, editable, focusText, project, me, onChange, onCommit, onRemove, onChanged }: FormProps) {
+function ObjectForm({ object, task, editable, project, me, onChange, onCommit, onRemove, onChanged }: FormProps) {
   const [details, setDetails] = useState(false)
-  const number = (label: string, field: 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2') => (
-    <label>
-      {label}
-      <input
-        type="number"
-        value={Math.round(object[field])}
-        disabled={!editable}
-        onChange={(event) => {
-          const value = event.target.valueAsNumber
-          if (Number.isFinite(value)) onChange({ [field]: value })
-        }}
-        onBlur={onCommit}
-      />
-    </label>
-  )
-
   return (
     <section className="board-form" aria-labelledby="board-form-heading">
       <h4 id="board-form-heading">{objectTypes[object.type]}</h4>
@@ -855,22 +898,6 @@ function ObjectForm({ object, task, editable, focusText, project, me, onChange, 
             </button>
           )}
         </>
-      )}
-      {object.type !== 'task' && object.type !== 'arrow' && (
-        <div className="board-text-field">
-          {/* A separate label keeps the field's name "Text" instead of label plus content. */}
-          <label htmlFor="board-object-text">Text</label>
-          <textarea
-            id="board-object-text"
-            value={object.text}
-            disabled={!editable}
-            autoFocus={focusText}
-            rows={3}
-            maxLength={2000}
-            onChange={(event) => onChange({ text: event.target.value })}
-            onBlur={onCommit}
-          />
-        </div>
       )}
       {object.type !== 'task' && (
         <div className="board-color-field">
@@ -895,24 +922,6 @@ function ObjectForm({ object, task, editable, focusText, project, me, onChange, 
           </div>
         </div>
       )}
-      <details className="board-geometry">
-        <summary>Position und Größe</summary>
-        <div className="board-fields">
-          {number(object.type === 'arrow' ? 'Start X' : 'X', 'x')}
-          {number(object.type === 'arrow' ? 'Start Y' : 'Y', 'y')}
-          {object.type === 'arrow' ? (
-            <>
-              {number('Ende X', 'x2')}
-              {number('Ende Y', 'y2')}
-            </>
-          ) : (
-            <>
-              {number('Breite', 'w')}
-              {number('Höhe', 'h')}
-            </>
-          )}
-        </div>
-      </details>
       {editable && (
         <button type="button" className="danger" onClick={onRemove}>
           {objectTypes[object.type]} entfernen

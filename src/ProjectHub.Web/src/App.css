@@ -1683,6 +1683,24 @@ fieldset.block-fields {
   text-align: center;
 }
 
+/* Typing happens right in the object: the field looks like the text it replaces. */
+.board-text-input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+}
+
+.board-text-input.centered {
+  display: block;
+  padding-top: 1.5rem;
+}
+
 .board-task {
   box-sizing: border-box;
   display: flex;
@@ -1940,16 +1958,6 @@ fieldset.block-fields {
   box-shadow: var(--shadow-sm);
 }
 
-.board-text-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.board-form textarea {
-  font: inherit;
-}
-
 .board-color-field {
   display: flex;
   flex-direction: column;
@@ -1957,28 +1965,6 @@ fieldset.block-fields {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--muted);
-}
-
-.board-geometry summary {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.board-geometry[open] summary {
-  margin-bottom: 0.5rem;
-}
-
-.board-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-
-.board-fields input {
-  width: 100%;
-  box-sizing: border-box;
 }
 
 @media (max-width: 50rem) {

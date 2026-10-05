@@ -49,17 +49,15 @@ test('two people draw together, a viewer follows and the board survives a reload
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
   await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
 
-  // Clara moves it with the form while Ben adds a task card; both changes arrive everywhere.
-  await objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
-  await claraPage.getByText('Position und Größe').click()
-  await claraPage.getByLabel('X', { exact: true }).fill('400')
+  // Clara edits it with a double click while Ben adds a task card; both changes arrive everywhere.
+  await claraPage.getByRole('application').locator('[data-object-id]', { hasText: 'Suche nach oben' }).dblclick()
+  await claraPage.getByLabel('Text', { exact: true }).fill('Suche nach oben, bitte')
+  await claraPage.keyboard.press('Escape')
   await ben.getByRole('button', { name: 'Aufgabe als Karte' }).click()
   await ben.getByRole('combobox', { name: 'Aufgabe für eine Karte' }).selectOption({ label: task })
   await ben.getByRole('button', { name: '+ Aufgabe' }).click()
   await expect(objectList(evaPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
-  await objectList(ben).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
-  await ben.getByText('Position und Größe').click()
-  await expect(ben.getByLabel('X', { exact: true })).toHaveValue('400')
+  await expect(objectList(ben).getByRole('button', { name: 'Notiz: Suche nach oben, bitte' })).toBeVisible()
 
   // Ben starts a retrospective from a template; it arrives for the others as a whole.
   await ben.getByRole('button', { name: 'Vorlagen' }).click()
@@ -72,15 +70,15 @@ test('two people draw together, a viewer follows and the board survives a reload
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz (Gelb)' })).toBeVisible()
 
   // The viewer cannot change the note.
-  await objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
-  await expect(evaPage.getByLabel('Text', { exact: true })).toBeDisabled()
+  await evaPage.getByRole('application').locator('[data-object-id]', { hasText: 'Suche nach oben, bitte' }).dblclick()
+  await expect(evaPage.getByLabel('Text', { exact: true })).toHaveCount(0)
 
   // After a reload everything is still there.
   await claraPage.reload()
   await claraPage.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Projekte', exact: true }).click()
   await claraPage.getByRole('button', { name }).click()
   await claraPage.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Whiteboard' }).click()
-  await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
+  await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben, bitte' })).toBeVisible()
   await expect(objectList(claraPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
 
   // Ben renames and deletes the board; the others follow.
