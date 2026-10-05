@@ -16,28 +16,33 @@ import {
   type Positions,
   type Transform,
 } from './graph'
+import { drawPlanet } from './planets'
+import { createSpace, drawSpace, float, wrapTitle } from './space'
 import { useLayout } from './useLayout'
 
 type Props = { spaces: Space[]; onOpenArticle: (id: string) => void }
 
 type View = 'galaxy' | 'list'
 
-const HEIGHT = 560
+const HEIGHT = 600
+/** Room around the outermost bubbles when the whole galaxy is shown. */
+const FIT_PADDING = 90
 
-function usePrefersReducedMotion() {
-  const query = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
-  const [reduced, setReduced] = useState(query?.matches ?? false)
+function useMediaQuery(media: string) {
+  const query = useMemo(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(media) : null), [media])
+  const [matches, setMatches] = useState(query?.matches ?? false)
   useEffect(() => {
     if (!query) return
-    const update = () => setReduced(query.matches)
+    const update = () => setMatches(query.matches)
     query.addEventListener('change', update)
     return () => query.removeEventListener('change', update)
   }, [query])
-  return reduced
+  return matches
 }
 
 /**
- * Knowledge Galaxy: articles as stars, relations as lines, colored by article type.
+ * Knowledge Galaxy: articles as glowing bubbles with their title, relations as threads of light,
+ * colored by article type, floating in a violet space.
  * Canvas 2D with a d3-force layout (docs/OPEN_DECISIONS.md, Knowledge Galaxy renderer). The list view
  * shows the same graph for keyboard and screen reader users.
  */
@@ -47,7 +52,9 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [view, setView] = useState<View>('galaxy')
-  const reducedMotion = usePrefersReducedMotion()
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  // Phones in portrait get a tall galaxy instead of a wide one, so the planets stay readable.
+  const narrow = useMediaQuery('(max-width: 40rem)')
 
   useEffect(() => {
     let current = true
@@ -64,7 +71,7 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
     }
   }, [filter])
 
-  const layout = useLayout(graph, !reducedMotion)
+  const layout = useLayout(graph, !reducedMotion, narrow ? 0.45 : 1)
   const selected = graph?.nodes.find((n) => n.id === selectedId) ?? null
 
   return (
@@ -140,6 +147,7 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
               selectedId={selectedId}
               reducedMotion={reducedMotion}
               onSelect={setSelectedId}
+              onOpenArticle={onOpenArticle}
             />
           ) : (
             <GalaxyList graph={graph} selectedId={selectedId} onSelect={setSelectedId} />
@@ -161,17 +169,23 @@ type CanvasProps = {
   selectedId: string | null
   reducedMotion: boolean
   onSelect: (id: string | null) => void
+  onOpenArticle: (id: string) => void
 }
 
-function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, onSelect }: CanvasProps) {
+function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, onSelect, onOpenArticle }: CanvasProps) {
   const wrapper = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const transform = useRef<Transform>(identity)
   const userMoved = useRef(false)
   const drag = useRef<{ x: number; y: number; start: Transform; moved: boolean } | null>(null)
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ distance: number; mid: { x: number; y: number }; start: Transform } | null>(null)
   const animation = useRef<number | null>(null)
   const frame = useRef<number | null>(null)
   const [width, setWidth] = useState(800)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(HEIGHT)
+  const height = fullscreen ? viewportHeight : HEIGHT
   const [hoverId, setHoverId] = useState<string | null>(null)
 
   const neighborIds = useMemo(() => {
@@ -179,95 +193,133 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     return focus ? new Set([focus, ...neighborsOf(graph, focus).map((n) => n.node.id)]) : null
   }, [graph, selectedId, hoverId])
 
-  const draw = useCallback(() => {
-    frame.current = null
-    const element = canvas.current
-    const ctx = element?.getContext('2d')
-    if (!element || !ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const t = transform.current
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, width, HEIGHT)
-    ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y)
+  const space = useMemo(() => createSpace(), [])
+  const titleCache = useRef(new Map<string, string[]>())
 
-    const incident = (source: string, target: string) => neighborIds !== null && (source === (selectedId ?? hoverId) || target === (selectedId ?? hoverId))
-    ctx.lineWidth = 1 / t.k
-    ctx.strokeStyle = neighborIds ? 'rgba(90, 101, 115, 0.12)' : 'rgba(90, 101, 115, 0.35)'
-    ctx.beginPath()
-    for (const edge of graph.edges) {
-      const a = positions[edge.source]
-      const b = positions[edge.target]
-      if (!a || !b || incident(edge.source, edge.target)) continue
-      ctx.moveTo(a.x, a.y)
-      ctx.lineTo(b.x, b.y)
-    }
-    ctx.stroke()
-    if (neighborIds) {
-      ctx.lineWidth = 2 / t.k
-      ctx.strokeStyle = 'rgba(42, 91, 215, 0.8)'
-      ctx.beginPath()
-      for (const edge of graph.edges) {
-        const a = positions[edge.source]
-        const b = positions[edge.target]
-        if (!a || !b || !incident(edge.source, edge.target)) continue
-        ctx.moveTo(a.x, a.y)
-        ctx.lineTo(b.x, b.y)
+  /** Paints one frame; <paramref name="time"/> drives the floating and twinkling (0 = still). */
+  const draw = useCallback(
+    (time: number) => {
+      frame.current = null
+      const element = canvas.current
+      const ctx = element?.getContext('2d')
+      if (!element || !ctx) return
+      const dpr = window.devicePixelRatio || 1
+      const t = transform.current
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      drawSpace(ctx, space, width, height, time, t)
+      ctx.setTransform(dpr * t.k, 0, 0, dpr * t.k, dpr * t.x, dpr * t.y)
+
+      const focus = selectedId ?? hoverId
+      const at = (id: string) => {
+        const p = positions[id]
+        if (!p) return null
+        const offset = float(id, time)
+        return { x: p.x + offset.x, y: p.y + offset.y }
       }
-      ctx.stroke()
-    }
 
-    // One path per type and emphasis keeps hundreds of nodes cheap to draw.
-    for (const dimmed of [true, false]) {
-      ctx.globalAlpha = dimmed ? 0.2 : 1
-      for (const type of Object.keys(typeColors) as ArticleType[]) {
-        ctx.fillStyle = typeColors[type]
+      // Relations: softly curved threads of light; the ones of the focused article shine brighter.
+      const glow = graph.nodes.length <= 150
+      for (const highlighted of [false, true]) {
+        if (highlighted && !focus) continue
+        ctx.lineWidth = (highlighted ? 2.5 : 1.4) / t.k
+        ctx.strokeStyle = highlighted ? 'rgba(251, 207, 232, 0.95)' : focus ? 'rgba(244, 170, 255, 0.12)' : 'rgba(244, 170, 255, 0.4)'
+        ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
+        ctx.shadowBlur = highlighted && glow ? 12 : 0
         ctx.beginPath()
-        for (const node of graph.nodes) {
-          const p = positions[node.id]
-          if (!p || node.articleType !== type || (neighborIds !== null && !neighborIds.has(node.id)) !== dimmed) continue
-          const r = nodeRadius(node)
-          ctx.moveTo(p.x + r, p.y)
-          ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+        for (const edge of graph.edges) {
+          const a = at(edge.source)
+          const b = at(edge.target)
+          if (!a || !b || (edge.source === focus || edge.target === focus) !== highlighted) continue
+          const bend = 0.12
+          ctx.moveTo(a.x, a.y)
+          ctx.quadraticCurveTo((a.x + b.x) / 2 - (b.y - a.y) * bend, (a.y + b.y) / 2 + (b.x - a.x) * bend, b.x, b.y)
         }
-        ctx.fill()
+        ctx.stroke()
       }
-    }
-    ctx.globalAlpha = 1
+      ctx.shadowBlur = 0
 
-    for (const [id, color, width] of [
-      [hoverId, '#1c2430', 1.5],
-      [selectedId, '#1c2430', 3],
-    ] as const) {
-      const node = id ? graph.nodes.find((n) => n.id === id) : null
-      const p = node ? positions[node.id] : null
-      if (!node || !p) continue
-      ctx.lineWidth = width / t.k
-      ctx.strokeStyle = color
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, nodeRadius(node) + 3 / t.k, 0, Math.PI * 2)
-      ctx.stroke()
-    }
+      // Planets in the color of their type, the title inside.
+      const showAllLabels = graph.nodes.length <= 40 || t.k >= 1.6
+      for (const node of graph.nodes) {
+        const p = at(node.id)
+        if (!p) continue
+        const r = nodeRadius(node)
+        const sx = p.x * t.k + t.x
+        const sy = p.y * t.k + t.y
+        const sr = r * t.k
+        if (sx < -sr - 200 || sx > width + sr || sy < -sr || sy > height + sr) continue
+        const color = typeColors[node.articleType]
+        const dimmed = neighborIds !== null && !neighborIds.has(node.id)
+        ctx.globalAlpha = dimmed ? 0.25 : 1
 
-    // Labels: all when zoomed in or few articles, otherwise only around the focus.
-    const showAll = graph.nodes.length <= 40 || t.k >= 1.6
-    ctx.font = `${12 / t.k}px system-ui, sans-serif`
-    ctx.fillStyle = '#1c2430'
-    for (const node of graph.nodes) {
-      const p = positions[node.id]
-      if (!p || !(showAll || neighborIds?.has(node.id))) continue
-      if (neighborIds && !neighborIds.has(node.id)) continue
-      const sx = p.x * t.k + t.x
-      const sy = p.y * t.k + t.y
-      if (sx < -200 || sx > width + 20 || sy < -20 || sy > HEIGHT + 20) continue
-      ctx.fillText(node.title, p.x + nodeRadius(node) + 4 / t.k, p.y + 4 / t.k)
-    }
-  }, [graph, positions, width, neighborIds, selectedId, hoverId])
+        drawPlanet(ctx, node.id, p.x, p.y, r, color, {
+          detailed: sr >= 14 && glow,
+          time,
+          ring: node.degree >= 3,
+          moon: node.degree >= 4,
+        })
 
-  const requestDraw = useCallback(() => {
-    if (frame.current === null) frame.current = requestAnimationFrame(draw)
+        if (node.id === hoverId || node.id === selectedId) {
+          ctx.lineWidth = (node.id === selectedId ? 3 : 1.5) / t.k
+          ctx.strokeStyle = '#ffffff'
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, r + 5 / t.k, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+
+        if (dimmed) continue
+        if (sr >= 22) {
+          const px = Math.min(15, Math.max(8, sr * 0.2))
+          ctx.font = `600 ${px / t.k}px system-ui, sans-serif`
+          const key = `${node.id}:${px.toFixed(1)}:${t.k.toFixed(3)}:${node.title}`
+          let lines = titleCache.current.get(key)
+          if (!lines) {
+            if (titleCache.current.size > 2000) titleCache.current.clear()
+            lines = wrapTitle(ctx, node.title, r * 1.7, sr >= 30 ? 3 : 2)
+            titleCache.current.set(key, lines)
+          }
+          const lineHeight = (px * 1.2) / t.k
+          ctx.fillStyle = '#ffffff'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.shadowColor = 'rgba(18, 5, 42, 0.95)'
+          ctx.shadowBlur = 6
+          lines.forEach((line, i) => ctx.fillText(line, p.x, p.y + (i - (lines.length - 1) / 2) * lineHeight))
+          ctx.shadowBlur = 0
+          ctx.textAlign = 'start'
+          ctx.textBaseline = 'alphabetic'
+        } else if (showAllLabels || neighborIds?.has(node.id)) {
+          ctx.font = `${12 / t.k}px system-ui, sans-serif`
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+          ctx.fillText(node.title, p.x + r + 4 / t.k, p.y + 4 / t.k)
+        }
+      }
+      ctx.globalAlpha = 1
+    },
+    [graph, positions, width, height, neighborIds, selectedId, hoverId, space],
+  )
+
+  // Without reduced motion a frame loop keeps the bubbles floating; otherwise draw on change only.
+  const drawLatest = useRef(draw)
+  useEffect(() => {
+    drawLatest.current = draw
   }, [draw])
 
-  useEffect(requestDraw, [requestDraw])
+  useEffect(() => {
+    if (reducedMotion) return
+    let id = requestAnimationFrame(function loop(now) {
+      drawLatest.current(now)
+      id = requestAnimationFrame(loop)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [reducedMotion])
+
+  const requestDraw = useCallback(() => {
+    if (reducedMotion && frame.current === null) frame.current = requestAnimationFrame(() => drawLatest.current(0))
+  }, [reducedMotion])
+
+  useEffect(requestDraw, [requestDraw, draw])
+
 
   // Reset the refs as well: StrictMode unmounts and mounts again, and a stale id would block drawing.
   useEffect(
@@ -313,7 +365,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     [reducedMotion, setTransform],
   )
 
-  const fit = useCallback(() => setTransform(fitTransform(Object.values(positions), width, HEIGHT)), [positions, width, setTransform])
+  const fit = useCallback(() => setTransform(fitTransform(Object.values(positions), width, height, FIT_PADDING)), [positions, width, height, setTransform])
 
   // Follow the settling layout until the person moves the view themselves.
   useEffect(() => {
@@ -323,13 +375,16 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   // Focus the selected article.
   useEffect(() => {
     const p = selectedId ? positions[selectedId] : null
-    if (p && settled) animateTo(focusTransform(p, width, HEIGHT, Math.max(transform.current.k, 1.8)))
-  }, [selectedId, settled, positions, width, animateTo])
+    if (p && settled) animateTo(focusTransform(p, width, height, Math.max(transform.current.k, 1.2)))
+  }, [selectedId, settled, positions, width, height, animateTo])
 
   useEffect(() => {
     const element = wrapper.current
     if (!element || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, Math.floor(entry.contentRect.width))))
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(Math.max(320, Math.floor(entry.contentRect.width)))
+      setViewportHeight(Math.max(320, Math.floor(entry.contentRect.height)))
+    })
     observer.observe(element)
     return () => observer.disconnect()
   }, [])
@@ -353,13 +408,35 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   }
 
   function pointerDown(event: PointerEvent<HTMLCanvasElement>) {
-    event.currentTarget.setPointerCapture?.(event.pointerId)
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+    } catch {
+      // The pointer is already gone (or synthetic); panning still works without capture.
+    }
     const p = point(event)
+    pointers.current.set(event.pointerId, p)
+    if (pointers.current.size === 2) {
+      // Two fingers: pinch to zoom around their midpoint, move them to pan.
+      const [a, b] = [...pointers.current.values()]
+      pinch.current = { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, start: transform.current }
+      drag.current = null
+      return
+    }
     drag.current = { ...p, start: transform.current, moved: false }
   }
 
   function pointerMove(event: PointerEvent<HTMLCanvasElement>) {
     const p = point(event)
+    if (pointers.current.has(event.pointerId)) pointers.current.set(event.pointerId, p)
+    const zoom = pinch.current
+    if (zoom && pointers.current.size >= 2) {
+      const [a, b] = [...pointers.current.values()]
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const zoomed = zoomAt(zoom.start, Math.hypot(a.x - b.x, a.y - b.y) / zoom.distance, zoom.mid.x, zoom.mid.y)
+      userMoved.current = true
+      setTransform({ ...zoomed, x: zoomed.x + mid.x - zoom.mid.x, y: zoomed.y + mid.y - zoom.mid.y })
+      return
+    }
     const current = drag.current
     if (current) {
       const dx = p.x - current.x
@@ -376,6 +453,13 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   }
 
   function pointerUp(event: PointerEvent<HTMLCanvasElement>) {
+    pointers.current.delete(event.pointerId)
+    if (pinch.current) {
+      // A pinch never selects; the remaining finger does not start a drag either.
+      if (pointers.current.size === 0) pinch.current = null
+      drag.current = null
+      return
+    }
     const current = drag.current
     drag.current = null
     if (current && !current.moved) {
@@ -392,8 +476,8 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
       ArrowRight: () => ({ ...t, x: t.x - step }),
       ArrowUp: () => ({ ...t, y: t.y + step }),
       ArrowDown: () => ({ ...t, y: t.y - step }),
-      '+': () => zoomAt(t, 1.25, width / 2, HEIGHT / 2),
-      '-': () => zoomAt(t, 0.8, width / 2, HEIGHT / 2),
+      '+': () => zoomAt(t, 1.25, width / 2, height / 2),
+      '-': () => zoomAt(t, 0.8, width / 2, height / 2),
     }
     if (event.key in moves) {
       event.preventDefault()
@@ -407,25 +491,63 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     }
   }
 
+  /**
+   * Full screen: the browser's Fullscreen API where allowed, otherwise the galaxy covers the window.
+   * Either way Esc leaves it.
+   */
+  async function toggleFullscreen() {
+    userMoved.current = false
+    if (fullscreen) {
+      setFullscreen(false)
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
+      return
+    }
+    setFullscreen(true)
+    await wrapper.current?.requestFullscreen?.().catch(() => {})
+    canvas.current?.focus()
+  }
+
+  useEffect(() => {
+    if (!fullscreen) return
+    const change = () => {
+      if (!document.fullscreenElement) setFullscreen(false)
+    }
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape' && !document.fullscreenElement) setFullscreen(false)
+    }
+    document.addEventListener('fullscreenchange', change)
+    window.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('fullscreenchange', change)
+      window.removeEventListener('keydown', escape)
+    }
+  }, [fullscreen])
+
   const hovered = hoverId ? graph.nodes.find((n) => n.id === hoverId) : null
+  const selected = fullscreen && selectedId ? graph.nodes.find((n) => n.id === selectedId) : null
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
 
   return (
-    <div className="galaxy-canvas" ref={wrapper}>
+    <div className={fullscreen ? 'galaxy-canvas fullscreen' : 'galaxy-canvas'} ref={wrapper}>
       <canvas
         ref={canvas}
         width={width * dpr}
-        height={HEIGHT * dpr}
-        style={{ width, height: HEIGHT }}
+        height={height * dpr}
+        style={{ width, height }}
         tabIndex={0}
         role="img"
         aria-label={`Wissensgalaxie mit ${graph.nodes.length} ${graph.nodes.length === 1 ? 'Artikel' : 'Artikeln'} und ${graph.edges.length} ${graph.edges.length === 1 ? 'Beziehung' : 'Beziehungen'}`}
         aria-describedby="galaxy-help"
         className={hovered ? 'pointer' : undefined}
         data-layout={settled ? 'done' : 'running'}
+        onMouseDown={(event) => {
+          // The middle mouse button pans like the left one instead of starting the browser's autoscroll.
+          if (event.button === 1) event.preventDefault()
+        }}
         onPointerDown={pointerDown}
         onPointerMove={pointerMove}
         onPointerUp={pointerUp}
+        onPointerCancel={pointerUp}
         onPointerLeave={() => setHoverId(null)}
         onKeyDown={keyDown}
       />
@@ -435,25 +557,46 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         </div>
       )}
       <div className="galaxy-controls">
-        <button type="button" aria-label="Vergrößern" onClick={() => animateTo(zoomAt(transform.current, 1.4, width / 2, HEIGHT / 2))}>
+        <button type="button" aria-label="Vergrößern" onClick={() => animateTo(zoomAt(transform.current, 1.4, width / 2, height / 2))}>
           +
         </button>
-        <button type="button" aria-label="Verkleinern" onClick={() => animateTo(zoomAt(transform.current, 1 / 1.4, width / 2, HEIGHT / 2))}>
+        <button type="button" aria-label="Verkleinern" onClick={() => animateTo(zoomAt(transform.current, 1 / 1.4, width / 2, height / 2))}>
           −
         </button>
         <button
           type="button"
           onClick={() => {
             userMoved.current = false
-            animateTo(fitTransform(Object.values(positions), width, HEIGHT))
+            animateTo(fitTransform(Object.values(positions), width, height, FIT_PADDING))
           }}
         >
           Alles zeigen
         </button>
+        <button type="button" aria-pressed={fullscreen} onClick={toggleFullscreen}>
+          {fullscreen ? 'Vollbild beenden' : 'Vollbild'}
+        </button>
       </div>
+      {selected && (
+        <div className="galaxy-card" aria-live="polite">
+          <span className="galaxy-card-type">
+            <span className="legend-dot" style={{ background: typeColors[selected.articleType] }} aria-hidden="true" /> {articleTypes[selected.articleType]}
+          </span>
+          <strong>{selected.title}</strong>
+          {selected.summary && <p>{selected.summary}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+              onOpenArticle(selected.id)
+            }}
+          >
+            Artikel öffnen
+          </button>
+        </div>
+      )}
       <p id="galaxy-help" className="muted">
-        Ziehen verschiebt, Mausrad zoomt, Klick wählt einen Artikel. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Esc hebt die Auswahl auf. Die Darstellung „Liste“ zeigt
-        dieselben Inhalte.
+        Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad oder zwei Finger zoomen, Klick oder Tippen wählt einen Artikel. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Esc hebt die Auswahl
+        auf bzw. beendet das Vollbild. Die Darstellung „Liste“ zeigt dieselben Inhalte.
       </p>
     </div>
   )
@@ -548,7 +691,7 @@ function Legend({ graph }: { graph: KnowledgeGraph }) {
             </li>
           ))}
       </ul>
-      <p className="muted">Größere Sterne haben mehr Beziehungen.</p>
+      <p className="muted">Größere Kugeln haben mehr Beziehungen.</p>
     </section>
   )
 }

@@ -1,5 +1,6 @@
 import { apiFetch } from '../../api/client'
 import type { ArticleStatus, ArticleType, RelationType } from '../api'
+import { bubbleRadius } from './layout'
 
 export type GraphNode = {
   id: string
@@ -23,17 +24,17 @@ export function fetchGraph(filter: { spaceId?: string; type?: string }) {
   return apiFetch<KnowledgeGraph>(`/api/v1/knowledge/graph${suffix}`)
 }
 
-/** Colors per article type: the categories of the galaxy (legend in the view). */
+/** Colors per article type: the categories of the galaxy (legend in the view). Muted tones that read as planets on the dark space. */
 export const typeColors: Record<ArticleType, string> = {
-  article: '#2a5bd7',
-  how_to: '#0f7c8c',
-  best_practice: '#1d6b3a',
-  process: '#6b3fa0',
-  policy: '#a3221d',
-  faq: '#c98a00',
-  template: '#8c4a0f',
-  checklist: '#b0306b',
-  glossary: '#4a5a6b',
+  article: '#7c83db',
+  how_to: '#5fb0c2',
+  best_practice: '#6fb897',
+  process: '#a38bd8',
+  policy: '#d27a8c',
+  faq: '#d6ad6a',
+  template: '#d39070',
+  checklist: '#cc86b0',
+  glossary: '#9aa3b8',
 }
 
 export type Point = { x: number; y: number }
@@ -45,7 +46,7 @@ export type Transform = { k: number; x: number; y: number }
 
 export const identity: Transform = { k: 1, x: 0, y: 0 }
 
-export const nodeRadius = (node: Pick<GraphNode, 'degree'>) => 5 + Math.sqrt(node.degree) * 2
+export const nodeRadius = (node: Pick<GraphNode, 'degree'>) => bubbleRadius(node.degree)
 
 export const toWorld = (t: Transform, sx: number, sy: number): Point => ({ x: (sx - t.x) / t.k, y: (sy - t.y) / t.k })
 

@@ -78,37 +78,23 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div>
-          <h1>ProjectHub</h1>
-          {session && <p className="organization">{session.organization.name}</p>}
-        </div>
-        <div className="account">
-          {session && (
-            <div className="account-row">
-              <p>
-                <strong>{session.me.displayName}</strong> · {roleText[session.me.organizationRole]}
-              </p>
-              <NotificationBell key={session.me.id} onOpen={openNotification} />
+        <div className="app-header-inner">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true">
+              P
+            </span>
+            <div>
+              <h1>ProjectHub</h1>
+              {session && <p className="organization">{session.organization.name}</p>}
             </div>
-          )}
-          {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
-          {signedInWithEntra() && (
-            <button type="button" className="link-button" onClick={() => void signOut()}>
-              Abmelden
-            </button>
-          )}
-        </div>
-      </header>
-      <main className="content">
-        {error && <p role="alert">{error}</p>}
-        {session && (
-          <>
-            <nav className="tabs" aria-label="Bereiche">
+          </div>
+          {session && (
+            <nav className="main-nav" aria-label="Bereiche">
               {(Object.keys(tabText) as Tab[]).filter((value) => value !== 'assistant' || session.ai?.enabled).map((value) => (
                 <button
                   key={value}
                   type="button"
-                  className={value === tab ? 'tab active' : 'tab'}
+                  className={value === tab ? 'main-nav-item active' : 'main-nav-item'}
                   aria-current={value === tab ? 'page' : undefined}
                   onClick={() => {
                     setTab(value)
@@ -120,6 +106,33 @@ function App() {
                 </button>
               ))}
             </nav>
+          )}
+          <div className="account">
+            {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
+            {session && (
+              <div className="account-row">
+                <NotificationBell key={session.me.id} onOpen={openNotification} />
+                <span className="avatar" aria-hidden="true">
+                  {initials(session.me.displayName)}
+                </span>
+                <p className="account-name">
+                  <strong>{session.me.displayName}</strong>
+                  <span>{roleText[session.me.organizationRole]}</span>
+                </p>
+              </div>
+            )}
+            {signedInWithEntra() && (
+              <button type="button" className="sign-out" onClick={() => void signOut()}>
+                Abmelden
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+      <main className="content">
+        {error && <p role="alert">{error}</p>}
+        {session && (
+          <>
             {tab === 'projects' && (
               <ProjectsPage
                 key={`${session.me.id}:${openProject?.jump ?? 0}`}
@@ -154,6 +167,16 @@ function App() {
       </footer>
     </div>
   )
+}
+
+/** Up to two initials for the avatar, e.g. "Ada Admin" → "AA". */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('')
 }
 
 export default App
