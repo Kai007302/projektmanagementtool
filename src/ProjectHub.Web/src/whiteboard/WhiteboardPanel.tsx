@@ -1,4 +1,3 @@
-import { Reveal } from '../ui/Reveal'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
@@ -7,6 +6,7 @@ import { createWhiteboard, deleteWhiteboard, fetchWhiteboards, renameWhiteboard,
 import { BoardEditor } from './BoardEditor'
 import { useLatest } from '../api/useLatest'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 

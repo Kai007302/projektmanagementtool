@@ -13,6 +13,7 @@ import { NotificationBell } from './notifications/NotificationBell'
 import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
+import { CommandPalette } from './ui/CommandPalette'
 import { ThemeToggle } from './ui/ThemeToggle'
 import './App.css'
 
@@ -42,6 +43,19 @@ function App() {
   const [openArticle, setOpenArticle] = useState<string | null>(null)
   // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
   const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Ctrl+K (Cmd+K on a Mac) opens the search from anywhere, like in Linear or Notion.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -62,14 +76,29 @@ function App() {
 
   function openNotification(notification: Notification) {
     if (notification.resourceType === 'knowledge_article' && notification.resourceId) {
-      setOpenArticle(notification.resourceId)
-      setTab('knowledge')
+      showArticle(notification.resourceId)
     } else if (notification.projectId) {
-      const taskId = notification.resourceType === 'task' ? notification.resourceId : null
-      setOpenProject((current) => ({ projectId: notification.projectId!, taskId, jump: (current?.jump ?? 0) + 1 }))
-      setTab('projects')
+      showProject(notification.projectId, notification.resourceType === 'task' ? notification.resourceId : null)
     }
   }
+
+  function goTo(value: Tab) {
+    setTab(value)
+    setOpenArticle(null)
+    setOpenProject(null)
+  }
+
+  function showProject(projectId: string, taskId: string | null = null) {
+    setOpenProject((current) => ({ projectId, taskId, jump: (current?.jump ?? 0) + 1 }))
+    setTab('projects')
+  }
+
+  function showArticle(articleId: string) {
+    setOpenArticle(articleId)
+    setTab('knowledge')
+  }
+
+  const tabs = session ? (Object.keys(tabText) as Tab[]).filter((value) => value !== 'assistant' || session.ai?.enabled) : []
 
   function switchUser(objectId: string) {
     setDevUser(objectId)
@@ -93,17 +122,13 @@ function App() {
           </div>
           {session && (
             <nav className="main-nav" aria-label="Bereiche">
-              {(Object.keys(tabText) as Tab[]).filter((value) => value !== 'assistant' || session.ai?.enabled).map((value) => (
+              {tabs.map((value) => (
                 <button
                   key={value}
                   type="button"
                   className={value === tab ? 'main-nav-item active' : 'main-nav-item'}
                   aria-current={value === tab ? 'page' : undefined}
-                  onClick={() => {
-                    setTab(value)
-                    setOpenArticle(null)
-                    setOpenProject(null)
-                  }}
+                  onClick={() => goTo(value)}
                 >
                   {tabText[value]}
                 </button>
@@ -111,6 +136,16 @@ function App() {
             </nav>
           )}
           <div className="account">
+            {session && (
+              <button type="button" className="search-trigger" aria-label="Suchen (Strg+K)" onClick={() => setPaletteOpen(true)}>
+                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="9" cy="9" r="5.5" />
+                  <path d="M13.2 13.2 L17 17" />
+                </svg>
+                <span>Suchen</span>
+                <kbd aria-hidden="true">Strg K</kbd>
+              </button>
+            )}
             <ThemeToggle />
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
@@ -143,10 +178,7 @@ function App() {
                 me={session.me}
                 initialProjectId={openProject?.projectId ?? null}
                 initialTaskId={openProject?.taskId ?? null}
-                onOpenArticle={(id) => {
-                  setOpenArticle(id)
-                  setTab('knowledge')
-                }}
+                onOpenArticle={showArticle}
               />
             )}
             {tab === 'knowledge' && <KnowledgePage key={`${session.me.id}:${openArticle}`} me={session.me} initialArticleId={openArticle} />}
@@ -155,15 +187,20 @@ function App() {
               <AssistantPage
                 key={session.me.id}
                 status={session.ai}
-                onOpenArticle={(id) => {
-                  setOpenArticle(id)
-                  setTab('knowledge')
-                }}
+                onOpenArticle={showArticle}
               />
             )}
           </>
         )}
       </main>
+      {session && paletteOpen && (
+        <CommandPalette
+          destinations={tabs.map((value) => ({ label: tabText[value], go: () => goTo(value) }))}
+          onOpenProject={(id) => showProject(id)}
+          onOpenArticle={showArticle}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
       <footer className="app-footer">
         <span className={`status status-${status}`} role="status">
           {statusText[status]}

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Me } from '../identity/api'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 import {
   articleStatuses,
   articleTypeEmoji,
@@ -10,13 +11,10 @@ import {
   fetchSpaces,
   fetchTags,
   searchArticles,
-  visibilities,
   type ArticleFilter,
   type ArticleSummary,
-  type ArticleType,
   type Space,
   type Tag,
-  type Visibility,
 } from './api'
 import { ArticleView } from './ArticleView'
 import { typeColors } from './galaxy/graph'
@@ -73,9 +71,25 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
     )
   }
 
+  /** Like a new page in Notion: the draft exists at once and opens in the editor, where title and type are set. */
+  async function newArticle() {
+    setError(null)
+    try {
+      const created = await createArticle({ title: 'Neuer Artikel', articleType: 'article', summary: '', spaceId: filter.spaceId || null, visibility: 'organization' })
+      setOpen({ id: created.article.id, editing: true })
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   return (
     <section className="knowledge" aria-labelledby="knowledge-heading">
-      <h2 id="knowledge-heading">Wissen</h2>
+      <header className="page-header">
+        <h2 id="knowledge-heading">Wissen</h2>
+        <button type="submit" onClick={() => void newArticle()}>
+          + Artikel
+        </button>
+      </header>
       {error && <p role="alert">{error}</p>}
       <nav className="tabs" aria-label="Wissen anzeigen als">
         {(['articles', 'galaxy'] as Mode[]).map((value) => (
@@ -94,7 +108,7 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
         <KnowledgeGalaxy spaces={spaces} onOpenArticle={openArticle} />
       ) : (
         <>
-          <SearchForm spaces={spaces} tags={tags} onSearch={setFilter} />
+          <SearchBar key={filter.spaceId ?? ''} spaces={spaces} tags={tags} initial={filter} onSearch={setFilter} />
           <div className="project-layout">
             <div>
               {articles === null ? (
@@ -114,8 +128,8 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
               )}
             </div>
             <aside className="project-side">
-              <CreateArticleForm spaces={spaces} onCreated={(id) => setOpen({ id, editing: true })} />
-              <SpacesPanel me={me} spaces={spaces} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
+              <SpacesPanel me={me} spaces={spaces} current={filter.spaceId ?? ''} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
+              <p className="muted knowledge-note">Neue Artikel sind Entwürfe und nur für dich sichtbar, bis sie veröffentlicht werden.</p>
             </aside>
           </div>
         </>
@@ -157,148 +171,83 @@ export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOp
   )
 }
 
-function SearchForm({ spaces, tags, onSearch }: { spaces: Space[]; tags: Tag[]; onSearch: (filter: ArticleFilter) => void }) {
-  const [q, setQ] = useState('')
-  const [type, setType] = useState('')
-  const [status, setStatus] = useState('')
-  const [spaceId, setSpaceId] = useState('')
-  const [tag, setTag] = useState('')
+type SearchProps = { spaces: Space[]; tags: Tag[]; initial: ArticleFilter; onSearch: (filter: ArticleFilter) => void }
 
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    onSearch({ q: q.trim(), type, status, spaceId, tag })
-  }
+/**
+ * One search field that searches while typing, with the filters as small chips beside it. No search button and no
+ * filter form, like the search in Linear or Notion.
+ */
+function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
+  const [q, setQ] = useState(initial.q ?? '')
+  const [type, setType] = useState(initial.type ?? '')
+  const [status, setStatus] = useState(initial.status ?? '')
+  const [spaceId, setSpaceId] = useState(initial.spaceId ?? '')
+  const [tag, setTag] = useState(initial.tag ?? '')
+  const search = useRef(onSearch)
+  useEffect(() => {
+    search.current = onSearch
+  })
+
+  // Typing searches after a short pause; a changed filter searches at once.
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    const timer = window.setTimeout(() => search.current({ q: q.trim(), type, status, spaceId, tag }), 250)
+    return () => window.clearTimeout(timer)
+  }, [q, type, status, spaceId, tag])
+
+  const chip = (label: string, value: string, set: (value: string) => void, options: [string, string][]) => (
+    <select className={value ? 'filter-chip active' : 'filter-chip'} aria-label={label} value={value} onChange={(event) => set(event.target.value)}>
+      <option value="">{label}: alle</option>
+      {options.map(([optionValue, optionLabel]) => (
+        <option key={optionValue} value={optionValue}>
+          {label}: {optionLabel}
+        </option>
+      ))}
+    </select>
+  )
 
   return (
-    <form className="inline-form knowledge-search" role="search" onSubmit={submit}>
-      <label className="grow">
-        Suche
-        <input type="search" value={q} onChange={(event) => setQ(event.target.value)} placeholder="z. B. Deployment, Kickoff …" />
-      </label>
-      <label>
-        Art
-        <select value={type} onChange={(event) => setType(event.target.value)}>
-          <option value="">Alle</option>
-          {Object.entries(articleTypes).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Status
-        <select value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">Alle</option>
-          {Object.entries(articleStatuses).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Bereich
-        <select value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>
-          <option value="">Alle</option>
-          {spaces.map((space) => (
-            <option key={space.id} value={space.id}>
-              {space.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Tag
-        <select value={tag} onChange={(event) => setTag(event.target.value)}>
-          <option value="">Alle</option>
-          {tags.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.name} ({t.articleCount})
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit">Suchen</button>
+    <form
+      className="knowledge-search"
+      role="search"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSearch({ q: q.trim(), type, status, spaceId, tag })
+      }}
+    >
+      <input className="knowledge-search-input" type="search" aria-label="Suche" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Artikel suchen, z. B. Deployment, Kickoff …" />
+      <div className="filter-chips">
+        {chip('Art', type, setType, Object.entries(articleTypes))}
+        {chip('Status', status, setStatus, Object.entries(articleStatuses))}
+        {chip('Bereich', spaceId, setSpaceId, spaces.map((space) => [space.id, space.name]))}
+        {chip(
+          'Tag',
+          tag,
+          setTag,
+          tags.map((t) => [t.name, `${t.name} (${t.articleCount})`]),
+        )}
+      </div>
     </form>
   )
 }
 
-function CreateArticleForm({ spaces, onCreated }: { spaces: Space[]; onCreated: (id: string) => void }) {
-  const [title, setTitle] = useState('')
-  const [articleType, setArticleType] = useState<ArticleType>('article')
-  const [spaceId, setSpaceId] = useState('')
-  const [visibility, setVisibility] = useState<Visibility>('organization')
-  const [error, setError] = useState<string | null>(null)
+type SpacesProps = { me: Me; spaces: Space[]; current: string; onFilter: (spaceId: string) => void; onCreated: () => void }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setError(null)
-    try {
-      const created = await createArticle({ title, articleType, summary: '', spaceId: spaceId || null, visibility })
-      onCreated(created.article.id)
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  return (
-    <section className="panel" aria-labelledby="new-article-heading">
-      <h3 id="new-article-heading">Neuer Artikel</h3>
-      <form className="stacked-form" onSubmit={submit}>
-        <label>
-          Titel
-          <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={300} />
-        </label>
-        <label>
-          Art
-          <select value={articleType} onChange={(event) => setArticleType(event.target.value as ArticleType)}>
-            {Object.entries(articleTypes).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Bereich
-          <select value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>
-            <option value="">Kein Bereich</option>
-            {spaces.map((space) => (
-              <option key={space.id} value={space.id}>
-                {space.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Sichtbarkeit
-          <select value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
-            {Object.entries(visibilities).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="muted">Neue Artikel sind Entwürfe und nur für dich sichtbar, bis sie veröffentlicht werden.</p>
-        <button type="submit">Artikel anlegen</button>
-        {error && <p role="alert">{error}</p>}
-      </form>
-    </section>
-  )
-}
-
-function SpacesPanel({ me, spaces, onFilter, onCreated }: { me: Me; spaces: Space[]; onFilter: (spaceId: string) => void; onCreated: () => void }) {
+function SpacesPanel({ me, spaces, current, onFilter, onCreated }: SpacesProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
     setError(null)
     try {
       await createSpace(name, '')
       setName('')
+      close()
       onCreated()
     } catch (e) {
       setError((e as Error).message)
@@ -308,10 +257,15 @@ function SpacesPanel({ me, spaces, onFilter, onCreated }: { me: Me; spaces: Spac
   return (
     <section className="panel" aria-labelledby="spaces-heading">
       <h3 id="spaces-heading">Bereiche</h3>
-      <ul className="plain-list">
+      <ul className="plain-list space-list">
+        <li className="row">
+          <button type="button" className={current === '' ? 'link-button active' : 'link-button'} aria-pressed={current === ''} onClick={() => onFilter('')}>
+            Alle Bereiche
+          </button>
+        </li>
         {spaces.map((space) => (
           <li key={space.id} className="row">
-            <button type="button" className="link-button" onClick={() => onFilter(space.id)}>
+            <button type="button" className={current === space.id ? 'link-button active' : 'link-button'} aria-pressed={current === space.id} onClick={() => onFilter(space.id)}>
               {space.name}
             </button>
             <small className="muted">{space.articleCount} Artikel</small>
@@ -319,14 +273,14 @@ function SpacesPanel({ me, spaces, onFilter, onCreated }: { me: Me; spaces: Spac
         ))}
       </ul>
       {me.organizationRole === 'admin' && (
-        <form className="inline-form" onSubmit={submit}>
-          <label>
-            Neuer Bereich
-            <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
-          </label>
-          <button type="submit">Anlegen</button>
-          {error && <p role="alert">{error}</p>}
-        </form>
+        <Reveal label="Bereich">
+          {(close) => (
+            <form className="quick-create" onSubmit={(event) => void submit(event, close)}>
+              <input aria-label="Neuer Bereich" placeholder="Name, Enter zum Anlegen" value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
+              {error && <p role="alert">{error}</p>}
+            </form>
+          )}
+        </Reveal>
       )}
     </section>
   )

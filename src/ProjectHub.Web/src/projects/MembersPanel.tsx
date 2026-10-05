@@ -1,8 +1,8 @@
-import { Reveal } from '../ui/Reveal'
 import { useEffect, useState, type FormEvent } from 'react'
 import type { User } from '../identity/api'
 import { fetchUsers } from '../teams/api'
 import { addProjectMember, changeProjectMember, projectRoles, removeProjectMember, type ProjectDetails, type ProjectRole } from './api'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; onChanged: () => void }
 

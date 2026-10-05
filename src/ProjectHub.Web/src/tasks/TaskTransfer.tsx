@@ -1,7 +1,7 @@
-import { Reveal } from '../ui/Reveal'
 import { useId, useState } from 'react'
 import type { ProjectDetails } from '../projects/api'
 import { exportTasks, importErrorText, importTasks, type TaskFileFormat, type TaskImportResult } from './transfer'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; onImported: () => void }
 

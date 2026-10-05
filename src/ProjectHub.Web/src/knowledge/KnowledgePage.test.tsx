@@ -75,7 +75,7 @@ async function openArticle() {
 describe('KnowledgePage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('lists articles and searches with filters', async () => {
+  it('lists articles and searches while typing, with filters as chips', async () => {
     const api = fakeApi({ ...routes(), 'GET /api/v1/knowledge/articles?limit=100&q=Freigabe&type=process&tag=Betrieb': () => json(empty) })
     render(<KnowledgePage me={ben} />)
 
@@ -85,7 +85,7 @@ describe('KnowledgePage', () => {
     await userEvent.type(within(search).getByLabelText('Suche'), 'Freigabe')
     await userEvent.selectOptions(within(search).getByLabelText('Art'), 'process')
     await userEvent.selectOptions(within(search).getByLabelText('Tag'), 'Betrieb')
-    await userEvent.click(within(search).getByRole('button', { name: 'Suchen' }))
+    expect(within(search).queryByRole('button', { name: 'Suchen' })).not.toBeInTheDocument()
 
     expect(await screen.findByText('Keine Artikel gefunden.')).toBeInTheDocument()
     expect(api.calls.map((c) => c.key)).toContain('GET /api/v1/knowledge/articles?limit=100&q=Freigabe&type=process&tag=Betrieb')
@@ -111,6 +111,7 @@ describe('KnowledgePage', () => {
 
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Archivieren|Veröffentlichen/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zum Artikel' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Freigaben' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /wiederherstellen/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Kommentieren' })).toBeInTheDocument()
@@ -174,7 +175,8 @@ describe('KnowledgePage', () => {
     render(<KnowledgePage me={ben} />)
     await openArticle()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Archivieren' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zum Artikel' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Version 1 wiederherstellen' }))
 
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/knowledge/articles/a-1/status')?.init?.body))).toEqual({ version: 4, status: 'archived' })
@@ -183,22 +185,19 @@ describe('KnowledgePage', () => {
     expect(screen.queryByRole('button', { name: 'Zur Prüfung geben' })).not.toBeInTheDocument()
   })
 
-  it('creates a draft and opens it in the editor', async () => {
-    const created = details({ canEdit: true, canAdmin: true }, { id: 'a-1', title: 'Neu', status: 'draft' })
+  it('creates a draft with one click and opens it in the editor', async () => {
+    const created = details({ canEdit: true, canAdmin: true }, { id: 'a-1', title: 'Neuer Artikel', status: 'draft' })
     const api = fakeApi({ ...routes(created), 'POST /api/v1/knowledge/articles': () => json(created, 201) })
     render(<KnowledgePage me={ben} />)
 
-    const form = within(await screen.findByRole('region', { name: 'Neuer Artikel' }))
-    await userEvent.type(form.getByLabelText('Titel'), 'Neu')
-    await userEvent.selectOptions(form.getByLabelText('Bereich'), 's-1')
-    await userEvent.click(form.getByRole('button', { name: 'Artikel anlegen' }))
+    await userEvent.click(await screen.findByRole('button', { name: '+ Artikel' }))
 
     expect(await screen.findByRole('form', { name: 'Artikel bearbeiten' })).toBeInTheDocument()
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/knowledge/articles')?.init?.body))).toEqual({
-      title: 'Neu',
+      title: 'Neuer Artikel',
       articleType: 'article',
       summary: '',
-      spaceId: 's-1',
+      spaceId: null,
       visibility: 'organization',
     })
   })

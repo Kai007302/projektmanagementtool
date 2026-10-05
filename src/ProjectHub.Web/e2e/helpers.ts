@@ -17,7 +17,7 @@ export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | '
 export async function searchArticles(page: Page, text: string) {
   const search = page.getByRole('search')
   await search.getByLabel('Suche').fill(text)
-  await search.getByRole('button', { name: 'Suchen' }).click()
+  await search.getByLabel('Suche').press('Enter')
 }
 
 export const uniqueTitle = (prefix: string) => `${prefix} ${Date.now().toString(36)}`

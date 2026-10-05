@@ -22,27 +22,31 @@ import {
 import { ArticleComments, PermissionsPanel, ReferencesPanel, RelationsPanel, TagsPanel, VersionsPanel } from './ArticlePanels'
 import { BlockEditor } from './BlockEditor'
 import { BlockView } from './BlockView'
+import { Menu } from '../ui/Menu'
 import type { Block } from './blocks'
 
 type Props = { articleId: string; me: Me; startEditing?: boolean; onBack: () => void; onOpenArticle: (id: string) => void; onChanged: () => void }
 
-/** Status changes the UI offers; the API checks the rights again (Edit for review, Admin for the rest). */
-const transitions: Record<ArticleStatus, { to: ArticleStatus; label: string; admin: boolean }[]> = {
+/**
+ * Status changes the UI offers; the API checks the rights again (Edit for review, Admin for the rest). The usual next
+ * step is a visible button, the others sit in the "…" menu.
+ */
+const transitions: Record<ArticleStatus, { to: ArticleStatus; label: string; admin: boolean; next?: boolean }[]> = {
   draft: [
-    { to: 'review', label: 'Zur Prüfung geben', admin: false },
+    { to: 'review', label: 'Zur Prüfung geben', admin: false, next: true },
     { to: 'published', label: 'Veröffentlichen', admin: true },
     { to: 'archived', label: 'Archivieren', admin: true },
   ],
   review: [
     { to: 'draft', label: 'Zurück in Entwurf', admin: false },
-    { to: 'published', label: 'Veröffentlichen', admin: true },
+    { to: 'published', label: 'Veröffentlichen', admin: true, next: true },
     { to: 'archived', label: 'Archivieren', admin: true },
   ],
   published: [
     { to: 'draft', label: 'Zurück in Entwurf', admin: true },
     { to: 'archived', label: 'Archivieren', admin: true },
   ],
-  archived: [{ to: 'draft', label: 'Wieder bearbeiten', admin: true }],
+  archived: [{ to: 'draft', label: 'Wieder bearbeiten', admin: true, next: true }],
 }
 
 const conflictText = 'Jemand anderes hat den Artikel inzwischen geändert. Der aktuelle Stand wurde geladen.'
@@ -124,16 +128,22 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
               Bearbeiten
             </button>
           )}
-          {actions.map((action) => (
-            <button key={action.to} type="button" onClick={() => run(() => changeStatus(article.id, article.version, action.to))}>
-              {action.label}
-            </button>
-          ))}
-          {capabilities.canAdmin && (
-            <button type="button" className="danger" onClick={remove}>
-              Löschen
-            </button>
-          )}
+          {actions
+            .filter((action) => action.next)
+            .map((action) => (
+              <button key={action.to} type="button" onClick={() => run(() => changeStatus(article.id, article.version, action.to))}>
+                {action.label}
+              </button>
+            ))}
+          <Menu
+            label="Weitere Aktionen zum Artikel"
+            items={[
+              ...actions
+                .filter((action) => !action.next)
+                .map((action) => ({ label: action.label, onSelect: () => void run(() => changeStatus(article.id, article.version, action.to)) })),
+              ...(capabilities.canAdmin ? [{ label: 'Artikel löschen', danger: true, onSelect: () => void remove() }] : []),
+            ]}
+          />
         </div>
       </header>
       {error && <p role="alert">{error}</p>}

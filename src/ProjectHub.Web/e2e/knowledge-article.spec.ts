@@ -8,13 +8,13 @@ test('an article is written, reviewed and published, and only then visible to th
   // Clara writes a draft with several block types.
   const clara = await browser.newPage()
   await signInAs(clara, 'dev-clara')
-  const create = clara.getByRole('region', { name: 'Neuer Artikel' })
-  await create.getByLabel('Titel').fill(title)
-  await create.getByLabel('Art').selectOption('how_to')
-  await create.getByLabel('Bereich').selectOption({ label: 'Projektmethodik' })
-  await create.getByRole('button', { name: 'Artikel anlegen' }).click()
+  await clara.getByRole('button', { name: '+ Artikel' }).click()
 
+  // The draft opens in the editor right away; title, type and space are set there.
   const editor = clara.getByRole('form', { name: 'Artikel bearbeiten' })
+  await editor.getByLabel('Titel').fill(title)
+  await editor.getByLabel('Art').selectOption('how_to')
+  await editor.getByLabel('Bereich').selectOption({ label: 'Projektmethodik' })
   await editor.getByLabel('Zusammenfassung').fill('Die ersten Tage im Projektteam.')
   await editor.getByLabel('Neuer Block').selectOption('heading')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()
