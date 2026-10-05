@@ -210,4 +210,18 @@ describe('GanttChart', () => {
     expect(design.querySelector('[data-handle]')).toBeNull()
     expect(api.calls.filter((c) => c.key !== 'GET /api/v1/projects/p-1/gantt')).toHaveLength(0)
   })
+
+  it('downloads the chart as PDF', async () => {
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:x'), revokeObjectURL: vi.fn() }))
+    const api = fakeApi({
+      'GET /api/v1/projects/p-1/gantt': () => json(gantt()),
+      'GET /api/v1/projects/p-1/gantt/export.pdf': () => new Response('%PDF-1.4', { headers: { 'Content-Type': 'application/pdf' } }),
+    })
+    renderChart(viewerRights)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Als PDF' }))
+
+    expect(api.calls.some((c) => c.key === 'GET /api/v1/projects/p-1/gantt/export.pdf')).toBe(true)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })

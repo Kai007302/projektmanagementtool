@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using ProjectHub.Api.Infrastructure.Http;
 
 namespace ProjectHub.Api.Modules.Calendar;
 
@@ -7,7 +8,7 @@ namespace ProjectHub.Api.Modules.Calendar;
 public sealed record CalendarEntry(string Uid, long Sequence, string Summary, DateOnly FirstDay, DateOnly LastDay, string Link);
 
 /// <summary>
-/// Writes a single all-day event as iCalendar (RFC 5545), which Outlook imports as an appointment. The same
+/// Writes all-day events as iCalendar (RFC 5545), which Outlook imports as appointments or subscribes to. The same
 /// <see cref="CalendarEntry.Uid"/> with a higher sequence replaces an earlier import.
 /// </summary>
 public static class CalendarFile
@@ -15,7 +16,13 @@ public static class CalendarFile
     public const string ContentType = "text/calendar; charset=utf-8";
     private const int MaxLineOctets = 75;
 
-    public static byte[] Write(CalendarEntry entry, DateTimeOffset stamp)
+    public static byte[] Write(CalendarEntry entry, DateTimeOffset stamp) => Write([entry], stamp);
+
+    /// <summary>
+    /// Several entries in one calendar. With <paramref name="feedName"/> it is a subscribed calendar: programs show the
+    /// name and are asked to refresh it every hour.
+    /// </summary>
+    public static byte[] Write(IReadOnlyList<CalendarEntry> entries, DateTimeOffset stamp, string? feedName = null)
     {
         var builder = new StringBuilder();
         void Line(string text) => Fold(builder, text);
@@ -25,36 +32,36 @@ public static class CalendarFile
         Line("PRODID:-//ProjectHub//ProjectHub//DE");
         Line("CALSCALE:GREGORIAN");
         Line("METHOD:PUBLISH");
-        Line("BEGIN:VEVENT");
-        Line($"UID:{Escape(entry.Uid)}");
-        Line($"DTSTAMP:{stamp.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture)}");
-        Line($"SEQUENCE:{Math.Clamp(entry.Sequence, 0, int.MaxValue).ToString(CultureInfo.InvariantCulture)}");
-        Line($"DTSTART;VALUE=DATE:{Day(entry.FirstDay)}");
-        Line($"DTEND;VALUE=DATE:{Day((entry.LastDay < entry.FirstDay ? entry.FirstDay : entry.LastDay).AddDays(1))}");
-        Line($"SUMMARY:{Escape(entry.Summary)}");
-        Line($"DESCRIPTION:{Escape($"In ProjectHub öffnen: {entry.Link}")}");
-        Line($"URL:{entry.Link}");
+        if (feedName is not null)
+        {
+            Line($"X-WR-CALNAME:{Escape(feedName)}");
+            Line("REFRESH-INTERVAL;VALUE=DURATION:PT1H");
+            Line("X-PUBLISHED-TTL:PT1H");
+        }
 
-        // All-day entries for work items should not block the person's free/busy time.
-        Line("TRANSP:TRANSPARENT");
-        Line("END:VEVENT");
+        foreach (var entry in entries)
+        {
+            Line("BEGIN:VEVENT");
+            Line($"UID:{Escape(entry.Uid)}");
+            Line($"DTSTAMP:{stamp.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture)}");
+            Line($"SEQUENCE:{Math.Clamp(entry.Sequence, 0, int.MaxValue).ToString(CultureInfo.InvariantCulture)}");
+            Line($"DTSTART;VALUE=DATE:{Day(entry.FirstDay)}");
+            Line($"DTEND;VALUE=DATE:{Day((entry.LastDay < entry.FirstDay ? entry.FirstDay : entry.LastDay).AddDays(1))}");
+            Line($"SUMMARY:{Escape(entry.Summary)}");
+            Line($"DESCRIPTION:{Escape($"In ProjectHub öffnen: {entry.Link}")}");
+            Line($"URL:{entry.Link}");
+
+            // All-day entries for work items should not block the person's free/busy time.
+            Line("TRANSP:TRANSPARENT");
+            Line("END:VEVENT");
+        }
+
         Line("END:VCALENDAR");
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
 
     /// <summary>A file name from the title: no path or reserved characters, at most 60 characters.</summary>
-    public static string FileName(string title)
-    {
-        var invalid = Path.GetInvalidFileNameChars().Concat(['"', '<', '>', '|', ':', '*', '?', '\\', '/']).ToHashSet();
-        var cleaned = new string(title.Select(c => invalid.Contains(c) || char.IsControl(c) ? ' ' : c).ToArray());
-        cleaned = string.Join(' ', cleaned.Split(' ', StringSplitOptions.RemoveEmptyEntries));
-        if (cleaned.Length > 60)
-        {
-            cleaned = cleaned[..60].TrimEnd();
-        }
-
-        return (cleaned.Length == 0 ? "termin" : cleaned) + ".ics";
-    }
+    public static string FileName(string title) => FileNames.Safe(title, "termin") + ".ics";
 
     private static string Day(DateOnly day) => day.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
 

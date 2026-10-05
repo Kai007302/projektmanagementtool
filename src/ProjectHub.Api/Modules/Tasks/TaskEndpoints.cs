@@ -1,12 +1,13 @@
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Modules.Identity;
+using ProjectHub.Api.Modules.Tasks.Transfer;
 
 namespace ProjectHub.Api.Modules.Tasks;
 
 public static class TaskEndpoints
 {
     public static IServiceCollection AddTasksModule(this IServiceCollection services) =>
-        services.AddScoped<TaskService>().AddScoped<TaskAccess>();
+        services.AddScoped<TaskService>().AddScoped<TaskAccess>().AddScoped<TaskTransferService>();
 
     public static RouteGroupBuilder MapTaskEndpoints(this RouteGroupBuilder api)
     {
@@ -35,6 +36,6 @@ public static class TaskEndpoints
         api.MapDelete("/tasks/{id:guid}", async (Guid id, UserContext user, TaskService service, CancellationToken ct) =>
             ApiResults.NoContent(await service.DeleteAsync(user, id, ct)));
 
-        return api;
+        return api.MapTaskTransferEndpoints();
     }
 }

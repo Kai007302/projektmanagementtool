@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Modules.Ai;
+using ProjectHub.Api.Modules.Calendar;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Development;
 using ProjectHub.Api.Modules.Integrations.Webex;
@@ -69,6 +70,18 @@ public sealed class EntraIdAuthenticationTests(InfrastructureFixture infrastruct
             metadata.GetProperty("authorization_servers")[0].GetString());
         Assert.Equal("api://00000000-0000-0000-0000-000000000000/access_as_user", metadata.GetProperty("scopes_supported")[0].GetString());
         Assert.EndsWith(AiModule.McpPath, metadata.GetProperty("resource").GetString());
+    }
+
+    [Fact]
+    public async Task Calendar_feed_is_fetched_without_a_token_but_managing_it_needs_one()
+    {
+        var client = factory.CreateClient();
+
+        var feed = await client.GetAsync($"{CalendarFeedService.FeedPath}?token={new string('A', 43)}");
+        var manage = await client.PostAsync("/api/v1/me/calendar-feed", null);
+
+        Assert.Equal(HttpStatusCode.NotFound, feed.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, manage.StatusCode);
     }
 
     [Fact]

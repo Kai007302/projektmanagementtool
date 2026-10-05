@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { CalendarFeedPanel } from '../calendar/CalendarFeedPanel'
 import { downloadMyData, fetchLegal, type LegalInformation } from './api'
 
 /** Privacy notice, imprint and the person's own data export, at the bottom of every page. */
 export function LegalFooter({ signedIn }: { signedIn: boolean }) {
   const [legal, setLegal] = useState<LegalInformation | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [calendar, setCalendar] = useState(false)
 
   useEffect(() => {
     // Without the links the app still works; the footer then only offers the export.
@@ -21,15 +23,23 @@ export function LegalFooter({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <nav className="legal-links" aria-label="Rechtliches">
-      {legal?.privacyNoticeUrl && <a href={legal.privacyNoticeUrl}>Datenschutz</a>}
-      {legal?.imprintUrl && <a href={legal.imprintUrl}>Impressum</a>}
-      {signedIn && (
-        <button type="button" className="link-button" onClick={() => void download()}>
-          Meine Daten herunterladen
-        </button>
-      )}
-      {error && <span role="alert">{error}</span>}
-    </nav>
+    <>
+      <nav className="legal-links" aria-label="Rechtliches">
+        {legal?.privacyNoticeUrl && <a href={legal.privacyNoticeUrl}>Datenschutz</a>}
+        {legal?.imprintUrl && <a href={legal.imprintUrl}>Impressum</a>}
+        {signedIn && (
+          <button type="button" className="link-button" aria-expanded={calendar} onClick={() => setCalendar(!calendar)}>
+            Kalender abonnieren
+          </button>
+        )}
+        {signedIn && (
+          <button type="button" className="link-button" onClick={() => void download()}>
+            Meine Daten herunterladen
+          </button>
+        )}
+        {error && <span role="alert">{error}</span>}
+      </nav>
+      {signedIn && calendar && <CalendarFeedPanel />}
+    </>
   )
 }

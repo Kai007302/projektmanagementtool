@@ -43,6 +43,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-037 | Löschen einer Person | entschieden (Kai, 2026-10-05) | Anonymisieren statt Löschen: Name, E-Mail, Entra-Kennung und Abteilung werden überschrieben, Mitgliedschaften, Benachrichtigungen und Freigaben gelöscht, Aufgaben frei; eigene Kommentare und Inhalte bleiben mit „Ehemalige Person“. Nur Organisations-Admins (ADR 0017). Wann anonymisiert wird (z. B. beim Austritt), legt der Betreiber fest |
 | DEC-038 | Rechtstexte | offen | Datenschutzhinweise und Impressum als Links des Betreibers (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`); auf dem eigenen Server statische Seiten unter `/rechtliches/`. Vorlage in `deploy/legal/` (ADR 0017, `docs/LEGAL.md`) |
 | DEC-039 | Name und E-Mail aus Entra ID aktuell halten | entschieden (Kai, 2026-10-05) | bei jeder Anmeldung: weichen Name oder E-Mail im Token vom gespeicherten Wert ab, übernimmt ProjectHub sie (Art. 5 Abs. 1 lit. d DSGVO). Gehört die neue E-Mail schon einem anderen Konto, bleibt die alte (Warnung im Log). Abteilung kommt nicht aus dem Token (ADR 0017) |
+| DEC-040 | Benachrichtigungen beim Import von Aufgaben | offen | keine Benachrichtigung je zugewiesener Aufgabe, damit ein Import mit vielen Zeilen keine Mailflut auslöst; die Aufgaben erscheinen im Board und im Aktivitätsfeed (ADR 0018) |
+| DEC-041 | Inhalt des Kalender-Abos | offen | der Person zugewiesene Aufgaben mit Termin und Meilensteine ihrer Projekte, ab 90 Tagen zurück; Titel mit Projektname, keine Beschreibung. Wer die Adresse kennt, sieht das; kein Schalter für Betreiber, der Abos verbietet (ADR 0018) |
+| DEC-042 | Was der Import von Aufgaben anlegt | offen | immer neue Aufgaben der obersten Ebene, alle Zeilen oder keine. Kein Aktualisieren über die ID, keine Unteraufgaben aus „Übergeordnete Aufgabe“ (ADR 0018) |
 
 
 ## Knowledge / AI

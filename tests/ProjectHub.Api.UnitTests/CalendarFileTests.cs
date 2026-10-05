@@ -62,4 +62,30 @@ public sealed class CalendarFileTests
         Assert.Equal(expected, CalendarFile.FileName(title));
 
     private static string Write(CalendarEntry entry) => Encoding.UTF8.GetString(CalendarFile.Write(entry, Stamp));
+
+    [Fact]
+    public void A_feed_holds_several_events_and_asks_for_hourly_refresh()
+    {
+        var bytes = CalendarFile.Write(
+            [
+                new CalendarEntry("task-1@projecthub", 1, "Eins", new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5), "https://app"),
+                new CalendarEntry("milestone-2@projecthub", 2, "Zwei", new DateOnly(2026, 10, 9), new DateOnly(2026, 10, 9), "https://app"),
+            ],
+            Stamp,
+            "ProjectHub – Meine Termine");
+        var text = Encoding.UTF8.GetString(bytes);
+
+        Assert.Contains("\r\nX-WR-CALNAME:ProjectHub – Meine Termine\r\nREFRESH-INTERVAL;VALUE=DURATION:PT1H\r\n", text, StringComparison.Ordinal);
+        Assert.Equal(2, text.Split("BEGIN:VEVENT").Length - 1);
+        Assert.Contains("\r\nUID:milestone-2@projecthub\r\n", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_empty_feed_is_a_valid_calendar()
+    {
+        var text = Encoding.UTF8.GetString(CalendarFile.Write([], Stamp, "Leer"));
+
+        Assert.DoesNotContain("BEGIN:VEVENT", text, StringComparison.Ordinal);
+        Assert.EndsWith("X-PUBLISHED-TTL:PT1H\r\nEND:VCALENDAR\r\n", text, StringComparison.Ordinal);
+    }
 }

@@ -293,6 +293,28 @@ public sealed class TaskService(
 
     private async Task<ServiceFailure?> ValidateAsync(UserContext user, ProjectTask task, bool assigneeChanged, bool parentChanged, CancellationToken ct)
     {
+        if (ValidateFields(task) is { } invalid)
+        {
+            return invalid;
+        }
+
+        if (assigneeChanged && task.AssigneeId is { } assigneeId
+            && !await authorization.CanBeAssignedAsync(user.OrganizationId, task.ProjectId, assigneeId, ct))
+        {
+            return ServiceFailure.Invalid("assigneeId", "The user cannot be assigned tasks in this project.");
+        }
+
+        if (parentChanged && task.ParentTaskId is { } parentId)
+        {
+            return await ValidateParentAsync(user, task, parentId, ct);
+        }
+
+        return null;
+    }
+
+    /// <summary>The checks that need no database: also used by the import (TaskImportService).</summary>
+    public static ServiceFailure? ValidateFields(ProjectTask task)
+    {
         if (task.Title.Length is 0 or > MaxTitleLength)
         {
             return ServiceFailure.Invalid("title", $"Required, at most {MaxTitleLength} characters.");
@@ -326,17 +348,6 @@ public sealed class TaskService(
         if (task.StartDate is { } start && task.DueDate is { } due && due < start)
         {
             return ServiceFailure.Invalid("dueDate", "Must not be before the start date.");
-        }
-
-        if (assigneeChanged && task.AssigneeId is { } assigneeId
-            && !await authorization.CanBeAssignedAsync(user.OrganizationId, task.ProjectId, assigneeId, ct))
-        {
-            return ServiceFailure.Invalid("assigneeId", "The user cannot be assigned tasks in this project.");
-        }
-
-        if (parentChanged && task.ParentTaskId is { } parentId)
-        {
-            return await ValidateParentAsync(user, task, parentId, ct);
         }
 
         return null;

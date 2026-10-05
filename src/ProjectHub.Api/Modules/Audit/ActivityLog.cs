@@ -45,6 +45,7 @@ public static class ActivityActions
     public const string TaskUpdated = "TaskUpdated";
     public const string TaskDeleted = "TaskDeleted";
     public const string TaskMoved = "TaskMoved";
+    public const string TasksImported = "TasksImported";
     public const string BoardColumnCreated = "BoardColumnCreated";
     public const string BoardColumnUpdated = "BoardColumnUpdated";
     public const string BoardColumnDeleted = "BoardColumnDeleted";

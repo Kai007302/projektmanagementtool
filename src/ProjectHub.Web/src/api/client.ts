@@ -59,6 +59,21 @@ export async function apiDownload(path: string, fileName: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+/** File name like the server's: no path or reserved characters, at most 60 characters. */
+export function safeFileName(title: string, fallback: string): string {
+  const cleaned = title
+    .replace(/[\\/:*?"<>|\p{Cc}]/gu, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .join(' ')
+    .slice(0, 60)
+    .trim()
+  return cleaned || fallback
+}
+
+/** Today as ISO date (yyyy-mm-dd), for file names. */
+export const isoToday = () => new Date().toISOString().slice(0, 10)
+
 export const jsonBody = (value: unknown) => JSON.stringify(value)
 
 export type Paged<T> = { items: T[]; nextOffset: number | null }

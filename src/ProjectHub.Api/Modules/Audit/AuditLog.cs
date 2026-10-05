@@ -29,6 +29,8 @@ public static class AuditActions
     public const string KnowledgeArticleDeleted = "KnowledgeArticleDeleted";
     public const string PersonalDataExported = "PersonalDataExported";
     public const string UserAnonymized = "UserAnonymized";
+    public const string CalendarFeedCreated = "CalendarFeedCreated";
+    public const string CalendarFeedRevoked = "CalendarFeedRevoked";
 }
 
 public interface IAuditLog

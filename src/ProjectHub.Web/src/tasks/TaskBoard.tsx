@@ -4,6 +4,7 @@ import type { ProjectDetails } from '../projects/api'
 import { createTask, fetchTasks, taskStatuses, type Task } from './api'
 import { PriorityBadge } from './PriorityBadge'
 import { TaskDetails } from './TaskDetails'
+import { TaskTransfer } from './TaskTransfer'
 import { useLatest } from '../api/useLatest'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
@@ -66,6 +67,7 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
     <section className="panel task-board" aria-labelledby="tasks-heading">
       <h3 id="tasks-heading">Aufgaben</h3>
       {error && <p role="alert">{error}</p>}
+      <TaskTransfer project={project} onImported={changed} />
       {project.capabilities.canContribute && (
         <NewTaskForm
           label="Neue Aufgabe"
