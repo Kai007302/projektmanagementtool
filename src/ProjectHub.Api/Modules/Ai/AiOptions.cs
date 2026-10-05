@@ -13,7 +13,8 @@ public sealed record AiOptions(
     int MaxOutputTokens,
     int RequestsPerMinute,
     bool McpEnabled,
-    bool McpWriteTools)
+    bool McpWriteTools,
+    bool AssistantWriteTools = true)
 {
     public const string ProviderKey = "PROJECTHUB_AI_PROVIDER";
     public const string ModelKey = "PROJECTHUB_AI_MODEL";
@@ -32,6 +33,9 @@ public sealed record AiOptions(
     public const string RequestsPerMinuteKey = "PROJECTHUB_AI_RATE_LIMIT_PER_MINUTE";
     public const string McpKey = "PROJECTHUB_MCP";
     public const string McpWriteToolsKey = "PROJECTHUB_MCP_WRITE_TOOLS";
+
+    /// <summary>Whether the assistant may propose changes; each one needs the person's approval (ADR 0016).</summary>
+    public const string AssistantWriteToolsKey = "PROJECTHUB_AI_WRITE_TOOLS";
 
     public const string Off = "off";
     public const string Fake = "fake";
@@ -101,6 +105,7 @@ public sealed record AiOptions(
         }
 
         return new AiOptions(
-            provider, model, apiKey, baseUrl, effort, maxOutputTokens, requestsPerMinute, mcp == "on", configuration.GetValue(McpWriteToolsKey, false));
+            provider, model, apiKey, baseUrl, effort, maxOutputTokens, requestsPerMinute, mcp == "on", configuration.GetValue(McpWriteToolsKey, false),
+            configuration.GetValue(AssistantWriteToolsKey, true));
     }
 }

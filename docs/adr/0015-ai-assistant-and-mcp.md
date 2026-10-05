@@ -42,7 +42,7 @@ Stand der Technik 2026: Sprachmodelle rufen Werkzeuge selbst auf (Tool Use), Ant
 
 - `POST /api/v1/ai/chat` streamt die Antwort als **Server-Sent Events** (`delta`, `tool`, `sources`, `done`, `error`); `GET /api/v1/ai/status` sagt der Oberfläche, ob der Assistent eingerichtet ist.
 - Das Gespräch liegt nur im Browser und wird bei jeder Frage mitgeschickt; ProjectHub speichert keine Gespräche (DEC-035). Grenzen: 40 Nachrichten, je 8000 Zeichen, zusammen 60 000.
-- Der Assistent ist **nur lesend** (DEC-034): Er bekommt keine Schreibwerkzeuge, weil es in der Oberfläche noch keine Bestätigung vor einer Änderung gibt.
+- Der Assistent ist **nur lesend** (DEC-034): Er bekommt keine Schreibwerkzeuge, weil es in der Oberfläche noch keine Bestätigung vor einer Änderung gibt. *Abgelöst durch ADR 0016: Änderungen mit Freigabe.*
 - Eigenes Rate Limit je Person (`PROJECTHUB_AI_RATE_LIMIT_PER_MINUTE`, Standard 10), zusätzlich zum allgemeinen Limit.
 - Die Oberfläche zeigt Antworten mit einem kleinen Markdown-Ausschnitt. Klickbar sind nur Links auf ProjectHub-Artikel, Bilder werden nie geladen.
 

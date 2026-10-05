@@ -5,13 +5,18 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Server;
+using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Comments;
+using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
+using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Users;
+using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.Modules.Ai;
 
@@ -36,6 +41,12 @@ public sealed record TaskDetailsItem(
     Guid TaskId, Guid ProjectId, string Title, string? Description, string Status, string Priority, string? Assignee,
     DateOnly? StartDate, DateOnly? DueDate, short Progress, IReadOnlyList<string> RecentComments);
 
+public sealed record PersonItem(Guid UserId, string Name, string Email, string? Department);
+
+public sealed record TeamItem(Guid TeamId, string Name, string? Description, int Members);
+
+public sealed record SpaceItem(Guid SpaceId, string Name, string? Description);
+
 /// <summary>Knowledge articles the assistant looked at during one request, the sources of its answer.</summary>
 public sealed class AssistantSources
 {
@@ -59,13 +70,21 @@ public sealed class AssistantSources
 /// small records; failures come back as <see cref="ToolError"/> so the model can react instead of the request failing.
 /// </summary>
 [McpServerToolType]
-public sealed class ProjectHubTools(
+public sealed partial class ProjectHubTools(
     UserContext user,
+    ProjectHubDbContext db,
     KnowledgeAccess knowledgeAccess,
     IKnowledgeRetrieval retrieval,
     ProjectService projects,
     TaskService tasks,
     CommentService comments,
+    KnowledgeArticleService articles,
+    KnowledgeCommentService articleComments,
+    KnowledgeLinkService links,
+    KnowledgeSpaceService spaces,
+    GanttService gantt,
+    TeamService teams,
+    WhiteboardService whiteboards,
     AssistantSources sources,
     TimeProvider clock)
 {
@@ -104,29 +123,24 @@ public sealed class ProjectHubTools(
     }
 
     [McpServerTool(Name = "read_knowledge_article", Title = "Wissensartikel lesen", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Reads the full text of one knowledge article by id, when the passages from search_knowledge are not enough.")]
+    [Description("Reads one knowledge article by id as Markdown, when the passages from search_knowledge are not enough or before changing it.")]
     public async Task<object> ReadKnowledgeArticle(
         [Description("Article id from search_knowledge.")] Guid articleId,
         CancellationToken ct = default)
     {
-        var reader = await knowledgeAccess.ReaderAsync(user, ct);
-        var article = await (
-                from a in knowledgeAccess.Visible(reader)
-                where a.Id == articleId
-                join space in knowledgeAccess.Spaces() on a.KnowledgeSpaceId equals space.Id into spaces
-                from space in spaces.DefaultIfEmpty()
-                select new { a.Id, a.Title, a.ArticleType, a.Status, Space = space == null ? null : space.Name, a.Summary, a.UpdatedAt, a.SearchText })
-            .SingleOrDefaultAsync(ct);
-        if (article is null)
+        var result = await articles.GetAsync(user, articleId, ct);
+        if (!result.Succeeded)
         {
             return new ToolError("Article not found or not readable for the user.");
         }
 
+        var article = result.Value!.Article;
         sources.Add(article.Id, article.Title);
-        var truncated = article.SearchText.Length > MaxArticleChars;
+        var text = MarkdownBlocks.FromContent(result.Value.Content);
+        var truncated = text.Length > MaxArticleChars;
         return new KnowledgeArticleText(
-            article.Id, article.Title, article.ArticleType, article.Status, article.Space, article.Summary, article.UpdatedAt,
-            truncated ? article.SearchText[..MaxArticleChars] : article.SearchText, truncated);
+            article.Id, article.Title, article.ArticleType, article.Status, article.SpaceName, article.Summary, article.UpdatedAt,
+            truncated ? text[..MaxArticleChars] : text, truncated);
     }
 
     [McpServerTool(Name = "list_projects", Title = "Projekte auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
@@ -193,39 +207,48 @@ public sealed class ProjectHubTools(
             task.Progress, recent.Succeeded ? recent.Value!.Take(10).Select(c => $"{c.AuthorName}: {c.Content}").ToList() : []);
     }
 
-    [McpServerTool(Name = "create_task", Title = "Aufgabe anlegen", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
-    [Description("Creates a task in a project as the user (needs the right to contribute to the project).")]
-    public async Task<object> CreateTask(
-        [Description("Project id from list_projects.")] Guid projectId,
-        [Description("Short title of the task.")] string title,
-        [Description("Optional description.")] string? description = null,
-        [Description("Optional due date (yyyy-MM-dd).")] DateOnly? dueDate = null,
-        [Description("Optional priority: low, normal, high or urgent.")] string? priority = null,
+    [McpServerTool(Name = "find_people", Title = "Personen suchen", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Finds people of the organization by name or e-mail, e.g. to assign a task or add a project member.")]
+    public async Task<object> FindPeople(
+        [Description("Part of the name or e-mail address.")] string search,
         CancellationToken ct = default)
     {
-        var result = await tasks.CreateAsync(
-            user, projectId, new CreateTaskRequest(title, description, null, priority, null, null, null, dueDate, null, null), ct);
-        return result.Succeeded
-            ? new TaskItem(result.Value!.Id, projectId, result.Value.Title, result.Value.Status, result.Value.Priority, result.Value.AssigneeName,
-                result.Value.StartDate, result.Value.DueDate, result.Value.Progress, 0)
-            : Error(result);
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return new ToolError("search must not be empty.");
+        }
+
+        var pattern = $"%{search.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+        return await db.Set<AppUser>().AsNoTracking()
+            .Where(u => u.OrganizationId == user.OrganizationId && u.Status == UserStatus.Active)
+            .Where(u => EF.Functions.ILike(u.DisplayName, pattern, "\\") || EF.Functions.ILike(u.Email, pattern, "\\"))
+            .OrderBy(u => u.DisplayName)
+            .Take(20)
+            .Select(u => new PersonItem(u.Id, u.DisplayName, u.Email, u.Department))
+            .ToListAsync(ct);
     }
 
-    [McpServerTool(Name = "add_task_comment", Title = "Aufgabe kommentieren", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
-    [Description("Adds a comment to a task as the user.")]
-    public async Task<object> AddTaskComment(
-        [Description("Task id.")] Guid taskId,
-        [Description("Comment text.")] string text,
-        CancellationToken ct = default)
-    {
-        var result = await comments.AddAsync(user, taskId, new CreateCommentRequest(text, null), ct);
-        return result.Succeeded ? new { CommentId = result.Value!.Id, TaskId = taskId } : Error(result);
-    }
+    [McpServerTool(Name = "list_teams", Title = "Teams auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Lists the teams of the organization.")]
+    public async Task<object> ListTeams(CancellationToken ct = default) =>
+        (await teams.ListAsync(user, 0, MaxListSize, ct)).Select(t => new TeamItem(t.Id, t.Name, t.Description, t.MemberCount)).ToList();
 
-    /// <summary>The tools as <see cref="AIFunction"/>s for a chat client; write tools only when asked for.</summary>
+    [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissensbereiche auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Lists the knowledge spaces (sections of the knowledge hub) an article can belong to.")]
+    public async Task<object> ListKnowledgeSpaces(CancellationToken ct = default) =>
+        (await spaces.ListAsync(user, ct)).Select(s => new SpaceItem(s.Id, s.Name, s.Description)).ToList();
+
+    /// <summary>
+    /// The tools as <see cref="AIFunction"/>s for a chat client; write tools only when asked for, and then wrapped so that
+    /// the function-invoking client asks for approval instead of running them (ADR 0016).
+    /// </summary>
     public IReadOnlyList<AITool> AsAiFunctions(bool includeWriteTools) =>
         Methods(includeWriteTools)
-            .Select(m => (AITool)AIFunctionFactory.Create(m.Method, this, new AIFunctionFactoryOptions { Name = m.Attribute.Name, SerializerOptions = SerializerOptions }))
+            .Select(m =>
+            {
+                var function = AIFunctionFactory.Create(m.Method, this, new AIFunctionFactoryOptions { Name = m.Attribute.Name, SerializerOptions = SerializerOptions });
+                return m.Attribute.ReadOnly ? (AITool)function : new ApprovalRequiredAIFunction(function);
+            })
             .ToList();
 
     /// <summary>Tool methods with their MCP metadata; read-only ones unless <paramref name="includeWriteTools"/>.</summary>

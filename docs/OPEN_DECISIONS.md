@@ -37,8 +37,8 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-031 | Auslieferung der Oberfläche | offen | eigener Web-Container (Nginx) vor der API, eine Origin für Browser, TLS am Ingress (ADR 0012) |
 | DEC-032 | Performance-Ziele | offen | je API-Instanz: 95 % der Lesezugriffe unter 300 ms, unter 1 % Fehler; geprüft mit dem Lasttest `tests/load` (50 gleichzeitige Personen, 1000 Aufgaben, 300 Artikel). Ergebnis in `docs/OPERATIONS.md` |
 | DEC-033 | Redis in der Readiness | offen | heute: Redis nicht erreichbar → Instanz nicht bereit, die App ist weg, obwohl nur Realtime betroffen ist. Vorschlag: Redis nur als „beeinträchtigt“ melden und per Alarm sichtbar machen (`docs/OPERATIONS.md`) |
-| DEC-034 | Was KI ändern darf | offen | Der Assistent in der Oberfläche liest nur. Über MCP gibt es `create_task` und `add_task_comment`, aber nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true` (Standard aus); immer mit den Rechten der Person (ADR 0015) |
-| DEC-035 | Gespräche mit dem Assistenten | offen | werden nicht gespeichert: der Verlauf liegt nur im Browser-Tab, Telemetrie ohne Prompts und Antworten (ADR 0015) |
+| DEC-034 | Was KI ändern darf | entschieden (Kai, 2026-10-05) | Alles, was die Person selbst darf, aber jede Änderung erst nach ihrer Freigabe: Der Assistent zeigt jede Änderung als Karte mit „Ausführen“ und „Ablehnen“; über MCP fragt der Client nach, Schreibwerkzeuge nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true` (ADR 0016) |
+| DEC-035 | Gespräche mit dem Assistenten | offen | werden nicht gespeichert: der Verlauf liegt nur im Browser-Tab, ein auf Freigabe wartender Schritt verschlüsselt im Browser (ADR 0016), Telemetrie ohne Prompts und Antworten (ADR 0015) |
 | DEC-036 | Embeddings für die Wissenssuche | offen | vorerst nicht: Volltextsuche mit agentischem Nachsuchen; pgvector hinter `IKnowledgeRetrieval`, wenn Antworten Umschreibungen nicht finden (ADR 0015) |
 
 

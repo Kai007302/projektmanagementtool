@@ -37,6 +37,10 @@ public static class AiModule
         {
             services.AddSingleton(provider => AiChatClients.Create(options, provider.GetRequiredService<ILoggerFactory>()));
             services.AddScoped<AssistantService>();
+            services.AddScoped<AssistantActions>();
+            services.AddSingleton<AssistantContinuations>();
+            services.AddDataProtection();
+            services.AddMemoryCache();
         }
 
         services.AddRateLimiter(limiter => limiter.AddPolicy(RateLimitPolicy, context => HttpHardening.PerPersonPerMinute(context, options.RequestsPerMinute)));
@@ -79,7 +83,9 @@ public static class AiModule
         var ai = api.MapGroup("/ai");
 
         ai.MapGet("/status", (AiOptions options) =>
-            Results.Ok(new AiStatusResponse(options.AssistantEnabled, options.Provider, options.AssistantEnabled ? options.Model : null, options.McpEnabled)));
+            Results.Ok(new AiStatusResponse(
+                options.AssistantEnabled, options.Provider, options.AssistantEnabled ? options.Model : null, options.McpEnabled,
+                options.AssistantEnabled && options.AssistantWriteTools)));
 
         ai.MapPost("/chat", (AssistantChatRequest request, HttpContext context, AiOptions options) =>
             {

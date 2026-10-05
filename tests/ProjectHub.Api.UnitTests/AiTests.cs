@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -136,6 +137,84 @@ public sealed class AiChatClientTests
     }
 
     [Fact]
+    public async Task Approved_changes_survive_the_round_trip_through_the_browser_and_keep_the_thinking_block_first()
+    {
+        var handler = new ScriptedHandler(call => call == 0 ? Sse(ToolUse("toolu_1", "save", """{"title":"Kickoff"}""")) : Sse(TextAnswer("Gespeichert.")));
+        var model = Claude(handler);
+        var saved = new List<string>();
+        var chat = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create((string title) => { saved.Add(title); return "ok"; }, "save", "Saves."))],
+        };
+        model.Configure(chat);
+        List<ChatMessage> question = [new ChatMessage(ChatRole.User, "Leg Kickoff an")];
+
+        var first = await model.Client.GetStreamingResponseAsync(question, chat).ToChatResponseAsync();
+
+        Assert.Empty(saved);
+        var request = Assert.Single(first.Messages.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>());
+        // What AssistantContinuations does: the turn goes to the browser as JSON and comes back.
+        var json = JsonSerializer.Serialize(first.Messages, AIJsonUtilities.DefaultOptions);
+        var turn = JsonSerializer.Deserialize<List<ChatMessage>>(json, AIJsonUtilities.DefaultOptions)!;
+        var returned = Assert.Single(turn.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>());
+        List<ChatMessage> next = [.. question, .. turn, new ChatMessage(ChatRole.User, [returned.CreateResponse(true)])];
+
+        var second = await model.Client.GetStreamingResponseAsync(next, chat).ToChatResponseAsync();
+
+        Assert.Equal(["Kickoff"], saved);
+        Assert.Equal("Gespeichert.", second.Text);
+        using var body = JsonDocument.Parse(handler.Requests[1].Body);
+        var messages = body.RootElement.GetProperty("messages");
+        var assistant = messages[messages.GetArrayLength() - 2];
+        Assert.Equal("assistant", assistant.GetProperty("role").GetString());
+        Assert.Equal("thinking", assistant.GetProperty("content")[0].GetProperty("type").GetString());
+        Assert.Equal("sig-1", assistant.GetProperty("content")[0].GetProperty("signature").GetString());
+        Assert.Equal("tool_use", assistant.GetProperty("content")[1].GetProperty("type").GetString());
+        var result = messages[messages.GetArrayLength() - 1].GetProperty("content")[0];
+        Assert.Equal("tool_result", result.GetProperty("type").GetString());
+        Assert.Equal("toolu_1", result.GetProperty("tool_use_id").GetString());
+        Assert.Equal(request.RequestId, returned.RequestId);
+    }
+
+    [Fact]
+    public async Task A_second_approval_in_the_same_turn_does_not_run_the_first_change_again()
+    {
+        var handler = new ScriptedHandler(call => call switch
+        {
+            0 => Sse(ToolUse("toolu_1", "save", """{"title":"A"}""")),
+            1 => Sse(ToolUse("toolu_2", "save", """{"title":"B"}""")),
+            _ => Sse(TextAnswer("Beides gespeichert.")),
+        });
+        var model = Claude(handler);
+        var saved = new List<string>();
+        var chat = new ChatOptions
+        {
+            Tools = [new ApprovalRequiredAIFunction(AIFunctionFactory.Create((string title) => { saved.Add(title); return "ok"; }, "save", "Saves."))],
+        };
+        model.Configure(chat);
+        List<ChatMessage> question = [new ChatMessage(ChatRole.User, "Leg A und B an")];
+        var turn = new List<ChatMessage>();
+
+        for (var round = 0; round < 3; round++)
+        {
+            var response = await model.Client.GetStreamingResponseAsync([.. question, .. turn], chat).ToChatResponseAsync();
+            turn = JsonSerializer.Deserialize<List<ChatMessage>>(JsonSerializer.Serialize<List<ChatMessage>>([.. turn, .. response.Messages], AIJsonUtilities.DefaultOptions), AIJsonUtilities.DefaultOptions)!;
+            var answered = turn.SelectMany(m => m.Contents).OfType<ToolApprovalResponseContent>().Select(r => r.RequestId).ToHashSet();
+            var pending = turn.SelectMany(m => m.Contents).OfType<ToolApprovalRequestContent>().Where(r => !answered.Contains(r.RequestId)).ToList();
+            if (pending.Count == 0)
+            {
+                Assert.Equal("Beides gespeichert.", response.Text);
+                break;
+            }
+
+            turn.Add(new ChatMessage(ChatRole.User, [.. pending.Select(p => (AIContent)p.CreateResponse(true))]));
+        }
+
+        Assert.Equal(["A", "B"], saved);
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
+    [Fact]
     public async Task Models_without_the_server_side_fallback_send_no_fallback()
     {
         var handler = new ScriptedHandler(_ => Sse(TextAnswer("ok")));
@@ -255,5 +334,53 @@ public sealed class AiChatClientTests
             Requests.Add(new RecordedRequest(request.RequestUri!.AbsoluteUri, betas, body));
             return respond(Requests.Count - 1);
         }
+    }
+}
+
+public sealed class MarkdownBlocksTests
+{
+    [Fact]
+    public void Markdown_from_a_model_becomes_valid_article_blocks()
+    {
+        var content = MarkdownBlocks.ToContent("""
+            # Kickoff
+            Ein Absatz
+            über zwei Zeilen.
+
+            - Agenda
+            - Rollen
+            1. Einladen
+            2. Durchführen
+            - [ ] Protokoll
+            - [x] Raum
+            > Wichtig
+            ```sql
+            select 1;
+            ```
+            """);
+
+        var normalized = BlockContent.Normalize(content, out var error);
+
+        Assert.Null(error);
+        var blocks = normalized!.Content["blocks"]!.AsArray();
+        Assert.Equal(
+            ["heading", "paragraph", "bullet_list", "numbered_list", "checklist", "quote", "code"],
+            blocks.Select(b => b!["type"]!.GetValue<string>()).ToList());
+        Assert.Equal(1, blocks[0]!["level"]!.GetValue<int>());
+        Assert.Equal("Ein Absatz\nüber zwei Zeilen.", blocks[1]!["text"]!.GetValue<string>());
+        Assert.True(blocks[4]!["items"]![1]!["checked"]!.GetValue<bool>());
+        Assert.Equal("sql", blocks[6]!["language"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Replacing_the_text_keeps_links_and_references()
+    {
+        var current = MarkdownBlocks.ToContent("Alt");
+        current["blocks"]!.AsArray().Add(new JsonObject { ["type"] = "link", ["url"] = "https://example.org", ["label"] = "Beispiel" });
+
+        var replaced = MarkdownBlocks.ReplaceText(current, "## Neu\n\nText");
+
+        Assert.Equal(["heading", "paragraph", "link"], replaced["blocks"]!.AsArray().Select(b => b!["type"]!.GetValue<string>()).ToList());
+        Assert.Equal("## Neu\n\nText", MarkdownBlocks.FromContent(replaced));
     }
 }

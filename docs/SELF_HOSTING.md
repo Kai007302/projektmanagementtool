@@ -74,9 +74,11 @@ Gesperrte Personen bleiben gesperrt, auch wenn sie sich erneut anmelden.
 
 Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
 
-### KI-Assistent und MCP (ADR 0015)
+### KI-Assistent und MCP (ADR 0015, ADR 0016)
 
 Ohne Einstellung ist KI aus (`PROJECTHUB_AI_PROVIDER=off`); der Reiter „Assistent“ erscheint dann nicht. Mit einem externen Anbieter verlassen Fragen und gefundene Inhalte den Server; das ist eine Freigabeentscheidung.
+
+Der Assistent kann alles anlegen und ändern, was die angemeldete Person darf (Aufgaben, Wissensartikel, Projekte, Teams …). Jede Änderung zeigt er vorher als Karte; erst mit „Ausführen“ passiert sie. `PROJECTHUB_AI_WRITE_TOOLS=false` macht ihn wieder rein lesend.
 
 **Claude (Standard):** API-Schlüssel in der [Claude Console](https://platform.claude.com) anlegen, dann in `.env`:
 
@@ -111,7 +113,7 @@ PROJECTHUB_AI_MODEL=qwen3:32b
 
 Das Modell muss Werkzeugaufrufe (Tool Calling) können. Die Antwortqualität hängt stark vom Modell und von der Hardware ab.
 
-**MCP-Server für Agenten:** `PROJECTHUB_MCP=on` stellt `https://<Domain>/api/v1/mcp` bereit (Streamable HTTP). Agenten wie Claude oder VS Code arbeiten damit als die angemeldete Person: Wissen durchsuchen und lesen, Projekte und Aufgaben ansehen. Mit `PROJECTHUB_MCP_WRITE_TOOLS=true` dürfen sie zusätzlich Aufgaben anlegen und kommentieren (immer mit den Rechten der Person).
+**MCP-Server für Agenten:** `PROJECTHUB_MCP=on` stellt `https://<Domain>/api/v1/mcp` bereit (Streamable HTTP). Agenten wie Claude oder VS Code arbeiten damit als die angemeldete Person: Wissen durchsuchen und lesen, Projekte und Aufgaben ansehen. Mit `PROJECTHUB_MCP_WRITE_TOOLS=true` dürfen sie zusätzlich ändern: Projekte, Aufgaben, Wissensartikel und Teams, immer mit den Rechten der Person; der MCP-Client fragt vor jedem Aufruf nach (ADR 0016).
 
 Anmeldung: Der Server verlangt ein Entra-ID-Token für den Bereich `api://<Client-ID>/access_as_user` und nennt das MCP-Clients selbst (401 mit `resource_metadata`, Dokument unter `/.well-known/oauth-protected-resource/api/v1/mcp`). Entra kennt keine dynamische Client-Registrierung, deshalb:
 
@@ -162,6 +164,7 @@ Das Skript hält Caddy, Oberfläche und API an, spielt Datenbank und Dateien ein
 |---|---|
 | Reiter „Assistent“ fehlt | `PROJECTHUB_AI_PROVIDER` ist `off`; Fehler beim Start: `docker compose -f docker-compose.prod.yml logs api` nennt die fehlende Einstellung (z. B. `ANTHROPIC_API_KEY`) |
 | Assistent meldet „KI-Dienst nicht erreichbar“ | Schlüssel, Modellname oder Endpunkt falsch, oder der Server erreicht den Anbieter nicht (`api.anthropic.com`); Details im API-Log |
+| Assistent meldet „Die Freigabe ist abgelaufen“ | Zwischen Vorschlag und Klick lagen mehr als 30 Minuten, die API wurde neu gestartet oder die Freigabe wurde schon beantwortet: Frage noch einmal stellen |
 | Browser zeigt Zertifikatsfehler | DNS zeigt nicht auf den Server oder Port 80 ist zu: `docker compose -f docker-compose.prod.yml logs caddy` |
 | Microsoft meldet „AADSTS50011: redirect URI mismatch“ | Umleitungs-URI in der App-Registrierung muss genau `https://<Domain>/` sein, Plattform SPA |
 | Microsoft meldet „AADSTS65001“ (Zustimmung fehlt) | Schritt 1.5: Administratorzustimmung erteilen |
