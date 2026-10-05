@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { addObject, describe as describeObject, moveBy, objectsOf, readObjects, removeObject, updateObject } from './model'
+import { addObject, addObjects, localOrigin, describe as describeObject, moveBy, objectsOf, readObjects, removeObject, updateObject } from './model'
+import { templates } from './templates'
 
 describe('whiteboard model', () => {
   it('adds objects centered on a point and changes single fields', () => {
@@ -63,4 +64,52 @@ describe('whiteboard model', () => {
     expect(describeObject(card, 'Startseite')).toBe('Aufgabe: Startseite')
     expect(describeObject(card, null)).toBe('Aufgabe: nicht verfügbar')
   })
+
+  it('adds several objects centered on a point in one change', () => {
+    const doc = new Y.Doc()
+    const undo = new Y.UndoManager(objectsOf(doc), { trackedOrigins: new Set([localOrigin]) })
+    const { ids, bounds } = addObjects(
+      doc,
+      [
+        { type: 'rect', x: 0, y: 0, w: 200, h: 100, text: 'Rahmen' },
+        { type: 'arrow', x: 0, y: 150, x2: 400, y2: 150 },
+        { type: 'diamond', x: 300, y: 0 },
+      ],
+      { x: 1000, y: 1000 },
+    )
+
+    expect(ids).toHaveLength(3)
+    expect(bounds).toEqual({ x: 770, y: 925, w: 460, h: 150 })
+    expect(readObjects(doc)).toEqual([
+      expect.objectContaining({ type: 'rect', x: 770, y: 925, w: 200, h: 100, color: 'blue', text: 'Rahmen' }),
+      expect.objectContaining({ type: 'diamond', x: 1070, y: 925, w: 160, h: 120, color: 'yellow' }),
+      expect.objectContaining({ type: 'arrow', x: 770, y: 1075, x2: 1170, y2: 1075 }),
+    ])
+    undo.undo()
+    expect(readObjects(doc)).toEqual([])
+  })
 })
+
+describe('whiteboard templates', () => {
+  it('offers ten templates with distinct ids and names', () => {
+    expect(templates).toHaveLength(10)
+    expect(new Set(templates.map((t) => t.id)).size).toBe(10)
+    expect(new Set(templates.map((t) => t.name)).size).toBe(10)
+  })
+
+  it.each(templates.map((t) => [t.name, t] as const))('%s draws frames before what lies on them', (_name, template) => {
+    const doc = new Y.Doc()
+    addObjects(doc, template.items, { x: 0, y: 0 })
+    const objects = readObjects(doc)
+    expect(objects).toHaveLength(template.items.length)
+
+    // Rendering follows readObjects order, so anything inside a rectangle must come after it.
+    const inside = (o: (typeof objects)[number], f: (typeof objects)[number]) =>
+      o !== f && o.type !== 'arrow' && o.x >= f.x && o.y >= f.y && o.x + o.w <= f.x + f.w && o.y + o.h <= f.y + f.h
+    objects.forEach((frame, index) => {
+      if (frame.type !== 'rect') return
+      objects.slice(0, index).forEach((other) => expect(inside(other, frame), `${describeObject(other)} in ${describeObject(frame)}`).toBe(false))
+    })
+  })
+})
+

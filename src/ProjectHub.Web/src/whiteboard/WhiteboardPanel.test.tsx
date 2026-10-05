@@ -100,6 +100,34 @@ describe('WhiteboardPanel', () => {
     expect(readObjects(current().doc)).toHaveLength(1)
   })
 
+  it('inserts a template as one undo step and offers it on an empty board', async () => {
+    fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
+    render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    await connect(true)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mit einer Vorlage starten' }))
+    const picker = screen.getByRole('region', { name: 'Vorlage einfügen' })
+    expect(within(picker).getAllByRole('button', { name: /^(?!Schließen)/ })).toHaveLength(10)
+    await userEvent.click(within(picker).getByRole('button', { name: /^SWOT-Analyse/ }))
+
+    expect(screen.queryByRole('region', { name: 'Vorlage einfügen' })).not.toBeInTheDocument()
+    const list = within(screen.getByRole('region', { name: /Objekte/ }))
+    expect(list.getByRole('button', { name: /^Rechteck: Stärken \(intern\)/ })).toBeInTheDocument()
+    expect(readObjects(current().doc)).toHaveLength(5)
+
+    // A second template goes to the right of what is already there.
+    const right = Math.max(...readObjects(current().doc).map((o) => o.x + o.w))
+    await userEvent.click(screen.getByRole('button', { name: 'Vorlagen' }))
+    await userEvent.click(within(screen.getByRole('region', { name: 'Vorlage einfügen' })).getByRole('button', { name: /^Retrospektive/ }))
+    const added = readObjects(current().doc).filter((o) => o.x >= right)
+    expect(added).toHaveLength(7)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }))
+    expect(readObjects(current().doc)).toHaveLength(5)
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }))
+    expect(readObjects(current().doc)).toEqual([])
+  })
+
   it('shows changes and people from others live', async () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
@@ -142,6 +170,7 @@ describe('WhiteboardPanel', () => {
     act(() => void addObject(current().doc, 'sticky', { x: 0, y: 0 }))
 
     expect(screen.queryByRole('button', { name: '+ Notiz' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Vorlagen' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Neues Whiteboard')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Umbenennen' })).not.toBeInTheDocument()
     expect(screen.getByText(/Nur ansehen/)).toBeInTheDocument()

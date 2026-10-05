@@ -7,7 +7,7 @@ import * as Y from 'yjs'
  */
 export const objectsKey = 'objects'
 
-export type ObjectType = 'sticky' | 'rect' | 'ellipse' | 'text' | 'arrow' | 'task'
+export type ObjectType = 'sticky' | 'rect' | 'ellipse' | 'diamond' | 'text' | 'arrow' | 'task'
 
 export type Color = 'yellow' | 'green' | 'blue' | 'pink' | 'gray' | 'white'
 
@@ -30,6 +30,7 @@ export const objectTypes: Record<ObjectType, string> = {
   sticky: 'Notiz',
   rect: 'Rechteck',
   ellipse: 'Ellipse',
+  diamond: 'Raute',
   text: 'Text',
   arrow: 'Pfeil',
   task: 'Aufgabe',
@@ -48,6 +49,7 @@ const defaults: Record<ObjectType, { w: number; h: number; color: Color; text: s
   sticky: { w: 180, h: 120, color: 'yellow', text: 'Neue Notiz' },
   rect: { w: 200, h: 120, color: 'blue', text: '' },
   ellipse: { w: 160, h: 110, color: 'green', text: '' },
+  diamond: { w: 160, h: 120, color: 'yellow', text: '' },
   text: { w: 220, h: 40, color: 'white', text: 'Text' },
   arrow: { w: 0, h: 0, color: 'gray', text: '' },
   task: { w: 220, h: 90, color: 'white', text: '' },
@@ -119,6 +121,63 @@ export function addObject(doc: Y.Doc, type: ObjectType, center: { x: number; y: 
     objectsOf(doc).set(id, item)
   }, localOrigin)
   return id
+}
+
+/** An object without id, as templates describe them; missing fields take the type's defaults. */
+export type NewObject = { type: Exclude<ObjectType, 'task'>; x: number; y: number; w?: number; h?: number; x2?: number; y2?: number; color?: Color; text?: string }
+
+export type Bounds = { x: number; y: number; w: number; h: number }
+
+/** The box around the given objects; arrows count with both ends. */
+export function boundsOf(items: (Omit<NewObject, 'type'> & { type: ObjectType })[]): Bounds {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const item of items) {
+    const base = defaults[item.type]
+    const right = item.type === 'arrow' ? (item.x2 ?? item.x) : item.x + (item.w ?? base.w)
+    const bottom = item.type === 'arrow' ? (item.y2 ?? item.y) : item.y + (item.h ?? base.h)
+    minX = Math.min(minX, item.x, right)
+    minY = Math.min(minY, item.y, bottom)
+    maxX = Math.max(maxX, item.x, right)
+    maxY = Math.max(maxY, item.y, bottom)
+  }
+  return items.length === 0 ? { x: 0, y: 0, w: 0, h: 0 } : { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+/**
+ * Adds several objects in one change (one undo step, one update for everyone), placed so their box is
+ * centered on the given point. Returns the new ids and the box on the board.
+ */
+export function addObjects(doc: Y.Doc, items: NewObject[], center: { x: number; y: number }): { ids: string[]; bounds: Bounds } {
+  const box = boundsOf(items)
+  const dx = Math.round(center.x - box.x - box.w / 2)
+  const dy = Math.round(center.y - box.y - box.h / 2)
+  const ids: string[] = []
+  doc.transact(() => {
+    for (const object of items) {
+      const base = defaults[object.type]
+      const id = newObjectId()
+      const item = new Y.Map<unknown>()
+      item.set('type', object.type)
+      item.set('x', Math.round(object.x + dx))
+      item.set('y', Math.round(object.y + dy))
+      if (object.type === 'arrow') {
+        item.set('x2', Math.round((object.x2 ?? object.x + 120) + dx))
+        item.set('y2', Math.round((object.y2 ?? object.y) + dy))
+      } else {
+        item.set('w', Math.max(minSize, Math.round(object.w ?? base.w)))
+        item.set('h', Math.max(minSize, Math.round(object.h ?? base.h)))
+      }
+      item.set('color', object.color ?? base.color)
+      const text = object.text ?? base.text
+      if (text) item.set('text', text)
+      objectsOf(doc).set(id, item)
+      ids.push(id)
+    }
+  }, localOrigin)
+  return { ids, bounds: { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h } }
 }
 
 export type Changes = Partial<Pick<BoardObject, 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2' | 'color' | 'text'>>

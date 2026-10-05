@@ -7,6 +7,8 @@ import { TaskDetails } from '../tasks/TaskDetails'
 import { fetchWhiteboardTasks, type Whiteboard, type WhiteboardTask } from './api'
 import {
   addObject,
+  addObjects,
+  boundsOf,
   colors,
   describe,
   localOrigin,
@@ -21,7 +23,10 @@ import {
   type Color,
   type ObjectType,
 } from './model'
+import { diamondPoints, fills, strokes } from './palette'
 import { connectWhiteboard, type Peer, type SyncStatus, type WhiteboardSync } from './sync'
+import { TemplatePicker } from './TemplatePicker'
+import type { Template } from './templates'
 
 type Props = {
   board: Whiteboard
@@ -39,24 +44,6 @@ type Drag =
   | { kind: 'pan'; startX: number; startY: number; view: View }
   | { kind: 'move' | 'resize' | 'start' | 'end'; startX: number; startY: number; object: BoardObject }
 
-const fills: Record<Color, string> = {
-  yellow: '#fff3a3',
-  green: '#c9f0d3',
-  blue: '#cfe0ff',
-  pink: '#ffd6e7',
-  gray: '#e3e7ec',
-  white: '#ffffff',
-}
-
-const strokes: Record<Color, string> = {
-  yellow: '#b59a00',
-  green: '#2f8a4c',
-  blue: '#2a5bd7',
-  pink: '#c2417a',
-  gray: '#5a6573',
-  white: '#8a95a3',
-}
-
 const peerColors = ['#d7263d', '#1b998b', '#c05805', '#6a4c93', '#2e86ab', '#8a6d00']
 
 const peerColor = (userId: string) => peerColors[[...userId].reduce((sum, c) => sum + c.charCodeAt(0), 0) % peerColors.length]
@@ -67,7 +54,7 @@ const statusText: Record<SyncStatus, string> = {
   offline: 'Offline. Änderungen werden gesendet, sobald die Verbindung zurück ist.',
 }
 
-const addable: ObjectType[] = ['sticky', 'rect', 'ellipse', 'text', 'arrow']
+const addable: ObjectType[] = ['sticky', 'rect', 'ellipse', 'diamond', 'text', 'arrow']
 
 const minZoom = 0.25
 const maxZoom = 3
@@ -86,6 +73,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const [tasks, setTasks] = useState<Map<string, WhiteboardTask>>(new Map())
   const [message, setMessage] = useState<string | null>(null)
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false })
+  const [showTemplates, setShowTemplates] = useState(false)
   const docRef = useRef<Y.Doc | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
   const syncRef = useRef<WhiteboardSync | null>(null)
@@ -184,6 +172,28 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     const id = addObject(doc(), type, viewCenter(), taskId)
     undoRef.current?.stopCapturing()
     select(id)
+  }
+
+  /**
+   * Places a template as one undo step: in the middle of the view on an empty board, otherwise to the right of
+   * everything already there so nothing is covered. Then zooms so all of it is visible.
+   */
+  function insertTemplate(template: Template) {
+    undoRef.current?.stopCapturing()
+    const size = boundsOf(template.items)
+    const existing = objects.length > 0 ? boundsOf(objects) : null
+    const center = existing ? { x: existing.x + existing.w + 120 + size.w / 2, y: existing.y + size.h / 2 } : viewCenter()
+    const { bounds } = addObjects(doc(), template.items, center)
+    undoRef.current?.stopCapturing()
+    select(null)
+    setShowTemplates(false)
+    const svg = svgRef.current
+    const width = svg?.clientWidth || 600
+    const height = svg?.clientHeight || 400
+    const margin = 40
+    const zoom = clampZoom(Math.min(1, (width - 2 * margin) / bounds.w, (height - 2 * margin) / bounds.h))
+    setView({ zoom, x: width / 2 - (bounds.x + bounds.w / 2) * zoom, y: height / 2 - (bounds.y + bounds.h / 2) * zoom })
+    svg?.focus()
   }
 
   function change(id: string, changes: Changes) {
@@ -311,6 +321,9 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
                 + {objectTypes[type]}
               </button>
             ))}
+            <button type="button" aria-expanded={showTemplates} onClick={() => setShowTemplates(!showTemplates)}>
+              Vorlagen
+            </button>
             <TaskAdder projectId={project.id} onAdd={(taskId) => add('task', taskId)} />
             <button type="button" disabled={!undoState.canUndo} onClick={() => undoRef.current?.undo()}>
               Rückgängig
@@ -333,6 +346,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
           </button>
         </span>
       </div>
+      {canEdit && showTemplates && <TemplatePicker onPick={insertTemplate} onClose={() => setShowTemplates(false)} />}
       <p className="muted board-status" role="status">
         {statusText[status]}
         {status === 'online' && !canEdit && ' · Nur ansehen'}
@@ -394,7 +408,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
           </g>
         </svg>
         <aside className="board-side">
-          <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} />
+          <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} onTemplates={canEdit ? () => setShowTemplates(true) : undefined} />
           {selected && (
             <ObjectForm
               key={selected.id}
@@ -508,6 +522,14 @@ type ShapeProps = {
   onHandleDown: (event: PointerEvent, kind: 'resize' | 'start' | 'end') => void
 }
 
+const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
+  sticky: 'board-text',
+  rect: 'board-text',
+  ellipse: 'board-text centered',
+  diamond: 'board-text centered',
+  text: 'board-text large',
+}
+
 function ObjectShape({ object, task, selected, peerSelected, editable, markerId, onDown, onHandleDown }: ShapeProps) {
   const { x, y, w, h } = object
   const fill = fills[object.color]
@@ -532,6 +554,8 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
   const shape =
     object.type === 'ellipse' ? (
       <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2} fill={fill} stroke={stroke} />
+    ) : object.type === 'diamond' ? (
+      <polygon points={diamondPoints(x, y, w, h)} fill={fill} stroke={stroke} />
     ) : object.type === 'text' ? (
       <rect x={x} y={y} width={w} height={h} fill="transparent" stroke={selected ? stroke : 'none'} strokeDasharray="4 3" />
     ) : (
@@ -564,7 +588,7 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
             )}
           </div>
         ) : (
-          <div className={object.type === 'text' ? 'board-text large' : 'board-text'}>{object.text}</div>
+          <div className={textClass[object.type]}>{object.text}</div>
         )}
       </foreignObject>
       {outline && <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} fill="none" stroke={outline} strokeDasharray="6 4" strokeWidth={2} />}
@@ -573,12 +597,30 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
   )
 }
 
-function ObjectList({ objects, tasks, selectedId, onSelect }: { objects: BoardObject[]; tasks: Map<string, WhiteboardTask>; selectedId: string | null; onSelect: (id: string) => void }) {
+type ListProps = {
+  objects: BoardObject[]
+  tasks: Map<string, WhiteboardTask>
+  selectedId: string | null
+  onSelect: (id: string) => void
+  onTemplates?: () => void
+}
+
+function ObjectList({ objects, tasks, selectedId, onSelect, onTemplates }: ListProps) {
   return (
     <section aria-labelledby="board-objects-heading">
       <h4 id="board-objects-heading">Objekte ({objects.length})</h4>
       {objects.length === 0 ? (
-        <p className="muted">Noch leer.</p>
+        <p className="muted">
+          Noch leer.
+          {onTemplates && (
+            <>
+              {' '}
+              <button type="button" className="link-button" onClick={onTemplates}>
+                Mit einer Vorlage starten
+              </button>
+            </>
+          )}
+        </p>
       ) : (
         <ul className="board-object-list">
           {objects.map((object) => (

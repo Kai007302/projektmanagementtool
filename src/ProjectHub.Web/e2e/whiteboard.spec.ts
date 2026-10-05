@@ -59,6 +59,12 @@ test('two people draw together, a viewer follows and the board survives a reload
   await objectList(ben).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
   await expect(ben.getByLabel('X', { exact: true })).toHaveValue('400')
 
+  // Ben starts a retrospective from a template; it arrives for the others as a whole.
+  await ben.getByRole('button', { name: 'Vorlagen' }).click()
+  await ben.getByRole('region', { name: 'Vorlage einfügen' }).getByRole('button', { name: /^Retrospektive/ }).click()
+  await expect(objectList(claraPage).getByRole('button', { name: 'Rechteck: Was lief gut?' })).toBeVisible()
+  await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Daily auf 15 Minuten begrenzen' })).toBeVisible()
+
   // The viewer cannot change the note.
   await objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
   await expect(evaPage.getByLabel('Text')).toBeDisabled()
