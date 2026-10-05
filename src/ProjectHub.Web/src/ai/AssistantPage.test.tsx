@@ -96,4 +96,80 @@ describe('AssistantPage', () => {
       { role: 'user', text: 'Und weiter?' },
     ])
   })
+
+  it('runs a proposed change only after the person approved it', async () => {
+    let call = 0
+    const { calls } = fakeApi({
+      'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }),
+      'POST /api/v1/ai/chat': () =>
+        ++call === 1
+          ? sse([
+              { type: 'delta', text: 'Ich lege die Aufgabe an.' },
+              {
+                type: 'approval',
+                continuation: 'geheim',
+                actions: [
+                  {
+                    id: 'a-1',
+                    tool: 'create_task',
+                    title: 'Aufgabe anlegen',
+                    destructive: false,
+                    details: [
+                      { label: 'Projekt', value: 'Intranet-Relaunch' },
+                      { label: 'Titel', value: 'Protokoll schreiben' },
+                    ],
+                  },
+                ],
+              },
+              { type: 'done' },
+            ])
+          : sse([{ type: 'tool', tool: 'create_task' }, { type: 'delta', text: 'Erledigt.' }, { type: 'done' }]),
+    })
+    render(<AssistantPage status={{ ...status, actions: true }} onOpenArticle={() => {}} />)
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Deine Frage' }), 'Leg eine Aufgabe an{Enter}')
+    const card = await screen.findByRole('region', { name: 'Vorschlag: Aufgabe anlegen' })
+    expect(within(card).getByText('Protokoll schreiben')).toBeInTheDocument()
+    expect(calls.filter((c) => c.key === 'POST /api/v1/ai/chat')).toHaveLength(1)
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Ausführen' }))
+
+    expect(await screen.findByText(/Erledigt\./)).toBeInTheDocument()
+    expect(within(card).getByText('Freigegeben')).toBeInTheDocument()
+    const second = JSON.parse(String(calls.filter((c) => c.key === 'POST /api/v1/ai/chat')[1].init!.body))
+    expect(second).toEqual({
+      messages: [{ role: 'user', text: 'Leg eine Aufgabe an' }],
+      projectId: null,
+      continuation: 'geheim',
+      approvals: [{ id: 'a-1', approved: true }],
+    })
+  })
+
+  it('drops a waiting change when the person asks something else', async () => {
+    let call = 0
+    const { calls } = fakeApi({
+      'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }),
+      'POST /api/v1/ai/chat': () =>
+        ++call === 1
+          ? sse([
+              {
+                type: 'approval',
+                continuation: 'geheim',
+                actions: [{ id: 'a-1', tool: 'delete_task', title: 'Aufgabe löschen', destructive: true, details: [] }],
+              },
+              { type: 'done' },
+            ])
+          : sse([{ type: 'delta', text: 'Okay.' }, { type: 'done' }]),
+    })
+    render(<AssistantPage status={{ ...status, actions: true }} onOpenArticle={() => {}} />)
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Deine Frage' }), 'Lösch die Aufgabe{Enter}')
+    const card = await screen.findByRole('region', { name: 'Vorschlag: Aufgabe löschen' })
+    expect(within(card).getByRole('button', { name: 'Löschen' })).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Deine Frage' }), 'Doch nicht{Enter}')
+
+    expect(await within(card).findByText('Nicht ausgeführt')).toBeInTheDocument()
+    const second = JSON.parse(String(calls.filter((c) => c.key === 'POST /api/v1/ai/chat')[1].init!.body))
+    expect(second.continuation).toBeUndefined()
+  })
 })

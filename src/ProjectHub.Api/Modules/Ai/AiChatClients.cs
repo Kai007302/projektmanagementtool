@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using Anthropic;
 using Anthropic.Core;
@@ -45,6 +46,7 @@ public static class AiChatClients
                 invoking.IncludeDetailedErrors = false;
             })
             .UseOpenTelemetry(loggerFactory, TelemetrySourceName, telemetry => telemetry.EnableSensitiveData = false)
+            .Use(provider => new MergedTurnsChatClient(provider))
             .Build();
         return new AiModel(client, options.Provider, options.Model, configure);
     }
@@ -145,9 +147,50 @@ public static class AiChatClients
 /// Deterministic model for Development and tests (no network, no key): looks the question up with
 /// <c>search_knowledge</c> and answers with links to the passages it found, so the whole tool loop runs.
 /// </summary>
-internal sealed class FakeChatClient : IChatClient
+/// <summary>
+/// Joins consecutive assistant messages into one before they reach the provider. After an approval the function-invoking client
+/// puts the approved tool call into a message of its own, after the one with the model's thinking; Claude expects the thinking
+/// block and the tool call in the same turn, and OpenAI-compatible APIs expect text and tool calls in one message.
+/// </summary>
+internal sealed class MergedTurnsChatClient(IChatClient inner) : DelegatingChatClient(inner)
+{
+    public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        base.GetResponseAsync(Merge(messages), options, cancellationToken);
+
+    public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        base.GetStreamingResponseAsync(Merge(messages), options, cancellationToken);
+
+    internal static List<ChatMessage> Merge(IEnumerable<ChatMessage> messages)
+    {
+        var merged = new List<ChatMessage>();
+        foreach (var message in messages)
+        {
+            if (message.Role == ChatRole.Assistant && merged is [.., { Role.Value: "assistant" } previous])
+            {
+                merged[^1] = new ChatMessage(ChatRole.Assistant, [.. previous.Contents, .. message.Contents])
+                {
+                    AuthorName = previous.AuthorName,
+                    MessageId = previous.MessageId,
+                    AdditionalProperties = previous.AdditionalProperties,
+                };
+            }
+            else
+            {
+                merged.Add(message);
+            }
+        }
+
+        return merged;
+    }
+}
+
+internal sealed partial class FakeChatClient : IChatClient
 {
     public const string Marker = "(Testantwort ohne Sprachmodell)";
+
+    /// <summary>"Neue Aufgabe: Titel" with an open project makes the fake propose create_task, to exercise approvals.</summary>
+    public const string NewTaskPrefix = "Neue Aufgabe:";
 
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -156,6 +199,22 @@ internal sealed class FakeChatClient : IChatClient
         if (toolResult is null)
         {
             var question = history.LastOrDefault(m => m.Role == ChatRole.User)?.Contents.OfType<TextContent>().LastOrDefault()?.Text ?? string.Empty;
+            var context = history.FirstOrDefault(m => m.Role == ChatRole.User)?.Contents.OfType<TextContent>().FirstOrDefault()?.Text ?? string.Empty;
+            if (question.StartsWith(NewTaskPrefix, StringComparison.Ordinal)
+                && options?.Tools?.Any(t => t.Name == "create_task") == true
+                && ProjectInContext().Match(context) is { Success: true } project)
+            {
+                var call = new FunctionCallContent($"call_{Guid.NewGuid():N}", "create_task", new Dictionary<string, object?>
+                {
+                    ["projectId"] = project.Groups[1].Value,
+                    ["title"] = question[NewTaskPrefix.Length..].Trim(),
+                });
+                return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [new TextContent("Ich lege die Aufgabe an. "), call]))
+                {
+                    FinishReason = ChatFinishReason.ToolCalls,
+                });
+            }
+
             var hasSearch = options?.Tools?.Any(t => t.Name == "search_knowledge") == true;
             if (hasSearch && !string.IsNullOrWhiteSpace(question))
             {
@@ -194,9 +253,27 @@ internal sealed class FakeChatClient : IChatClient
     {
     }
 
+    [GeneratedRegex(@"projectId ([0-9a-fA-F-]{36})")]
+    private static partial Regex ProjectInContext();
+
     private static string Answer(FunctionResultContent? toolResult)
     {
         var result = toolResult?.Result is { } value ? JsonSerializer.SerializeToElement(value, AIJsonUtilities.DefaultOptions) : default;
+        if (result.ValueKind == JsonValueKind.Object && result.TryGetProperty("done", out _))
+        {
+            return $"{Marker} Erledigt: „{result.GetProperty("title").GetString()}“ ist angelegt.";
+        }
+
+        if (result.ValueKind == JsonValueKind.Object && result.TryGetProperty("error", out var error))
+        {
+            return $"{Marker} Das ging nicht: {error.GetString()}";
+        }
+
+        if (result.ValueKind == JsonValueKind.String)
+        {
+            return $"{Marker} Gut, dann lasse ich das.";
+        }
+
         var hits = result is { ValueKind: JsonValueKind.Array } array
             ? array.EnumerateArray().Select(e => (Id: e.GetProperty("articleId").GetString(), Title: e.GetProperty("title").GetString())).ToList()
             : [];

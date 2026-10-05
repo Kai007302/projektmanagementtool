@@ -23,3 +23,25 @@ test('the assistant answers from knowledge with sources that open the article', 
   await source.getByRole('button').click()
   await expect(page.getByRole('heading', { name: 'Projekt-Kickoff durchführen' })).toBeVisible()
 })
+
+// ADR 0016: a change the assistant proposes waits for the person; only "Ausführen" makes it happen.
+test('a task the assistant proposes is created only after approval', async ({ page }) => {
+  await signInAs(page, 'dev-ben', 'Assistent')
+  const title = `Protokoll ${Date.now()}`
+
+  await page.getByRole('combobox', { name: 'Bezug' }).selectOption({ label: 'Intranet-Relaunch' })
+  await page.getByRole('textbox', { name: 'Deine Frage' }).fill(`Neue Aufgabe: ${title}`)
+  await page.getByRole('button', { name: 'Fragen' }).click()
+
+  const card = page.getByRole('region', { name: 'Vorschlag: Aufgabe anlegen' })
+  await expect(card).toContainText('Intranet-Relaunch')
+  await expect(card).toContainText(title)
+
+  const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  expect(violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([])
+
+  await card.getByRole('button', { name: 'Ausführen' }).click()
+  await expect(page.getByRole('article', { name: 'Antwort des Assistenten' })).toContainText('ist angelegt')
+  await expect(card).toContainText('Freigegeben')
+  await expectAlertFree(page)
+})
