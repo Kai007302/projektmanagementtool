@@ -81,3 +81,5 @@ Mindestens:
 ## Datenschutz
 
 DSGVO und interne Richtlinien mit IT/Datenschutz/Security abstimmen. Die AI darf rechtliche Freigaben nicht voraussetzen.
+
+Überblick über die rechtlichen Anforderungen und eine Checkliste für Betreiber: `docs/LEGAL.md`. Umgesetzt (ADR 0015): Export der eigenen Daten, Anonymisieren von Personen durch Organisations-Admins, Löschfristen für Benachrichtigungen, Aktivität und Audit-Log, Links auf Datenschutzhinweise und Impressum. Zugriffslogs des Web-Containers enthalten weder IP-Adresse noch Query-String (dort stünde das Token der Hubs).

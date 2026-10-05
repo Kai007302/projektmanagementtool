@@ -23,7 +23,8 @@ public static class UserEndpoints
                 return error!;
             }
 
-            var query = db.Set<AppUser>().AsNoTracking().Where(u => u.OrganizationId == user.OrganizationId);
+            // Anonymized people (ADR 0015) are no longer anyone to find, assign or mention.
+            var query = db.Set<AppUser>().AsNoTracking().Where(u => u.OrganizationId == user.OrganizationId && u.AnonymizedAt == null);
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var pattern = $"%{EscapeLike(search.Trim())}%";

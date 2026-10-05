@@ -17,6 +17,7 @@ using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Organizations;
+using ProjectHub.Api.Modules.Privacy;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Realtime;
 using ProjectHub.Api.Modules.Tasks;
@@ -67,6 +68,7 @@ builder.Services.AddKnowledgeModule();
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 builder.Services.AddWhiteboardModule(builder.Configuration, builder.Environment);
+builder.Services.AddPrivacyModule(builder.Configuration);
 
 var app = builder.Build();
 
@@ -114,7 +116,8 @@ app.MapApiV1()
     .MapWebexEndpoints()
     .MapNotificationEndpoints()
     .MapWhiteboardEndpoints()
-    .MapKnowledgeEndpoints();
+    .MapKnowledgeEndpoints()
+    .MapPrivacyEndpoints();
 
 app.MapRealtimeEndpoints();
 app.MapNotificationHub();

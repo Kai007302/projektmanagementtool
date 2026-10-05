@@ -55,7 +55,7 @@ curl https://projecthub.example.com/health/ready    # Healthy
 
 Deshalb: Gleich nach der Installation selbst als Erste/r anmelden. Wer nur bestimmte Personen zulassen will, schaltet in Entra „Zuweisung erforderlich“ ein (Schritt 1.7).
 
-Eine Person sperren (eine Oberfläche dafür gibt es noch nicht):
+Eine Person sperren (eine Oberfläche dafür gibt es noch nicht; zum Löschen nach DSGVO gibt es „Person anonymisieren“, siehe Abschnitt Rechtliches):
 
 ```bash
 docker compose -f docker-compose.prod.yml exec postgres \
@@ -71,6 +71,20 @@ Gesperrte Personen bleiben gesperrt, auch wenn sie sich erneut anmelden.
 - **Telemetrie:** `OTEL_EXPORTER_OTLP_ENDPOINT` auf einen OpenTelemetry-Collector (ADR 0013). Ohne: `docker compose -f docker-compose.prod.yml logs api` zeigt die JSON-Logs.
 
 Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
+
+## Rechtliches und Datenschutz
+
+Überblick und Checkliste: `docs/LEGAL.md` (keine Rechtsberatung). Kurz:
+
+```bash
+mkdir -p legal
+cp deploy/legal/datenschutz.vorlage.html legal/datenschutz.html
+nano legal/datenschutz.html                         # alle [eckigen Klammern] ausfüllen
+```
+
+Caddy zeigt die Datei unter `https://<Domain>/rechtliches/datenschutz.html`, die App verlinkt sie unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`). Ein Impressum kommt genauso nach `legal/impressum.html` und wird über `PROJECTHUB_IMPRINT_URL=/rechtliches/impressum.html` eingeblendet. Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
+
+ProjectHub löscht Benachrichtigungen nach 180, Projektaktivität nach 365 und Audit-Einträge nach 730 Tagen (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Teams → Person anonymisieren**.
 
 ## 5. Updates
 

@@ -7,6 +7,7 @@ import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
+import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import './App.css'
@@ -152,6 +153,7 @@ function App() {
         <span className={`status status-${status}`} role="status">
           {statusText[status]}
         </span>
+        <LegalFooter signedIn={session !== null} />
       </footer>
     </div>
   )

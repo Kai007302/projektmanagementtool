@@ -4,6 +4,10 @@
 
 server_tokens off;
 
+# Access log without client address and query string (ADR 0015): the hubs carry the access token in the query
+# string, and the address is personal data nobody here needs. $uri is the path without the query.
+log_format projecthub '$time_iso8601 "$request_method $uri" $status $body_bytes_sent $request_time';
+
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -24,6 +28,7 @@ map $http_x_forwarded_for $forwarded_for {
 server {
     listen 8080;
     root /usr/share/nginx/html;
+    access_log /var/log/nginx/access.log projecthub;
 
     # Uploads up to PROJECTHUB_ATTACHMENT_MAX_BYTES (100 MB); the API enforces the real limits per endpoint.
     client_max_body_size 110m;

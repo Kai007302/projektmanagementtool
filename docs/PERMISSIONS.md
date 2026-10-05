@@ -111,6 +111,12 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Der Realtime-Hub `/api/v1/hubs/notifications` stellt nur an die angemeldete Person zu und überträgt nur den Zähler.
 - Den Zustand der Mail-Warteschlange (`/admin/mail-outbox`) sehen nur Organisations-Admins, und nur für ihre Organisation. Antworten enthalten weder Adressen noch Betreff. Erneutes Versenden einer fehlgeschlagenen Mail steht im `audit_log`.
 
+## Datenschutz
+
+- Den Export der eigenen Daten (`/me/data-export`) bekommt jede angemeldete Person, nur für sich selbst. Jeder Export steht im `audit_log`.
+- Personen anonymisieren (`/admin/users/{id}/anonymize`) dürfen nur Organisations-Admins, nur in ihrer Organisation (sonst 404) und nie sich selbst (400). Die Anonymisierung steht im `audit_log`.
+- Die Links auf Datenschutzhinweise und Impressum (`/legal`) sind ohne Anmeldung lesbar.
+
 ## Webex
 
 - Webex-Links eines Projekts sieht, wer das Projekt sehen darf (View). Links hinzufügen, entfernen und einen Projektraum anlegen braucht Edit.

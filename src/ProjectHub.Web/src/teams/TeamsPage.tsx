@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Me } from '../identity/api'
+import { AnonymizePersonForm } from '../privacy/AnonymizePersonForm'
 import { createTeam, fetchTeams, type TeamSummary } from './api'
 import { TeamDetailsPanel } from './TeamDetailsPanel'
 
@@ -22,6 +23,7 @@ export function TeamsPage({ me }: { me: Me }) {
       <h2 id="teams-heading">Teams</h2>
       {error && <p role="alert">{error}</p>}
       {me.organizationRole === 'admin' && <CreateTeamForm onCreated={load} />}
+      {me.organizationRole === 'admin' && <AnonymizePersonForm myId={me.id} />}
       {teams === null ? (
         <p>Teams werden geladen …</p>
       ) : teams.length === 0 ? (
