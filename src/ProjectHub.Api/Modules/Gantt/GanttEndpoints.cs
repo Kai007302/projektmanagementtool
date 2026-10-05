@@ -13,6 +13,9 @@ public static class GanttEndpoints
         api.MapGet("/projects/{projectId:guid}/gantt", async (Guid projectId, UserContext user, GanttService service, CancellationToken ct) =>
             ApiResults.Ok(await service.GetAsync(user, projectId, ct)));
 
+        api.MapGet("/projects/{projectId:guid}/gantt/export.pdf", async (Guid projectId, UserContext user, GanttService service, CancellationToken ct) =>
+            ApiResults.From(await service.ExportPdfAsync(user, projectId, ct), file => Results.File(file.Content, "application/pdf", file.FileName)));
+
         api.MapPost("/projects/{projectId:guid}/gantt/dependencies", async (
                 Guid projectId, CreateDependencyRequest request, UserContext user, GanttService service, CancellationToken ct) =>
             ApiResults.From(await service.CreateDependencyAsync(user, projectId, request, ct),

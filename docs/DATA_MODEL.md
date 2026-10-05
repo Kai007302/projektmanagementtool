@@ -16,6 +16,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `010_webex.sql`: `project_webex_link` (Webex-Räume und Besprechungslinks je Projekt), `mail_outbox.channel` (`email`/`webex`) und `webhook_event` (empfangene Webhooks zur Deduplizierung, ADR 0011)
 - `012_privacy.sql`: `app_user.anonymized_at` (anonymisierte Personen, ADR 0017) und Indizes über `created_at` für die Löschfristen von Benachrichtigungen, Aktivität und Audit-Log
 - `011_knowledge_search_vector.sql`: `knowledge_article.search_vector`, von PostgreSQL generierter Suchvektor mit GIN-Index; ersetzt den Ausdrucksindex aus 006 (ADR 0013)
+- `013_calendar_feed.sql`: `calendar_feed` (geheime Adresse des Kalender-Abos je Person, ADR 0018)
 
 ## Regeln
 
@@ -163,6 +164,12 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 - `notification_preference`: Kanäle je Person; ohne Zeile sind In-App und Mail an. `webex_enabled` schaltet Direktnachrichten des Webex-Bots ein (Standard aus).
 - `mail_outbox`: eine ausgehende Benachrichtigung an eine Person über `channel` (`email`, `webex`; Migration 010) mit Adresse, Betreff und Text (nur Titel und Link), `status` (`pending`, `sent`, `failed`), `attempts`, `next_attempt_at` (nächster Versuch bzw. Ende der Sperrfrist während des Versands) und `last_error` (nur HTTP-Status und Graph-Fehlercode). Verschickte Zeilen werden nach 7 Tagen gelöscht, fehlgeschlagene nach 30 Tagen.
 - Zustellung und Mail siehe ADR 0008 und ADR 0010, Webex ADR 0011.
+
+## Kalender-Abo
+
+Migration 013 (ADR 0018):
+
+- `calendar_feed`: höchstens eine Zeile je Person (`user_id` eindeutig) mit `token_hash` (SHA-256 des Tokens in der Adresse, 32 Bytes, eindeutig), `created_at` und `last_used_at` (höchstens alle 15 Minuten aktualisiert). Das Token selbst wird nicht gespeichert. Die Anonymisierung einer Person löscht die Zeile.
 
 ## Webex
 

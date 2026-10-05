@@ -11,6 +11,7 @@ import {
   createMilestone,
   deleteDependency,
   deleteMilestone,
+  downloadGanttPdf,
   dependencyTypes,
   fetchGantt,
   updateMilestone,
@@ -208,6 +209,15 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
           ))}
           <button type="button" onClick={scrollToToday}>
             Heute
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              downloadGanttPdf(project.id, project.name).catch((e: Error) => setError(e.message))
+            }}
+          >
+            Als PDF
           </button>
         </div>
       </header>

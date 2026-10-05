@@ -58,7 +58,7 @@ public sealed class CalendarService(
 public static class CalendarEndpoints
 {
     public static IServiceCollection AddCalendarModule(this IServiceCollection services) =>
-        services.AddScoped<CalendarService>();
+        services.AddScoped<CalendarService>().AddScoped<CalendarFeedService>();
 
     public static RouteGroupBuilder MapCalendarEndpoints(this RouteGroupBuilder api)
     {
@@ -67,6 +67,21 @@ public static class CalendarEndpoints
 
         api.MapGet("/gantt-milestones/{id:guid}/calendar.ics", async (Guid id, UserContext user, CalendarService service, CancellationToken ct) =>
             ApiResults.From(await service.MilestoneAsync(user, id, ct), File));
+
+        api.MapGet("/me/calendar-feed", async (UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            Results.Ok(await service.StatusAsync(user, ct)));
+
+        api.MapPost("/me/calendar-feed", async (UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            Results.Ok(await service.CreateAsync(user, ct)));
+
+        api.MapDelete("/me/calendar-feed", async (UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            ApiResults.NoContent(await service.DeleteAsync(user, ct)));
+
+        // Fetched by calendar programs without signing in; the token in the query string is the credential. Query
+        // strings are neither logged by the web container nor recorded in traces (ADR 0017, ADR 0018).
+        api.MapGet(CalendarFeedService.FeedPath["/api/v1".Length..], async (string? token, CalendarFeedService service, CancellationToken ct) =>
+                ApiResults.From(await service.FeedAsync(token, ct), content => Results.File(content, CalendarFile.ContentType, "projecthub.ics")))
+            .AllowAnonymous();
 
         return api;
     }

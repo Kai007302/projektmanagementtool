@@ -46,7 +46,9 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 | Kanban-Board ansehen | View |
 | Karten verschieben (ändert den Status der Aufgabe) | Contribute |
 | Spalten anlegen, ändern, sortieren, löschen | Edit |
-| Gantt ansehen | View |
+| Aufgaben als Excel/CSV exportieren | View (ADR 0018) |
+| Aufgaben aus Excel/CSV importieren (legt neue Aufgaben an) | Contribute (ADR 0018) |
+| Gantt ansehen, als PDF herunterladen | View |
 | Termine im Gantt verschieben (ändert Start/Ende der Aufgabe), Abhängigkeiten anlegen und löschen | Contribute (DEC-024) |
 | Meilensteine anlegen, ändern, löschen | Edit (DEC-024) |
 | Whiteboards ansehen, live mitverfolgen, Mauszeiger der anderen sehen und eigenen zeigen | View (DEC-027) |
@@ -131,6 +133,7 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 
 - Kalenderdateien für Aufgaben und Meilensteine bekommt, wer das Projekt sehen darf (View). Sonst „nicht gefunden“ (404).
 - Sie enthalten nur Titel, Datum und einen Link in die App.
+- Das Kalender-Abo (ADR 0018) verwaltet jede Person nur für sich selbst (`/me/calendar-feed`). Abgerufen wird es ohne Anmeldung mit dem Token aus der Adresse; es enthält nur, was die Person zu diesem Zeitpunkt sehen darf: ihr zugewiesene Aufgaben in sichtbaren Projekten und Meilensteine der Projekte, in denen sie Mitglied ist. Inaktive oder anonymisierte Personen: 404.
 
 ## Identität
 

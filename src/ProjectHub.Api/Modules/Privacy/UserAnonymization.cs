@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Audit;
+using ProjectHub.Api.Modules.Calendar;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Knowledge;
@@ -66,6 +67,7 @@ public sealed class UserAnonymizationService(ProjectHubDbContext db, IAuditLog a
         await db.Set<Notification>().Where(n => n.OrganizationId == org && n.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<NotificationPreference>().Where(p => p.OrganizationId == org && p.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<MailOutboxEntry>().Where(m => m.OrganizationId == org && m.RecipientId == userId).ExecuteDeleteAsync(ct);
+        await db.Set<CalendarFeed>().Where(f => f.OrganizationId == org && f.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<TeamMember>().Where(m => m.OrganizationId == org && m.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<ProjectMember>().Where(m => m.OrganizationId == org && m.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<KnowledgePermission>()

@@ -1,4 +1,4 @@
-import { apiFetch, jsonBody } from '../api/client'
+import { apiDownload, apiFetch, isoToday, jsonBody, safeFileName } from '../api/client'
 import type { TaskStatus } from '../tasks/api'
 
 export type DependencyType = 'finish_to_start' | 'start_to_start' | 'finish_to_finish' | 'start_to_finish'
@@ -54,3 +54,7 @@ export const updateMilestone = (milestone: GanttMilestone, changes: Partial<Pick
   })
 
 export const deleteMilestone = (id: string) => apiFetch<void>(`/api/v1/gantt-milestones/${id}`, { method: 'DELETE' })
+
+/** The chart as PDF (A4 landscape), drawn by the server so it looks the same for everyone. */
+export const downloadGanttPdf = (projectId: string, projectName: string) =>
+  apiDownload(`/api/v1/projects/${projectId}/gantt/export.pdf`, `${safeFileName(projectName, 'projekt')} Gantt ${isoToday()}.pdf`)

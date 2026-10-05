@@ -67,6 +67,7 @@ public sealed class PrivacyTests(InfrastructureFixture infrastructure) : ApiTest
         var project = await CreateProjectAsync(Ben, (person, "member"));
         var task = await CreateTaskAsync(Ben, project.Id, NewTask("Übergabe", assigneeId: person.Id));
         Assert.True(await ScalarAsync("select count(*) from notification where user_id = $1", person.Id) > 0);
+        await InsertAsync("insert into calendar_feed (organization_id, user_id, token_hash) values ($1, $2, $3) returning id", Contoso.Id, person.Id, new byte[32]);
 
         var response = await As(Ada).PostAsync($"/api/v1/admin/users/{person.Id}/anonymize", null);
 
@@ -80,6 +81,7 @@ public sealed class PrivacyTests(InfrastructureFixture infrastructure) : ApiTest
             person.Id, UserAnonymizationService.AnonymizedEmail(person.Id), UserAnonymizationService.AnonymizedObjectId(person.Id)));
         Assert.Equal(0, await ScalarAsync("select count(*) from notification where user_id = $1", person.Id));
         Assert.Equal(0, await ScalarAsync("select count(*) from mail_outbox where recipient_id = $1", person.Id));
+        Assert.Equal(0, await ScalarAsync("select count(*) from calendar_feed where user_id = $1", person.Id));
         Assert.Equal(0, await ScalarAsync("select count(*) from project_member where user_id = $1", person.Id));
         Assert.Equal(1, await ScalarAsync("select count(*) from task where id = $1 and assignee_id is null and deleted_at is null", task.Id));
         Assert.Equal(1, await ScalarAsync("select count(*) from audit_log where action = 'UserAnonymized' and resource_id = $1 and actor_id = $2", person.Id, Ada.Id));

@@ -92,4 +92,12 @@ Mindestens:
 
 DSGVO und interne Richtlinien mit IT/Datenschutz/Security abstimmen. Die AI darf rechtliche Freigaben nicht voraussetzen.
 
-Überblick über die rechtlichen Anforderungen und eine Checkliste für Betreiber: `docs/LEGAL.md`. Umgesetzt (ADR 0017): Export der eigenen Daten, Anonymisieren von Personen durch Organisations-Admins, Löschfristen für Benachrichtigungen, Aktivität und Audit-Log, Links auf Datenschutzhinweise und Impressum. Zugriffslogs des Web-Containers enthalten weder IP-Adresse noch Query-String (dort stünde das Token der Hubs).
+Überblick über die rechtlichen Anforderungen und eine Checkliste für Betreiber: `docs/LEGAL.md`. Umgesetzt (ADR 0017): Export der eigenen Daten, Anonymisieren von Personen durch Organisations-Admins, Löschfristen für Benachrichtigungen, Aktivität und Audit-Log, Links auf Datenschutzhinweise und Impressum. Zugriffslogs des Web-Containers enthalten weder IP-Adresse noch Query-String (dort stünde das Token der Hubs und des Kalender-Abos).
+
+## Import, Export und Kalender-Abo
+
+Umgesetzt in ADR 0018:
+
+- Import von Aufgaben nur mit Schreibrecht im Projekt, höchstens 2 MB, 1.000 Zeilen und 50 Spalten; Excel-Dateien werden vor dem Öffnen auf entpackte Größe (50 MB) und Anzahl der Teile geprüft (Zip-Bombe). Jede Zeile durchläuft dieselbe Validierung wie das Anlegen über die API.
+- CSV-Export setzt vor Freitext, der wie eine Formel beginnt, ein `'` (CSV-Injection); Excel-Zellen werden nur als Text, Zahl oder Datum geschrieben, nie als Formel.
+- Das Kalender-Abo ist die einzige Abfrage von Inhalten ohne Anmeldung. Das Token (256 Bit, zufällig) steht im Query-String, wird nur als SHA-256-Hash gespeichert und nur beim Erzeugen angezeigt. Rechte werden bei jedem Abruf neu geprüft; inaktive oder anonymisierte Personen bekommen 404.

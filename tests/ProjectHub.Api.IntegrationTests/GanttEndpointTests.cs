@@ -247,4 +247,21 @@ public sealed class GanttEndpointTests(InfrastructureFixture infrastructure) : A
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<GanttDependency>())!;
     }
+
+    [Fact]
+    public async Task Chart_downloads_as_pdf_for_viewers_and_stays_hidden_from_outsiders()
+    {
+        var project = await CreateTeamProjectAsync();
+        await CreateTaskAsync(Ben, project.Id, NewTask("Konzept", startDate: Day, dueDate: Day.AddDays(4)));
+
+        var response = await As(Gina).GetAsync($"/api/v1/projects/{project.Id}/gantt/export.pdf");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.EndsWith(".pdf", response.Content.Headers.ContentDisposition?.FileNameStar, StringComparison.Ordinal);
+        Assert.Equal("%PDF-"u8.ToArray(), bytes[..5]);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(Felix).GetAsync($"/api/v1/projects/{project.Id}/gantt/export.pdf")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(Fritz).GetAsync($"/api/v1/projects/{project.Id}/gantt/export.pdf")).StatusCode);
+    }
 }

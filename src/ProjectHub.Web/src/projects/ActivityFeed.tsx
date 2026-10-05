@@ -16,6 +16,7 @@ const actionText: Record<string, string> = {
   TaskUpdated: 'hat eine Aufgabe geändert',
   TaskDeleted: 'hat eine Aufgabe gelöscht',
   TaskMoved: 'hat eine Aufgabe verschoben',
+  TasksImported: 'hat Aufgaben aus einer Datei importiert',
   BoardColumnCreated: 'hat eine Spalte angelegt',
   BoardColumnUpdated: 'hat eine Spalte geändert',
   BoardColumnDeleted: 'hat eine Spalte gelöscht',
@@ -41,6 +42,7 @@ const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeSt
 function iconOf(action: string): string {
   if (action.endsWith('Deleted') || action.endsWith('Removed')) return '🗑️'
   if (action === 'TaskMoved') return '➡️'
+  if (action === 'TasksImported') return '📥'
   if (action.startsWith('Comment')) return '💬'
   if (action.startsWith('Attachment')) return '📎'
   if (action.startsWith('Member')) return '👤'

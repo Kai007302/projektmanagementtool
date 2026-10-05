@@ -34,6 +34,8 @@ public sealed record GanttResponse(
     IReadOnlyList<GanttDependency> Dependencies,
     IReadOnlyList<GanttMilestoneResponse> Milestones);
 
+public sealed record GanttPdfFile(string FileName, byte[] Content);
+
 public sealed record CreateDependencyRequest(Guid? SourceTaskId, Guid? TargetTaskId, string? DependencyType);
 
 public sealed record CreateMilestoneRequest(string? Name, DateOnly? Date);
@@ -60,6 +62,21 @@ public sealed class GanttService(
         }
 
         return await ReadAsync(user, projectId, ct);
+    }
+
+    /// <summary>The chart as PDF (A4 landscape) for printing and sending; same visibility as the chart itself.</summary>
+    public async Task<ServiceResult<GanttPdfFile>> ExportPdfAsync(UserContext user, Guid projectId, CancellationToken ct)
+    {
+        if (await projectAccess.RequireAsync(user, projectId, ProjectPermission.View, ct) is { } failure)
+        {
+            return failure;
+        }
+
+        var gantt = await ReadAsync(user, projectId, ct);
+        var name = await db.Set<Project>().AsNoTracking().Where(p => p.Id == projectId).Select(p => p.Name).SingleAsync(ct);
+        var now = clock.GetUtcNow();
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        return new GanttPdfFile($"{FileNames.Safe(name, "projekt")} Gantt {today:yyyy-MM-dd}.pdf", GanttPdf.Render(name, gantt, today, now));
     }
 
     public async Task<ServiceResult<GanttDependency>> CreateDependencyAsync(

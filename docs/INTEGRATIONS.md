@@ -35,6 +35,19 @@ Umgesetzt (Phase 8, Vorschlag DEC-028) ohne Graph-Berechtigung:
 - `GET /api/v1/tasks/{id}/calendar.ics` und `GET /api/v1/gantt-milestones/{id}/calendar.ics`: ganztägiger Termin mit Titel und Link, feste UID (erneuter Import ersetzt den alten Eintrag).
 - „In Outlook anlegen“ öffnet Outlook im Web mit vorausgefülltem Termin im Browser der Person.
 
+### Kalender-Abo
+
+Umgesetzt (ADR 0018), ebenfalls ohne Graph-Berechtigung: Jede Person kann unten auf jeder Seite eine geheime Kalender-Adresse erstellen und in Outlook („Aus dem Internet abonnieren“), Google oder Apple Kalender eintragen. Der Kalender enthält ihre Aufgaben mit Termin und die Meilensteine ihrer Projekte und aktualisiert sich selbst (`GET /api/v1/calendar-feed.ics?token=…`).
+
+## Standardformate
+
+Umgesetzt (ADR 0018):
+
+- **Excel (.xlsx) und CSV:** Aufgaben eines Projekts exportieren und importieren (Ansicht „Liste“). CSV wie Excel in Deutschland (Semikolon, UTF-8 mit BOM); der Import liest auch Komma, Tab und Windows-1252 und versteht deutsche und englische Spaltennamen.
+- **PDF:** das Gantt-Diagramm eines Projekts, A4 quer, vom Server gezeichnet.
+- **iCalendar (.ics):** einzelne Termine (oben) und das Kalender-Abo.
+- **JSON:** Export der eigenen Daten (ADR 0017).
+
 ## Webex
 
 Umgesetzt (Phase 9, ADR 0011) über **einen zentralen Bot**. Personen verbinden kein eigenes Webex-Konto. Einrichtung: `docs/integrations/webex-setup.md`.
