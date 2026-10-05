@@ -7,7 +7,6 @@ import { createTask, taskStatuses, type TaskStatus } from '../tasks/api'
 import { DueDate } from '../tasks/DueDate'
 import { celebrate } from '../ui/confetti'
 import { PriorityBadge } from '../tasks/PriorityBadge'
-import { NewTaskForm } from '../tasks/TaskBoard'
 import { TaskDetails } from '../tasks/TaskDetails'
 import {
   createColumn,
@@ -21,6 +20,10 @@ import {
   type KanbanColumn,
 } from './api'
 import { useLatest } from '../api/useLatest'
+import { InlineEdit } from '../ui/InlineEdit'
+import { Menu } from '../ui/Menu'
+import { QuickCreate } from '../ui/QuickCreate'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
 
@@ -49,6 +52,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
   const lastPointer = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 3 })
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [selected, setSelected] = useState<string | null>(initialTaskId)
+  const [settingsOf, setSettingsOf] = useState<string | null>(null)
   const { canContribute, canEdit } = project.capabilities
 
   const latest = useLatest()
@@ -85,6 +89,19 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
     void apply(() => moveCard(card, target.columnId, index))
   }
 
+  /** A new card goes to the end of the column it was typed into, like in Trello. */
+  async function createIn(column: KanbanColumn, title: string) {
+    const task = await createTask(project.id, title, null, column.taskStatus)
+    const fresh = await fetchBoard(project.id)
+    const card = fresh.columns.flatMap((c) => c.cards).find((c) => c.id === task.id)
+    const target = fresh.columns.find((c) => c.id === column.id)
+    setBoard(fresh)
+    if (card && target && !target.cards.some((c) => c.id === card.id)) {
+      setBoard(await moveCard(card, column.id, target.cards.length))
+    }
+    onChanged()
+  }
+
   function drop(event: DragEvent) {
     event.preventDefault()
     if (dragging && dropTarget) move(dragging, dropTarget)
@@ -113,16 +130,6 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
     <section className="panel kanban" aria-labelledby="board-heading">
       <h3 id="board-heading">Board</h3>
       {error && <p role="alert">{error}</p>}
-      {canContribute && (
-        <NewTaskForm
-          label="Neue Aufgabe"
-          onCreate={async (title) => {
-            await createTask(project.id, title, null)
-            load()
-            onChanged()
-          }}
-        />
-      )}
       <div
         className="kanban-columns"
         onPointerDownCapture={(event) => (lastPointer.current = { x: event.clientX, y: event.clientY })}
@@ -141,29 +148,46 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
               <header className="kanban-column-header">
                 <h4>
                   <span className={`status-dot status-${column.taskStatus}`} aria-hidden="true" />
-                  {column.name}
+                  <InlineEdit
+                    key={`${column.id}-${column.version}`}
+                    value={column.name}
+                    label={`Spaltenname „${column.name}“`}
+                    maxLength={100}
+                    editable={canEdit}
+                    onSave={(name) => apply(() => updateColumn(column, { name }))}
+                  />
                 </h4>
                 <span className={overLimit ? 'wip over' : 'wip'} title="Karten / WIP-Limit">
                   {column.cards.length}
                   {column.wipLimit !== null && ` / ${column.wipLimit}`}
                 </span>
+                {canEdit && (
+                  <Menu
+                    label={`Spalte „${column.name}“`}
+                    items={[
+                      { label: 'Status und WIP-Limit', onSelect: () => setSettingsOf(column.id) },
+                      { label: 'Nach links', disabled: columnIndex === 0, onSelect: () => void apply(() => moveColumn(column, columnIndex - 1)) },
+                      { label: 'Nach rechts', disabled: columnIndex === board.columns.length - 1, onSelect: () => void apply(() => moveColumn(column, columnIndex + 1)) },
+                      {
+                        label: 'Spalte löschen',
+                        danger: true,
+                        onSelect: () => {
+                          if (window.confirm(`Spalte „${column.name}“ löschen? Die Karten bleiben erhalten.`)) void apply(() => deleteColumn(column))
+                        },
+                      },
+                    ]}
+                  />
+                )}
               </header>
               {column.name !== taskStatuses[column.taskStatus] && (
                 <p className="muted kanban-status">Status: {taskStatuses[column.taskStatus]}</p>
               )}
-              {canEdit && (
+              {canEdit && settingsOf === column.id && (
                 <ColumnSettings
                   key={`${column.id}-${column.version}`}
                   column={column}
-                  isFirst={columnIndex === 0}
-                  isLast={columnIndex === board.columns.length - 1}
                   onSave={(changes) => apply(() => updateColumn(column, changes))}
-                  onMove={(offset) => apply(() => moveColumn(column, columnIndex + offset))}
-                  onDelete={() => {
-                    if (window.confirm(`Spalte „${column.name}“ löschen? Die Karten bleiben erhalten.`)) {
-                      void apply(() => deleteColumn(column))
-                    }
-                  }}
+                  onClose={() => setSettingsOf(null)}
                 />
               )}
               <ol className="kanban-cards">
@@ -191,13 +215,27 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                     }}
                     onDragOver={(event) => overCard(event, column.id, index)}
                   >
-                    <button
-                      type="button"
-                      className="kanban-card-title"
-                      onClick={() => setSelected(card.id === selected ? null : card.id)}
-                    >
-                      {card.title}
-                    </button>
+                    <div className="kanban-card-top">
+                      <button
+                        type="button"
+                        className="kanban-card-title"
+                        onClick={() => setSelected(card.id === selected ? null : card.id)}
+                      >
+                        {card.title}
+                      </button>
+                      {canContribute && (
+                        <Menu
+                          className="kanban-card-menu"
+                          label={`Aktionen für „${card.title}“`}
+                          items={board.columns
+                            .filter((option) => option.id !== column.id)
+                            .map((option) => ({
+                              label: `Nach „${option.name}“ verschieben`,
+                              onSelect: () => move(card, { columnId: option.id, index: option.cards.length }),
+                            }))}
+                        />
+                      )}
+                    </div>
                     <div className="kanban-card-meta">
                       <PriorityBadge priority={card.priority} />
                       {card.dueDate && <DueDate date={card.dueDate} done={card.status === 'done'} />}
@@ -227,25 +265,6 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                         {card.assigneeName}
                       </span>
                     )}
-                    {canContribute && (
-                      <select
-                        aria-label={`„${card.title}“ verschieben nach`}
-                        className="kanban-move"
-                        value={column.id}
-                        onChange={(event) =>
-                          move(card, {
-                            columnId: event.target.value,
-                            index: board.columns.find((c) => c.id === event.target.value)?.cards.length ?? 0,
-                          })
-                        }
-                      >
-                        {board.columns.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
                   </li>
                 ))}
                 {dropTarget?.columnId === column.id && dropTarget.index >= column.cards.length && (
@@ -253,10 +272,15 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                 )}
               </ol>
               {column.cards.length === 0 && dropTarget?.columnId !== column.id && <p className="kanban-empty">Noch keine Karten. Zieh eine hierher ✨</p>}
+              {canContribute && <QuickCreate label="Aufgabe" fieldLabel={`Neue Aufgabe in ${column.name}`} onCreate={(title) => createIn(column, title)} />}
             </section>
           )
         })}
-        {canEdit && <NewColumnForm onCreate={(name, status) => apply(() => createColumn(project.id, name, status))} />}
+        {canEdit && (
+          <div className="kanban-column new-column">
+            <Reveal label="Spalte">{(close) => <NewColumnForm onCreate={(name) => apply(() => createColumn(project.id, name, 'in_progress'))} onClose={close} />}</Reveal>
+          </div>
+        )}
       </div>
       {selected && (
         <TaskDetails
@@ -273,6 +297,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
             load()
             onChanged()
           }}
+          onClose={() => setSelected(null)}
         />
       )}
     </section>
@@ -285,16 +310,12 @@ function conflictMessage(error: ApiError): string {
 
 type SettingsProps = {
   column: KanbanColumn
-  isFirst: boolean
-  isLast: boolean
-  onSave: (changes: { name?: string; taskStatus?: TaskStatus; wipLimit?: number | null }) => void
-  onMove: (offset: number) => void
-  onDelete: () => void
+  onSave: (changes: { taskStatus?: TaskStatus; wipLimit?: number | null }) => void
+  onClose: () => void
 }
 
-function ColumnSettings({ column, isFirst, isLast, onSave, onMove, onDelete }: SettingsProps) {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState(column.name)
+/** The rarely needed column settings, opened from the column menu. */
+function ColumnSettings({ column, onSave, onClose }: SettingsProps) {
   const [status, setStatus] = useState<TaskStatus>(column.taskStatus)
   const [wipLimit, setWipLimit] = useState(column.wipLimit?.toString() ?? '')
 
@@ -302,82 +323,25 @@ function ColumnSettings({ column, isFirst, isLast, onSave, onMove, onDelete }: S
     event.preventDefault()
     const limit = wipLimit === '' ? null : Number(wipLimit)
     const changes = {
-      ...(name !== column.name && { name }),
       ...(status !== column.taskStatus && { taskStatus: status }),
       ...(limit !== column.wipLimit && { wipLimit: limit }),
     }
     if (Object.keys(changes).length > 0) onSave(changes)
-    setOpen(false)
+    onClose()
   }
 
   return (
-    <div className="column-settings">
-      <button
-        type="button"
-        className="link-button"
-        aria-expanded={open}
-        aria-label={`Spalte „${column.name}“ bearbeiten`}
-        onClick={() => setOpen(!open)}
-      >
-        Bearbeiten
-      </button>
-      {open && (
-        <form className="stacked-form" onSubmit={submit}>
-          <label>
-            Spaltenname
-            <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} />
-          </label>
-          <label>
-            Status der Karten
-            <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)}>
-              {Object.entries(taskStatuses).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            WIP-Limit
-            <input type="number" min={1} value={wipLimit} onChange={(event) => setWipLimit(event.target.value)} />
-          </label>
-          <div className="row">
-            <button type="button" aria-label="Spalte nach links" disabled={isFirst} onClick={() => onMove(-1)}>
-              ←
-            </button>
-            <button type="button" aria-label="Spalte nach rechts" disabled={isLast} onClick={() => onMove(1)}>
-              →
-            </button>
-            <button type="submit">Spalte speichern</button>
-          </div>
-          <button type="button" className="danger" onClick={onDelete}>
-            Spalte löschen
-          </button>
-        </form>
-      )}
-    </div>
-  )
-}
-
-function NewColumnForm({ onCreate }: { onCreate: (name: string, status: TaskStatus) => void }) {
-  const [name, setName] = useState('')
-  const [status, setStatus] = useState<TaskStatus>('in_progress')
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    onCreate(name, status)
-    setName('')
-  }
-
-  return (
-    <form className="kanban-column new-column stacked-form" onSubmit={submit}>
-      <label>
-        Neue Spalte
-        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} />
-      </label>
+    <form
+      className="stacked-form column-settings"
+      aria-label={`Spalte „${column.name}“ einstellen`}
+      onSubmit={submit}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose()
+      }}
+    >
       <label>
         Status der Karten
-        <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)}>
+        <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)} autoFocus>
           {Object.entries(taskStatuses).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -385,7 +349,43 @@ function NewColumnForm({ onCreate }: { onCreate: (name: string, status: TaskStat
           ))}
         </select>
       </label>
-      <button type="submit">Spalte anlegen</button>
+      <label>
+        WIP-Limit
+        <input type="number" min={1} value={wipLimit} onChange={(event) => setWipLimit(event.target.value)} />
+      </label>
+      <div className="row">
+        <button type="submit">Übernehmen</button>
+        <button type="button" onClick={onClose}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function NewColumnForm({ onCreate, onClose }: { onCreate: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState('')
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    onCreate(name)
+    onClose()
+  }
+
+  return (
+    <form className="quick-create" onSubmit={submit}>
+      <input
+        aria-label="Name der neuen Spalte"
+        placeholder="Spaltenname, Enter zum Anlegen"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onBlur={() => {
+          if (!name.trim()) onClose()
+        }}
+        required
+        maxLength={100}
+        autoFocus
+      />
     </form>
   )
 }

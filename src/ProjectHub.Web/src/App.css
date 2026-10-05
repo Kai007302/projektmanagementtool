@@ -406,11 +406,6 @@
   justify-self: start;
 }
 
-.task-form {
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  align-items: end;
-}
-
 .inline-form label,
 .stacked-form label {
   display: flex;
@@ -439,10 +434,6 @@
 .project-header h2,
 .project-header h4 {
   margin: 0.5rem 0 0.25rem;
-}
-
-.project-header + .inline-form {
-  margin: 0.5rem 0 1.5rem;
 }
 
 .project-layout {
@@ -484,12 +475,6 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
-}
-
-.task-details {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
 }
 
 .row {
@@ -567,11 +552,6 @@ button.danger:hover:not(:disabled) {
   font-size: 0.875rem;
 }
 
-.kanban-column-header .link-button {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
 .kanban-status {
   margin: 0 0 0.25rem;
 }
@@ -647,19 +627,10 @@ button.danger:hover:not(:disabled) {
   font-weight: 600;
 }
 
-.kanban-move {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.25rem;
-}
-
 .new-column {
   background: transparent;
   border: 1px dashed var(--border-strong);
   margin: 0;
-}
-
-.column-settings .stacked-form {
-  margin: 0.5rem 0;
 }
 
 .knowledge-search .grow,
@@ -2686,4 +2657,247 @@ fieldset.block-fields {
   width: 100%;
   font-family: ui-monospace, monospace;
   font-size: 0.8125rem;
+}
+
+/* Fewer visible options: rare actions in a "…" menu, text edited in place, forms only on demand. */
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu-button,
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.menu-button svg {
+  fill: currentColor;
+}
+
+.menu-button:hover:not(:disabled),
+.menu-button[aria-expanded='true'],
+.icon-button:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 12rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.menu-item {
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
+  background: var(--surface-muted);
+}
+
+.menu-item.danger-item {
+  color: var(--danger);
+}
+
+.inline-edit {
+  max-width: 100%;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.inline-edit:hover:not(:disabled) {
+  border-color: var(--border);
+  background: transparent;
+}
+
+.inline-edit-input {
+  width: 100%;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+  font: inherit;
+}
+
+.add-button {
+  justify-self: start;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.add-button:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.quick-create {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.quick-create input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.kanban-column > .add-button,
+.kanban-column > .quick-create {
+  width: 100%;
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.new-column .add-button {
+  width: 100%;
+  text-align: left;
+}
+
+.project-subline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.status-chip {
+  width: auto;
+  padding: 0.125rem 1.75rem 0.125rem 0.625rem;
+  border-radius: 999px;
+  background-color: var(--surface-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.kanban-column-header .menu-button {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.kanban-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.kanban-card-menu .menu-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.25rem -0.25rem 0 0;
+}
+
+/* The card menu appears on hover or keyboard focus, like in Trello. */
+@media (hover: hover) {
+  .kanban-card-menu:not(:focus-within) .menu-button[aria-expanded='false'] {
+    opacity: 0;
+  }
+
+  .kanban-card:hover .kanban-card-menu .menu-button {
+    opacity: 1;
+  }
+}
+
+.column-settings {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.task-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(30rem, 100vw);
+  box-sizing: border-box;
+  padding: 1rem 1.25rem 2rem;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.task-drawer:focus {
+  outline: none;
+}
+
+.task-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.task-drawer-kicker {
+  flex: 1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.task-drawer-title {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.25rem;
+}
+
+.task-props {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.task-props label,
+.task-props dt {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.task-props dd {
+  margin: 0;
+}
+
+.task-details > section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
 }

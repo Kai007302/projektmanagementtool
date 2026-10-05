@@ -55,8 +55,8 @@ export const fetchTasks = (projectId: string) => apiFetch<Paged<Task>>(`/api/v1/
 
 export const fetchTask = (id: string) => apiFetch<Task>(`/api/v1/tasks/${id}`)
 
-export const createTask = (projectId: string, title: string, parentTaskId: string | null) =>
-  apiFetch<Task>(`/api/v1/projects/${projectId}/tasks`, { method: 'POST', body: jsonBody({ title, parentTaskId }) })
+export const createTask = (projectId: string, title: string, parentTaskId: string | null, status?: TaskStatus) =>
+  apiFetch<Task>(`/api/v1/projects/${projectId}/tasks`, { method: 'POST', body: jsonBody({ title, parentTaskId, ...(status && { status }) }) })
 
 export const updateTask = (id: string, version: number, changes: TaskChanges) =>
   apiFetch<Task>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })

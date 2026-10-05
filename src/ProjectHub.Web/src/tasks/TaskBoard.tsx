@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { createTask, fetchTasks, taskStatuses, type Task } from './api'
@@ -6,6 +6,7 @@ import { PriorityBadge } from './PriorityBadge'
 import { TaskDetails } from './TaskDetails'
 import { TaskTransfer } from './TaskTransfer'
 import { useLatest } from '../api/useLatest'
+import { QuickCreate } from '../ui/QuickCreate'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -69,8 +70,9 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
       {error && <p role="alert">{error}</p>}
       <TaskTransfer project={project} onImported={changed} />
       {project.capabilities.canContribute && (
-        <NewTaskForm
-          label="Neue Aufgabe"
+        <QuickCreate
+          label="Aufgabe"
+          fieldLabel="Neue Aufgabe"
           onCreate={async (title) => {
             await createTask(project.id, title, null)
             changed()
@@ -95,35 +97,9 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
             setSelected(null)
             changed()
           }}
+          onClose={() => setSelected(null)}
         />
       )}
     </section>
-  )
-}
-
-export function NewTaskForm({ label, onCreate }: { label: string; onCreate: (title: string) => Promise<void> }) {
-  const [title, setTitle] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setError(null)
-    try {
-      await onCreate(title)
-      setTitle('')
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <label>
-        {label}
-        <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={500} />
-      </label>
-      <button type="submit">Anlegen</button>
-      {error && <p role="alert">{error}</p>}
-    </form>
   )
 }

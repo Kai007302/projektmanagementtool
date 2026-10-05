@@ -27,7 +27,9 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from './api'
-import { NewTaskForm } from './TaskBoard'
+import { InlineEdit } from '../ui/InlineEdit'
+import { Menu } from '../ui/Menu'
+import { QuickCreate } from '../ui/QuickCreate'
 
 type Props = {
   taskId: string
@@ -35,6 +37,7 @@ type Props = {
   me: Me
   onChanged: () => void
   onDeleted: () => void
+  onClose: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
@@ -42,15 +45,56 @@ const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeSt
 /** Roles that may work on tasks and therefore be assigned. */
 const assignable = (member: ProjectMember) => ['admin', 'editor', 'member'].includes(member.role)
 
-export function TaskDetails({ taskId, project, me, onChanged, onDeleted }: Props) {
+const staleText = 'Jemand anderes hat die Aufgabe inzwischen geändert. Der aktuelle Stand wurde geladen.'
+
+/**
+ * A task in a panel on the right, like in Asana: the board stays visible, every field saves as soon as it changes,
+ * rare actions sit in the "…" menu. Escape or the close button closes it.
+ */
+export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const current = useRef<Task | null>(null)
+  const queue = useRef<Promise<void>>(Promise.resolve())
+  const panel = useRef<HTMLElement>(null)
+
+  const show = useCallback((next: Task) => {
+    current.current = next
+    setTask(next)
+  }, [])
 
   const load = useCallback(() => {
-    fetchTask(taskId).then(setTask, (e: Error) => setError(e.message))
-  }, [taskId])
+    fetchTask(taskId).then(show, (e: Error) => setError(e.message))
+  }, [taskId, show])
 
   useEffect(load, [load])
+  useEffect(() => panel.current?.focus(), [])
+
+  /** Saves changes one after another, so a quick second change uses the version the first one returned. */
+  function save(changes: TaskChanges) {
+    queue.current = queue.current.then(async () => {
+      const before = current.current
+      if (!before) return
+      const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => before[field as keyof TaskChanges] !== value)) as TaskChanges
+      if (Object.keys(changed).length === 0) return
+      setError(null)
+      try {
+        const saved = await updateTask(before.id, before.version, changed)
+        if (changed.status === 'done') celebrate()
+        show(saved)
+        onChanged()
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 409) {
+          setError(staleText)
+          load()
+          onChanged()
+        } else {
+          setError((e as Error).message)
+        }
+      }
+    })
+    return queue.current
+  }
 
   async function remove() {
     if (!task || !window.confirm(`Aufgabe „${task.title}“ und ihre Unteraufgaben löschen?`)) return
@@ -62,58 +106,51 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted }: Props
     }
   }
 
-  if (!task) return error ? <p role="alert">{error}</p> : <p>Aufgabe wird geladen …</p>
-
   const { canContribute, canEdit } = project.capabilities
 
   return (
-    <article className="task-details" aria-labelledby="task-heading">
-      <header className="project-header">
-        <h4 id="task-heading">{task.title}</h4>
-        {canEdit && (
-          <button type="button" className="danger" onClick={remove}>
-            Aufgabe löschen
-          </button>
-        )}
+    <aside
+      ref={panel}
+      className="task-drawer"
+      aria-labelledby="task-heading"
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !event.defaultPrevented) onClose()
+      }}
+    >
+      <header className="task-drawer-header">
+        <span className="muted task-drawer-kicker">Aufgabe</span>
+        {task && canEdit && <Menu label="Weitere Aktionen zur Aufgabe" items={[{ label: 'Aufgabe löschen', danger: true, onSelect: () => void remove() }]} />}
+        <button type="button" className="icon-button" aria-label="Aufgabe schließen" title="Schließen (Esc)" onClick={onClose}>
+          ✕
+        </button>
       </header>
       {error && <p role="alert">{error}</p>}
-      {canContribute ? (
-        <TaskForm
-          key={task.version}
-          task={task}
-          members={project.members.filter(assignable)}
-          onSaved={(saved) => {
-            setError(null)
-            setTask(saved)
-            onChanged()
-          }}
-          onStale={() => {
-            setError('Jemand anderes hat die Aufgabe inzwischen geändert. Der aktuelle Stand wurde geladen.')
-            load()
-            onChanged()
-          }}
-        />
+      {!task ? (
+        !error && <p>Aufgabe wird geladen …</p>
       ) : (
-        <p className="muted">
-          {taskStatuses[task.status]} · {taskPriorities[task.priority]}
-          {task.assigneeName && ` · ${task.assigneeName}`}
-          {task.dueDate && ` · fällig ${task.dueDate}`}
-        </p>
+        <article className="task-details">
+          <h4 id="task-heading" className="task-drawer-title">
+            <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
+          </h4>
+          <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
+          <TaskCalendar task={task} />
+          {canContribute && (
+            <QuickCreate
+              label="Unteraufgabe"
+              fieldLabel="Neue Unteraufgabe"
+              onCreate={async (title) => {
+                await createTask(project.id, title, task.id)
+                onChanged()
+              }}
+            />
+          )}
+          <CommentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
+          <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
+          <TaskWhiteboards taskId={task.id} />
+        </article>
       )}
-      <TaskCalendar task={task} />
-      {canContribute && (
-        <NewTaskForm
-          label="Unteraufgabe"
-          onCreate={async (title) => {
-            await createTask(project.id, title, task.id)
-            onChanged()
-          }}
-        />
-      )}
-      <CommentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
-      <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
-      <TaskWhiteboards taskId={task.id} />
-    </article>
+    </aside>
   )
 }
 
@@ -144,100 +181,80 @@ function TaskWhiteboards({ taskId }: { taskId: string }) {
   )
 }
 
-type TaskFormProps = { task: Task; members: ProjectMember[]; onSaved: (task: Task) => void; onStale: () => void }
+type FieldsProps = { task: Task; members: ProjectMember[]; editable: boolean; onSave: (changes: TaskChanges) => Promise<void> }
 
-function TaskForm({ task, members, onSaved, onStale }: TaskFormProps) {
-  const [title, setTitle] = useState(task.title)
-  const [status, setStatus] = useState<TaskStatus>(task.status)
-  const [priority, setPriority] = useState<TaskPriority>(task.priority)
-  const [assigneeId, setAssigneeId] = useState(task.assigneeId ?? '')
+/** The task's properties as a compact list; each one saves on its own, there is no save button. */
+function TaskFields({ task, members, editable, onSave }: FieldsProps) {
   const [dueDate, setDueDate] = useState(task.dueDate ?? '')
-  const [progress, setProgress] = useState(task.progress)
-  const [message, setMessage] = useState<string | null>(null)
+  const [progress, setProgress] = useState(String(task.progress))
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setMessage(null)
-    const edited: TaskChanges = {
-      title,
-      status,
-      priority,
-      assigneeId: assigneeId || null,
-      dueDate: dueDate || null,
-      progress,
-    }
-    // Send only what actually changed, so the activity feed and parallel edits stay precise.
-    const changes = Object.fromEntries(
-      Object.entries(edited).filter(([field, value]) => task[field as keyof TaskChanges] !== value),
-    ) as TaskChanges
-    if (Object.keys(changes).length === 0) return
-    try {
-      const saved = await updateTask(task.id, task.version, changes)
-      if (changes.status === 'done') celebrate()
-      onSaved(saved)
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        onStale()
-      } else {
-        setMessage((e as Error).message)
-      }
-    }
+  if (!editable) {
+    return (
+      <dl className="task-props">
+        <dt>Status</dt>
+        <dd>{taskStatuses[task.status]}</dd>
+        <dt>Priorität</dt>
+        <dd>{taskPriorities[task.priority]}</dd>
+        <dt>Zuständig</dt>
+        <dd>{task.assigneeName ?? 'Niemand'}</dd>
+        {task.dueDate && (
+          <>
+            <dt>Fällig am</dt>
+            <dd>{task.dueDate}</dd>
+          </>
+        )}
+      </dl>
+    )
+  }
+
+  const saveProgress = () => {
+    const value = Math.min(100, Math.max(0, Math.round(Number(progress))))
+    if (Number.isFinite(value)) void onSave({ progress: value })
   }
 
   return (
-    <form className="stacked-form task-form" onSubmit={submit}>
-      <label>
-        Titel
-        <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={500} />
-      </label>
-      <label>
-        Status
-        <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)}>
-          {Object.entries(taskStatuses).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Priorität
-        <select value={priority} onChange={(event) => setPriority(event.target.value as TaskPriority)}>
-          {Object.entries(taskPriorities).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Zuständig
-        <select value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}>
-          <option value="">Niemand</option>
-          {members.map((member) => (
-            <option key={member.userId} value={member.userId}>
-              {member.displayName}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Fällig am
-        <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-      </label>
-      <label>
-        Fortschritt (%)
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={progress}
-          onChange={(event) => setProgress(Number(event.target.value))}
-        />
-      </label>
-      <button type="submit">Aufgabe speichern</button>
-      {message && <p role="alert">{message}</p>}
-    </form>
+    <div className="task-props">
+      <label htmlFor="task-status">Status</label>
+      <select id="task-status" value={task.status} onChange={(event) => void onSave({ status: event.target.value as TaskStatus })}>
+        {Object.entries(taskStatuses).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="task-priority">Priorität</label>
+      <select id="task-priority" value={task.priority} onChange={(event) => void onSave({ priority: event.target.value as TaskPriority })}>
+        {Object.entries(taskPriorities).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="task-assignee">Zuständig</label>
+      <select id="task-assignee" value={task.assigneeId ?? ''} onChange={(event) => void onSave({ assigneeId: event.target.value || null })}>
+        <option value="">Niemand</option>
+        {members.map((member) => (
+          <option key={member.userId} value={member.userId}>
+            {member.displayName}
+          </option>
+        ))}
+      </select>
+      <label htmlFor="task-due">Fällig am</label>
+      <input id="task-due" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} onBlur={() => void onSave({ dueDate: dueDate || null })} />
+      <label htmlFor="task-progress">Fortschritt (%)</label>
+      <input
+        id="task-progress"
+        type="number"
+        min={0}
+        max={100}
+        value={progress}
+        onChange={(event) => setProgress(event.target.value)}
+        onBlur={saveProgress}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') saveProgress()
+        }}
+      />
+    </div>
   )
 }
 

@@ -930,7 +930,7 @@ function ObjectForm({ object, task, editable, project, me, onChange, onCommit, o
       {details && task && <TaskDetails taskId={task.id} project={project} me={me} onChanged={onChanged} onDeleted={() => {
             setDetails(false)
             onChanged()
-          }} />}
+          }} onClose={() => setDetails(false)} />}
     </section>
   )
 }

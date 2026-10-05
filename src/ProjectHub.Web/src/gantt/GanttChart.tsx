@@ -568,7 +568,7 @@ function TaskSchedule({ project, me, task, gantt, canContribute, onReschedule, o
       {details && <TaskDetails taskId={task.id} project={project} me={me} onChanged={onChanged} onDeleted={() => {
         onClose()
         onChanged()
-      }} />}
+      }} onClose={() => setDetails(false)} />}
     </section>
   )
 }
