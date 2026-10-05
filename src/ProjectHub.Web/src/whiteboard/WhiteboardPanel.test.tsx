@@ -116,7 +116,7 @@ describe('WhiteboardPanel', () => {
     expect(screen.queryByText('Position und Größe')).not.toBeInTheDocument()
     fireEvent.pointerDown(note(), { button: 0 })
     fireEvent.pointerUp(note())
-    fireEvent.pointerDown(note(), { button: 0 })
+    fireEvent.doubleClick(screen.getByRole('application'))
     const field = screen.getByLabelText('Text')
     expect(field).toHaveFocus()
     await userEvent.clear(field)

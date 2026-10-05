@@ -13,6 +13,17 @@ Alle Farben, Radien und Schatten stehen als CSS-Variablen in `src/ProjectHub.Web
 | `--bg`, `--surface`, `--surface-muted` | Seitenhintergrund, Karten/Panels, Spalten und Chips |
 | `--danger`, `--success`, `--warning` (+ `-soft`) | nur für Status, nie als Dekoration |
 
+## Weniger sichtbare Optionen
+
+Seit Oktober 2026 gilt: Eine Ansicht zeigt ihren Inhalt und genau eine Hauptaktion, alles andere erscheint erst, wenn man es braucht. Vorbild sind Miro, Linear, Notion, Trello und Asana.
+
+- **Direkt bearbeiten statt Formular:** Titel (Projekt, Spalte, Whiteboard, Aufgabe) sind Text, den man anklickt (`ui/InlineEdit.tsx`); Enter oder Verlassen speichert, Esc bricht ab.
+- **Seltenes ins „…“-Menü:** Löschen, Spalten verschieben, Statuswechsel außer dem nächsten Schritt, Karten verschieben per Tastatur (`ui/Menu.tsx`).
+- **Hinzufügen auf Klick:** „+ Aufgabe“ unten in jeder Kanban-Spalte, „+ Spalte“, „+ Person hinzufügen“, „+ Webex-Link“, „+ Bereich“ öffnen erst auf Klick ein Feld oder Formular (`ui/QuickCreate.tsx`, `ui/Reveal.tsx`).
+- **Aufgaben im Seitenpanel:** Ein Klick auf eine Aufgabe öffnet rechts ein Panel; jedes Feld speichert sofort, es gibt keinen Speichern-Knopf. Esc schließt das Panel.
+- **Suchen statt Navigieren:** Strg+K (Cmd+K) oder „Suchen“ in der Kopfzeile springt zu Bereichen, Projekten und Wissensartikeln (`ui/CommandPalette.tsx`). Die Wissenssuche sucht beim Tippen, Filter sind Chips.
+- **Barrierefreiheit:** Alles bleibt per Tastatur erreichbar, nur nicht ständig sichtbar; das Kartenmenü erscheint beim Überfahren oder bei Tastaturfokus.
+
 ## Muster
 
 - **Kopfzeile:** feste, schmale Leiste mit Logo, Bereichsnavigation (Projekte, Wissen, Teams), Benachrichtigungen und Avatar. Die Dev-Anmeldung ist gestrichelt markiert, weil sie nur in Development erscheint.
@@ -28,5 +39,5 @@ Alle Farben, Radien und Schatten stehen als CSS-Variablen in `src/ProjectHub.Web
 - **Leere Zustände:** immer `EmptyState` mit Emoji in einem Kreis, einem Satz und optional einem Hinweis, was als Nächstes zu tun ist.
 - **Wissensartikel:** jede Art hat ein Emoji und links einen Farbstreifen in der Farbe ihres Planeten in der Galaxie.
 - **Aktivität:** Avatar mit kleinem Ereignis-Icon und relativer Zeit („vor 5 Minuten“), die genaue Zeit steht im Tooltip.
-- **Whiteboard:** Werkzeuge schweben auf der Fläche wie in Miro: links eine senkrechte Leiste mit Symbolen (Notizstapel mit Farbpunkt, Formen, Aufgabenkarte, Vorlagen), unten links Rückgängig/Wiederholen, unten rechts Zoom und „Alles zeigen“. Notizen haben keinen Rahmen, nur einen weichen Schatten; Rahmen (Rechtecke) zeigen ihre erste Textzeile fett als Überschrift. Die Auswahl ist ein durchgehender Akzentrahmen mit rundem Griff, fremde Auswahl gestrichelt in der Farbe der Person. Text bearbeitet man direkt im Objekt: Doppelklick oder Enter öffnet ihn, Esc oder ein Klick daneben schließt ihn; neue Notizen öffnen sich gleich zum Tippen. Farben wählt man über runde Farbfelder. Position und Größe gibt es nicht als Zahlenfelder, man zieht mit der Maus oder nutzt Pfeiltasten (verschieben) und Alt+Pfeiltasten (Größe).
+- **Whiteboard:** Werkzeuge schweben auf der Fläche wie in Miro: links eine senkrechte Leiste mit Symbolen (Notizstapel mit Farbpunkt, Formen, Aufgabenkarte, Vorlagen), unten links Rückgängig/Wiederholen, unten rechts Zoom und „Alles zeigen“, oben rechts die Objektliste zum Aufklappen. Es gibt keine Seitenleiste: über dem gewählten Objekt schwebt eine kleine Leiste mit Farbe, Text bearbeiten, Aufgabe öffnen und Entfernen. Notizen haben keinen Rahmen, nur einen weichen Schatten; Rahmen (Rechtecke) zeigen ihre erste Textzeile fett als Überschrift. Die Auswahl ist ein durchgehender Akzentrahmen mit rundem Griff, fremde Auswahl gestrichelt in der Farbe der Person. Text bearbeitet man direkt im Objekt: Doppelklick oder Enter öffnet ihn, Esc oder ein Klick daneben schließt ihn; neue Notizen öffnen sich gleich zum Tippen. Farben wählt man in der Objektleiste über runde Farbfelder. Position und Größe gibt es nicht als Zahlenfelder, man zieht mit der Maus oder nutzt Pfeiltasten (verschieben) und Alt+Pfeiltasten (Größe).
 - **Dunkelmodus:** folgt der Systemeinstellung, der Mond- bzw. Sonnen-Knopf im Kopf überschreibt sie und merkt sich die Wahl im Browser. Alle Farben kommen aus den Tokens in `index.css`, die dort für Dunkel ein zweites Mal definiert sind. Text in Akzentfarbe nutzt `--accent-text`, weil der Akzent auf dunklem Grund zu wenig Kontrast hat. Die axe-Prüfung läuft auch im Dunkelmodus.

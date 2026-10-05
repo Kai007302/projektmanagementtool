@@ -110,7 +110,6 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const syncRef = useRef<WhiteboardSync | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const lastPresence = useRef(0)
-  const lastDown = useRef({ id: '', time: 0 })
 
   const canEdit = serverCanEdit && project.capabilities.canContribute
 
@@ -308,16 +307,6 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function onObjectDown(event: PointerEvent, object: BoardObject) {
     if (event.button !== 0) return
-    // Pointer capture sends the second click to the canvas, so a double click is two quick presses on one object.
-    const now = event.timeStamp
-    const second = lastDown.current.id === object.id && now - lastDown.current.time < 400
-    lastDown.current = { id: object.id, time: second ? 0 : now }
-    if (second && canEdit && hasText(object)) {
-      event.stopPropagation()
-      event.preventDefault()
-      startEditing(object.id)
-      return
-    }
     select(object.id)
     svgRef.current?.focus()
     if (canEdit) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
@@ -461,6 +450,10 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             onPointerCancel={onPointerUp}
             onPointerLeave={onPointerLeave}
             onKeyDown={onKeyDown}
+            // Pointer capture makes the canvas the target of the double click; the press before it selected the object.
+            onDoubleClick={() => {
+              if (selected && canEdit && hasText(selected)) startEditing(selected.id)
+            }}
             onDragOver={(event) => {
               if (canEdit && event.dataTransfer.types.includes(stickyDragType)) {
                 event.preventDefault()
