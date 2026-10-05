@@ -25,7 +25,7 @@ export function StickyStack({ color, onColor, onAdd, onBulk }: Props) {
     <span className="sticky-stack">
       <button
         type="button"
-        className="sticky-stack-pile"
+        className="board-tool sticky-stack-pile"
         draggable
         aria-label="Notiz hinzufügen"
         title="Klicken oder auf das Whiteboard ziehen (Taste N)"
@@ -40,14 +40,13 @@ export function StickyStack({ color, onColor, onAdd, onBulk }: Props) {
           <span />
           <span />
         </span>
-        Notiz
       </button>
-      <button type="button" className="sticky-stack-toggle" aria-expanded={open} aria-label={`Notizfarbe und mehrere Notizen (${colors[color]})`} onClick={() => setOpen(!open)}>
+      <button type="button" className="sticky-stack-toggle" title="Notizfarbe" aria-expanded={open} aria-label={`Notizfarbe und mehrere Notizen (${colors[color]})`} onClick={() => setOpen(!open)}>
         <span className="sticky-swatch" style={{ background: fills[color], borderColor: strokes[color] }} aria-hidden="true" />
       </button>
       {open && (
         <div
-          className="sticky-stack-popover"
+          className="board-popover sticky-stack-popover"
           role="group"
           aria-label="Notizen"
           onKeyDown={(event) => {

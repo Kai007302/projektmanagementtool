@@ -45,18 +45,20 @@ test('two people draw together, a viewer follows and the board survives a reload
 
   // Ben writes a note; Clara and Eva see it without reloading.
   await ben.getByRole('button', { name: 'Notiz hinzufügen' }).click()
-  await ben.getByLabel('Text').fill('Suche nach oben')
+  await ben.getByLabel('Text', { exact: true }).fill('Suche nach oben')
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
   await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
 
   // Clara moves it with the form while Ben adds a task card; both changes arrive everywhere.
   await objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
+  await claraPage.getByText('Position und Größe').click()
   await claraPage.getByLabel('X', { exact: true }).fill('400')
-  await ben.getByRole('combobox', { name: 'Aufgabe für eine Karte' }).focus()
+  await ben.getByRole('button', { name: 'Aufgabe als Karte' }).click()
   await ben.getByRole('combobox', { name: 'Aufgabe für eine Karte' }).selectOption({ label: task })
   await ben.getByRole('button', { name: '+ Aufgabe' }).click()
   await expect(objectList(evaPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
   await objectList(ben).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
+  await ben.getByText('Position und Größe').click()
   await expect(ben.getByLabel('X', { exact: true })).toHaveValue('400')
 
   // Ben starts a retrospective from a template; it arrives for the others as a whole.
@@ -71,7 +73,7 @@ test('two people draw together, a viewer follows and the board survives a reload
 
   // The viewer cannot change the note.
   await objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()
-  await expect(evaPage.getByLabel('Text')).toBeDisabled()
+  await expect(evaPage.getByLabel('Text', { exact: true })).toBeDisabled()
 
   // After a reload everything is still there.
   await claraPage.reload()
