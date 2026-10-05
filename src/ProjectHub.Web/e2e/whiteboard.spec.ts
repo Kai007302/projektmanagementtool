@@ -23,6 +23,9 @@ async function openWhiteboards(browser: Browser, user: string, project: string):
 
 const objectList = (page: Page) => page.getByRole('region', { name: /^Objekte/ })
 
+/** The object list is folded away like in Miro; it opens from the top right corner of the board. */
+const showObjects = (page: Page) => page.getByRole('button', { name: /^Objekte \(/ }).click()
+
 test('two people draw together, a viewer follows and the board survives a reload', async ({ browser, request }) => {
   const name = uniqueTitle('E2E Whiteboard')
   const task = uniqueTitle('Navigation skizzieren')
@@ -32,15 +35,19 @@ test('two people draw together, a viewer follows and the board survives a reload
   await api(request, 'POST', `/projects/${project.id}/tasks`, { title: task })
 
   const ben = await openWhiteboards(browser, 'dev-ben', name)
+  await ben.getByRole('button', { name: '+ Whiteboard' }).click()
   await ben.getByLabel('Neues Whiteboard').fill('Workshop')
-  await ben.getByRole('button', { name: 'Anlegen', exact: true }).click()
+  await ben.getByLabel('Neues Whiteboard').press('Enter')
   await expect(ben.getByRole('heading', { name: 'Workshop' })).toBeVisible()
   await expect(ben.getByText(/^Verbunden/)).toBeVisible()
+  await showObjects(ben)
 
   const claraPage = await openWhiteboards(browser, 'dev-clara', name)
   const evaPage = await openWhiteboards(browser, 'dev-eva', name)
   await expect(claraPage.getByText(/^Verbunden · Gerade dabei: .*Ben Projektleiter/)).toBeVisible()
   await expect(evaPage.getByText(/Nur ansehen/)).toBeVisible()
+  await showObjects(claraPage)
+  await showObjects(evaPage)
   await expect(evaPage.getByRole('button', { name: 'Notiz hinzufügen' })).toHaveCount(0)
 
   // Ben writes a note; Clara and Eva see it without reloading.
@@ -78,16 +85,18 @@ test('two people draw together, a viewer follows and the board survives a reload
   await claraPage.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Projekte', exact: true }).click()
   await claraPage.getByRole('button', { name }).click()
   await claraPage.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Whiteboard' }).click()
+  await showObjects(claraPage)
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben, bitte' })).toBeVisible()
   await expect(objectList(claraPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
 
   // Ben renames and deletes the board; the others follow.
-  await ben.getByRole('button', { name: 'Umbenennen' }).click()
-  await ben.getByLabel('Name', { exact: true }).last().fill('Workshop März')
-  await ben.getByRole('button', { name: 'Speichern' }).last().click()
+  await ben.getByRole('button', { name: 'Name des Whiteboards: Workshop, bearbeiten' }).click()
+  await ben.getByLabel('Name des Whiteboards', { exact: true }).fill('Workshop März')
+  await ben.getByLabel('Name des Whiteboards', { exact: true }).press('Enter')
   await expect(evaPage.getByRole('heading', { name: 'Workshop März' })).toBeVisible()
   ben.once('dialog', (dialog) => void dialog.accept())
-  await ben.getByRole('button', { name: 'Löschen', exact: true }).click()
+  await ben.getByRole('button', { name: 'Weitere Aktionen zum Whiteboard' }).click()
+  await ben.getByRole('menuitem', { name: 'Whiteboard löschen' }).click()
   await expect(evaPage.getByText('Dieses Projekt hat noch kein Whiteboard.')).toBeVisible()
 
   await expectAlertFree(ben)

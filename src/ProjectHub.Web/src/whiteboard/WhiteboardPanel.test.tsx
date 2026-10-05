@@ -45,6 +45,8 @@ const board = (id: string, name: string): Whiteboard => ({ id, projectId: 'p-1',
 
 const current = () => sessions[sessions.length - 1]
 
+const openList = () => userEvent.click(screen.getByRole('button', { name: /^Objekte/ }))
+
 async function connect(canEdit: boolean) {
   await screen.findByRole('application')
   // The sync session starts in an effect, which can run a moment after the canvas is in the page.
@@ -71,8 +73,8 @@ describe('WhiteboardPanel', () => {
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
 
     expect(await screen.findByRole('heading', { name: 'Ideen' })).toBeInTheDocument()
-    await userEvent.type(screen.getByLabelText('Neues Whiteboard'), 'Workshop')
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }))
+    await userEvent.click(screen.getByRole('button', { name: '+ Whiteboard' }))
+    await userEvent.type(screen.getByLabelText('Neues Whiteboard'), 'Workshop{Enter}')
 
     expect(await screen.findByRole('heading', { name: 'Workshop' })).toBeInTheDocument()
     expect(api.calls.some((c) => c.key === 'POST /api/v1/projects/p-1/whiteboards' && String(c.init?.body).includes('Workshop'))).toBe(true)
@@ -83,6 +85,7 @@ describe('WhiteboardPanel', () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
+    await openList()
 
     await userEvent.click(screen.getByRole('button', { name: 'Notiz hinzufügen' }))
     const text = screen.getByLabelText('Text')
@@ -136,6 +139,43 @@ describe('WhiteboardPanel', () => {
     expect(readObjects(current().doc)[0]).toMatchObject({ x: before.x, y: before.y, w: before.w + 10, h: before.h + 10 })
   })
 
+  it('offers color, text, delete and the task in a bar above the selected object instead of a side panel', async () => {
+    fakeApi({
+      'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }),
+      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1': () => json([{ id: 't-1', title: 'Startseite', status: 'todo', assigneeName: null, dueDate: null }]),
+      'GET /api/v1/tasks/t-1': () => json({ id: 't-1', projectId: 'p-1', title: 'Startseite', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 1 }),
+      'GET /api/v1/tasks/t-1/comments?limit=100': () => json({ items: [], nextOffset: null }),
+      'GET /api/v1/tasks/t-1/attachments': () => json([]),
+      'GET /api/v1/tasks/t-1/whiteboards': () => json([]),
+    })
+    render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    await connect(true)
+    act(() => {
+      addObject(current().doc, 'sticky', { x: 0, y: 0 })
+      addObject(current().doc, 'task', { x: 0, y: 400 }, 't-1')
+    })
+    await openList()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz: Neue Notiz' }))
+    const bar = within(screen.getByRole('toolbar', { name: 'Notiz bearbeiten' }))
+    await userEvent.click(bar.getByRole('button', { name: /^Farbe:/ }))
+    await userEvent.click(bar.getByRole('button', { name: 'Blau' }))
+    expect(readObjects(current().doc).find((o) => o.type === 'sticky')?.color).toBe('blue')
+
+    await userEvent.click(bar.getByRole('button', { name: 'Text bearbeiten' }))
+    expect(screen.getByLabelText('Text')).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(within(screen.getByRole('toolbar', { name: 'Notiz bearbeiten' })).getByRole('button', { name: 'Notiz entfernen' }))
+    expect(readObjects(current().doc).map((o) => o.type)).toEqual(['task'])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Aufgabe: Startseite' }))
+    await userEvent.click(within(screen.getByRole('toolbar', { name: 'Aufgabe bearbeiten' })).getByRole('button', { name: 'Aufgabe öffnen' }))
+    expect(await screen.findByRole('heading', { name: /Startseite/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Aufgabe schließen' }))
+    expect(screen.queryByRole('heading', { name: /Startseite/ })).not.toBeInTheDocument()
+  })
+
   it('inserts a template as one undo step and offers it on an empty board', async () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
@@ -147,6 +187,7 @@ describe('WhiteboardPanel', () => {
     await userEvent.click(within(picker).getByRole('button', { name: /^SWOT-Analyse/ }))
 
     expect(screen.queryByRole('region', { name: 'Vorlage einfügen' })).not.toBeInTheDocument()
+    await openList()
     const list = within(screen.getByRole('region', { name: /Objekte/ }))
     expect(list.getByRole('button', { name: /^Rechteck: Stärken \(intern\)/ })).toBeInTheDocument()
     expect(readObjects(current().doc)).toHaveLength(5)
@@ -204,6 +245,7 @@ describe('WhiteboardPanel', () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
+    await openList()
 
     const other = new Y.Doc()
     addObject(other, 'ellipse', { x: 50, y: 50 })
@@ -224,6 +266,7 @@ describe('WhiteboardPanel', () => {
     })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
+    await openList()
 
     act(() => {
       addObject(current().doc, 'task', { x: 0, y: 0 }, 't-1')
@@ -239,12 +282,13 @@ describe('WhiteboardPanel', () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project(viewerRights)} me={ben} revision={0} onChanged={() => {}} />)
     await connect(false)
+    await openList()
     act(() => void addObject(current().doc, 'sticky', { x: 0, y: 0 }))
 
     expect(screen.queryByRole('button', { name: 'Notiz hinzufügen' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Vorlagen' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Neues Whiteboard')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Umbenennen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Whiteboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zum Whiteboard' })).not.toBeInTheDocument()
     expect(screen.getByText(/Nur ansehen/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Notiz: Neue Notiz' }))
