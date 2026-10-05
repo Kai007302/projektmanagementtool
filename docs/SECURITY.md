@@ -38,6 +38,15 @@ Ein zentraler Bot (ADR 0011). `WEBEX_BOT_TOKEN` und `WEBEX_WEBHOOK_SECRET` komme
 
 Webhooks validieren (HMAC-SHA1-Signatur, Vergleich in konstanter Zeit, ohne Secret wird nichts angenommen), deduplizieren und idempotent verarbeiten. Meeting- und Raum-Links nur als `https` auf `webex.com`.
 
+## KI (ADR 0015)
+
+- Ohne Konfiguration aus. `ANTHROPIC_API_KEY` und `PROJECTHUB_AI_API_KEY` nur aus dem Secret Store bzw. `.env`, nie im Browser oder Log.
+- Jedes Werkzeug läuft als die angemeldete Person über die vorhandenen Services; Wissen wird in der Datenbankabfrage gefiltert. Ein Modell sieht und tut nichts, was die Person nicht darf.
+- Prompt Injection: Werkzeugergebnisse gelten als Daten. Der Assistent liest nur, Schreibwerkzeuge gibt es nur über MCP und nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true`. Die Oberfläche macht nur Links auf ProjectHub-Artikel klickbar und lädt keine Bilder, damit kein Inhalt Daten an fremde Server schicken kann.
+- Gespräche werden nicht gespeichert; Telemetrie enthält Modell, Tokens und Werkzeugnamen, keine Prompts oder Antworten.
+- Eigenes Rate Limit je Person für den Assistenten; Eingaben sind in Anzahl und Länge begrenzt.
+- MCP: nur Entra-ID-Token des Mandanten; der Endpunkt liegt unter `/api/v1` mit derselben Autorisierung.
+
 ## Logging
 
 Nicht loggen:

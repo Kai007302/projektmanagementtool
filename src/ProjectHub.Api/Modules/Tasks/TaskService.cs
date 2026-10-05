@@ -43,6 +43,8 @@ public sealed record CreateTaskRequest(
     short? Progress,
     decimal? EstimatedHours);
 
+public sealed record TaskCounts(int Todo, int InProgress, int Done, int Overdue);
+
 public sealed record TaskFilter(Guid? ParentTaskId, bool TopLevelOnly, string? Status, Guid? AssigneeId);
 
 public sealed class TaskService(
@@ -91,6 +93,21 @@ public sealed class TaskService(
         return await Project(tasks.OrderBy(t => t.CreatedAt).ThenBy(t => t.Id))
             .Skip(paging.Skip).Take(paging.Take + 1)
             .ToListAsync(ct);
+    }
+
+    /// <summary>Task counts of a project by status, plus open tasks past their due date (assistant overview).</summary>
+    public async Task<TaskCounts> CountsAsync(UserContext user, Guid projectId, DateOnly today, CancellationToken ct)
+    {
+        if (await access.RequireAsync(user, projectId, ProjectPermission.View, ct) is not null)
+        {
+            return new TaskCounts(0, 0, 0, 0);
+        }
+
+        var tasks = ActiveTasks(user).Where(t => t.ProjectId == projectId);
+        var byStatus = await tasks.GroupBy(t => t.Status).Select(g => new { g.Key, Count = g.Count() }).ToListAsync(ct);
+        var overdue = await tasks.CountAsync(t => t.Status != TaskStatus.Done && t.DueDate != null && t.DueDate < today, ct);
+        int Count(string status) => byStatus.SingleOrDefault(s => s.Key == status)?.Count ?? 0;
+        return new TaskCounts(Count(TaskStatus.Todo), Count(TaskStatus.InProgress), Count(TaskStatus.Done), overdue);
     }
 
     public async Task<ServiceResult<TaskResponse>> GetAsync(UserContext user, Guid taskId, CancellationToken ct)

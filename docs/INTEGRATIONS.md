@@ -76,3 +76,8 @@ AI ist eine optionale interne Plattform-Schicht. Externe LLM-Anbieter dürfen ni
 Die Retrieval-Schicht muss Berechtigungen bereits beim Retrieval erzwingen. Es ist nicht ausreichend, erst im Prompt zu erwähnen, dass bestimmte Dokumente verboten sind.
 
 Für die erste Version bleibt die Suche provider-neutral. Eine Embedding-/Vector-Implementierung wird hinter Interfaces gekapselt.
+
+Umsetzung (ADR 0015):
+
+- **Sprachmodell:** `PROJECTHUB_AI_PROVIDER` = `off` (Standard), `anthropic` (Claude über das offizielle SDK, `ANTHROPIC_API_KEY`) oder `openai` (OpenAI-kompatibler Endpunkt, auch lokal, `PROJECTHUB_AI_BASE_URL`). Der Assistent hängt nicht an der Verfügbarkeit des Anbieters: Fällt er aus, endet die Antwort mit einer Fehlermeldung, alles andere läuft weiter.
+- **MCP-Server:** `PROJECTHUB_MCP=on` stellt `/api/v1/mcp` bereit (Streamable HTTP). Anmeldung mit Entra-ID-Token, Protected Resource Metadata unter `/.well-known/oauth-protected-resource/api/v1/mcp`. Einrichtung der Clients: `docs/SELF_HOSTING.md`.

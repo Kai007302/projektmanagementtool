@@ -99,7 +99,7 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 
 - Nicht sichtbare Artikel sind „nicht gefunden“ (404), sichtbare ohne ausreichendes Recht „verboten“ (403).
 - Beziehungen und Verweise zeigen nur Ziele, die die lesende Person selbst sehen darf. Neue Beziehungen und Verweise (auch Verweis-Blöcke im Inhalt) brauchen ein sichtbares Ziel.
-- Suche und alle späteren AI-Schnittstellen (`IKnowledgeSearch`, `IKnowledgeSemanticSearch`, `IKnowledgeAnswerService`) bekommen den `KnowledgeReader` und filtern in der Datenbankabfrage; nicht lesbare Inhalte verlassen die Datenbank nicht.
+- Suche und KI (`IKnowledgeSearch`, `IKnowledgeRetrieval`, die Werkzeuge des Assistenten und des MCP-Servers) bekommen den `KnowledgeReader` und filtern in der Datenbankabfrage; nicht lesbare Inhalte verlassen die Datenbank nicht (ADR 0015).
 - Statuswechsel, Sichtbarkeit, Freigaben, Anlage und Löschung werden im `audit_log` protokolliert.
 
 ## Benachrichtigungen

@@ -13,7 +13,8 @@ public static class KnowledgeEndpoints
             .AddScoped<KnowledgeCommentService>()
             .AddScoped<KnowledgeSpaceService>()
             .AddScoped<KnowledgeGraphService>()
-            .AddScoped<IKnowledgeSearch, PostgresKnowledgeSearch>();
+            .AddScoped<IKnowledgeSearch, PostgresKnowledgeSearch>()
+            .AddScoped<IKnowledgeRetrieval, PostgresKnowledgeRetrieval>();
 
     public static RouteGroupBuilder MapKnowledgeEndpoints(this RouteGroupBuilder api)
     {

@@ -41,6 +41,14 @@ server {
         proxy_request_buffering off;
     }
 
+    # MCP clients find the authorization server here (RFC 9728, ADR 0015).
+    location /.well-known/oauth-protected-resource {
+        proxy_pass ${PROJECTHUB_API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    }
+
     location /health/ {
         proxy_pass ${PROJECTHUB_API_UPSTREAM};
         proxy_set_header Host $host;

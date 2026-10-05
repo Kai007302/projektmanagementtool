@@ -108,6 +108,8 @@ Im Development-Modus legt die API beim Start synthetische Testdaten an (zwei Org
 
 Für Microsoft/Webex werden in der lokalen Entwicklung Mock-/Fake-Provider eingesetzt. Produktive Zugangsdaten werden nie aus dem Repository geladen.
 
+Der KI-Assistent (Reiter „Assistent“) antwortet in Development mit einem Testmodell ohne Schlüssel (`PROJECTHUB_AI_PROVIDER=fake`), das das Wissen wirklich durchsucht. Mit Claude: `PROJECTHUB_AI_PROVIDER=anthropic` und `ANTHROPIC_API_KEY` setzen. Der MCP-Server für Agenten liegt unter `/api/v1/mcp` (in Development mit `X-Dev-User`). Details: ADR 0015, `docs/SELF_HOSTING.md`.
+
 ### Tests und Checks
 
 ```bash
