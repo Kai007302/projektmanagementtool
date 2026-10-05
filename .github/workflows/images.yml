@@ -35,7 +35,7 @@ jobs:
             context: deploy
             file: deploy/caddy.Dockerfile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Image name (GHCR needs lower case)
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
