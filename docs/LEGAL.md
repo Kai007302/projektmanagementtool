@@ -18,9 +18,9 @@
 |---|---|---|---|
 | Informieren | Art. 13 DSGVO | Links „Datenschutz“ und „Impressum“ unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`). Auf dem eigenen Server liefert Caddy die Seiten unter `/rechtliches/` ohne Anmeldung aus. Vorlage: `deploy/legal/datenschutz.vorlage.html` | Vorlage ausfüllen und ablegen (siehe Checkliste) |
 | Auskunft, Datenübertragbarkeit | Art. 15, 20 DSGVO | „Meine Daten herunterladen“: alles, was ProjectHub zur Person speichert, als JSON (`GET /api/v1/me/data-export`). Jeder Export steht im Audit-Log | Anfragen binnen eines Monats beantworten; Daten in Entra ID, Microsoft 365, Webex und Sicherungen gehören zusätzlich dazu |
-| Berichtigung | Art. 16 DSGVO | Name und E-Mail kommen beim ersten Login aus Entra ID | Änderungen in Entra werden **nicht** nachgezogen (DEC-036); bis dahin per SQL korrigieren |
+| Berichtigung | Art. 16 DSGVO | Name und E-Mail kommen aus Entra ID und werden bei jeder Anmeldung aktualisiert, wenn sie sich dort geändert haben (DEC-036) | Berichtigungen in Entra ID vornehmen |
 | Löschung | Art. 17 DSGVO | Organisations-Admins anonymisieren Personen (Teams → „Person anonymisieren“). Name, E-Mail, Abteilung und Entra-Kennung werden überschrieben, Mitgliedschaften, Benachrichtigungen, Mails und Freigaben gelöscht, zugewiesene Aufgaben frei. Inhalte bleiben mit „Ehemalige Person“ als Autor (DEC-034) | Löschkonzept: wann wird wer anonymisiert (z. B. beim Austritt). Sicherungen enthalten die Person noch bis zu 14 Tage |
-| Speicherbegrenzung | Art. 5 Abs. 1 lit. e DSGVO | Löschfristen (DEC-005): Benachrichtigungen 180, Projektaktivität 365, Audit-Log 730 Tage, einstellbar; versendete Mails 7, fehlgeschlagene 30 Tage; Webhook-Ereignisse 30 Tage; Sicherungen 14 Tage; Container-Logs höchstens 5 × 10 MB je Dienst | Fristen bestätigen oder anpassen und ins Verarbeitungsverzeichnis übernehmen |
+| Speicherbegrenzung | Art. 5 Abs. 1 lit. e DSGVO | Löschfristen (DEC-005): Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre, einstellbar; versendete Mails 7, fehlgeschlagene 30 Tage; Webhook-Ereignisse 30 Tage; Sicherungen 14 Tage; Container-Logs höchstens 5 × 10 MB je Dienst | Fristen ins Verarbeitungsverzeichnis übernehmen |
 | Datenminimierung | Art. 5 Abs. 1 lit. c DSGVO | Mails und Webex-Nachrichten nur mit Titel und Link; Logs und Telemetrie nur mit IDs; Zugriffslog des Web-Containers ohne IP-Adresse und ohne Query-String (dort stünde sonst das Anmelde-Token der Live-Verbindungen) | – |
 | Sicherheit | Art. 32 DSGVO | Anmeldung über Entra ID (MFA dort), Rechte serverseitig, TLS/HSTS/CSP, Rate Limits, Audit-Log, Abhängigkeits-, Container- und Code-Scans (`docs/SECURITY.md`, ADR 0012) | TOMs dokumentieren (`docs/legal/verarbeitungsverzeichnis.md`), Server aktuell halten, Platte verschlüsseln, Sicherungen verschlüsselt außer Haus |
 | Verzeichnis der Verarbeitungstätigkeiten | Art. 30 DSGVO | Vorlage mit den Daten von ProjectHub: `docs/legal/verarbeitungsverzeichnis.md` | Eintrag anlegen |
@@ -57,7 +57,7 @@ ProjectHub enthält heute keine KI-Funktion. Für den geplanten Ausbau gilt:
 
 1. **Datenschutzhinweise:** `mkdir -p legal && cp deploy/legal/datenschutz.vorlage.html legal/datenschutz.html`, alle Stellen in `[eckigen Klammern]` ausfüllen. `PROJECTHUB_PRIVACY_NOTICE_URL=/rechtliches/datenschutz.html` steht schon in `.env.prod.example`. Der Ordner `legal/` ist nicht im Repository und übersteht `git pull`.
 2. **Impressum** nur, wenn nötig: eigene Seite als `legal/impressum.html` oder Link auf das bestehende, dann `PROJECTHUB_IMPRINT_URL` setzen.
-3. **Löschfristen** bestätigen (DEC-005) oder in `.env` ändern; `0` bewahrt unbegrenzt auf.
+3. **Löschfristen** stehen auf 3 Jahre (DEC-005); ändern in `.env`, `0` bewahrt unbegrenzt auf.
 4. **Verzeichnis der Verarbeitungstätigkeiten** aus `docs/legal/verarbeitungsverzeichnis.md` übernehmen.
 5. **Verträge:** Microsoft (Entra ID, ggf. Mail), Webex (falls genutzt), Server-Hoster, Ziel der Sicherungen.
 6. **Betriebsrat** beteiligen, falls vorhanden.

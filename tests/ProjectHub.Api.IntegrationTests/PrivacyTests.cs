@@ -106,16 +106,16 @@ public sealed class PrivacyTests(InfrastructureFixture infrastructure) : ApiTest
     public async Task Retention_deletes_only_entries_older_than_configured()
     {
         var oldNotification = await InsertAsync(
-            "insert into notification (organization_id, user_id, type, title, created_at) values ($1, $2, 'task_assigned', 'alt', now() - interval '200 days') returning id",
+            "insert into notification (organization_id, user_id, type, title, created_at) values ($1, $2, 'task_assigned', 'alt', now() - interval '1200 days') returning id",
             Contoso.Id, Felix.Id);
         var newNotification = await InsertAsync(
             "insert into notification (organization_id, user_id, type, title, created_at) values ($1, $2, 'task_assigned', 'neu', now() - interval '10 days') returning id",
             Contoso.Id, Felix.Id);
         var oldActivity = await InsertAsync(
-            "insert into activity_log (organization_id, actor_id, resource_type, action, created_at) values ($1, $2, 'task', 'TaskUpdated', now() - interval '400 days') returning id",
+            "insert into activity_log (organization_id, actor_id, resource_type, action, created_at) values ($1, $2, 'task', 'TaskUpdated', now() - interval '1200 days') returning id",
             Contoso.Id, Felix.Id);
         var oldAudit = await InsertAsync(
-            "insert into audit_log (organization_id, actor_id, action, created_at) values ($1, $2, 'TaskDeleted', now() - interval '800 days') returning id",
+            "insert into audit_log (organization_id, actor_id, action, created_at) values ($1, $2, 'TaskDeleted', now() - interval '1200 days') returning id",
             Contoso.Id, Felix.Id);
         var youngAudit = await InsertAsync(
             "insert into audit_log (organization_id, actor_id, action, created_at) values ($1, $2, 'TaskDeleted', now() - interval '400 days') returning id",

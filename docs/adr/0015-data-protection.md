@@ -28,9 +28,15 @@ ProjectHub verarbeitet Daten von Beschäftigten; DSGVO und BDSG gelten (Überbli
 - `/users` liefert anonymisierte Personen nicht mehr. Meldet sich das Microsoft-Konto später wieder an, entsteht bei `first-sign-in` ein neues, leeres Konto.
 - Oberfläche: Teams → „Person anonymisieren“ mit Suche und Bestätigung.
 
+### Richtigkeit: Name und E-Mail aus Entra ID (DEC-036)
+
+- Bei jeder Anfrage vergleicht die API Name und E-Mail im Token mit dem gespeicherten Benutzer. Weichen sie ab, übernimmt sie die neuen Werte (Art. 5 Abs. 1 lit. d DSGVO). Das ergänzt ADR 0014, nach der bestehende Benutzer nie verändert wurden; Rolle und Status bleiben weiterhin unangetastet.
+- Gehört die neue E-Mail schon einem anderen Benutzer der Organisation, bleibt die alte (Warnung im Log, ohne Adresse).
+- Die Abteilung steht nicht im Token und wird nicht abgeglichen.
+
 ### Löschfristen (DEC-005)
 
-- `PROJECTHUB_RETENTION_NOTIFICATION_DAYS` (180), `PROJECTHUB_RETENTION_ACTIVITY_DAYS` (365), `PROJECTHUB_RETENTION_AUDIT_DAYS` (730); `0` bewahrt unbegrenzt auf.
+- `PROJECTHUB_RETENTION_NOTIFICATION_DAYS`, `PROJECTHUB_RETENTION_ACTIVITY_DAYS`, `PROJECTHUB_RETENTION_AUDIT_DAYS`, je 1095 Tage (3 Jahre, Kai 2026-10-05); `0` bewahrt unbegrenzt auf.
 - Ein Hintergrunddienst löscht eine Minute nach dem Start und dann alle sechs Stunden, was älter ist. Er läuft in jeder Instanz; Löschen ist idempotent. Das Audit-Log bleibt für Benutzer unveränderbar; nur diese Frist entfernt Einträge.
 - Bestehende Fristen bleiben: Mail-Warteschlange 7/30 Tage (ADR 0010), Webhook-Ereignisse 30 Tage (ADR 0011), Sicherungen 14 Tage (ADR 0014).
 

@@ -7,7 +7,7 @@ namespace ProjectHub.Api.Modules.Privacy;
 
 /// <summary>
 /// How long personal data in logs and notifications is kept (Art. 5 (1) e GDPR, DEC-005, ADR 0015), in days.
-/// 0 keeps the data forever. Mail outbox and webhook events have their own fixed cleanup.
+/// 0 keeps the data forever. Default: three years each (Kai, 2026-10-05). Mail outbox and webhook events have their own fixed cleanup.
 /// </summary>
 public sealed record RetentionOptions(int NotificationDays, int ActivityLogDays, int AuditLogDays)
 {
@@ -15,7 +15,7 @@ public sealed record RetentionOptions(int NotificationDays, int ActivityLogDays,
     public const string ActivityLogDaysKey = "PROJECTHUB_RETENTION_ACTIVITY_DAYS";
     public const string AuditLogDaysKey = "PROJECTHUB_RETENTION_AUDIT_DAYS";
 
-    public static readonly RetentionOptions Default = new(180, 365, 730);
+    public static readonly RetentionOptions Default = new(1095, 1095, 1095);
 
     public static RetentionOptions FromConfiguration(IConfiguration configuration) =>
         new(

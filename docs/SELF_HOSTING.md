@@ -84,7 +84,7 @@ nano legal/datenschutz.html                         # alle [eckigen Klammern] au
 
 Caddy zeigt die Datei unter `https://<Domain>/rechtliches/datenschutz.html`, die App verlinkt sie unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`). Ein Impressum kommt genauso nach `legal/impressum.html` und wird über `PROJECTHUB_IMPRINT_URL=/rechtliches/impressum.html` eingeblendet. Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
 
-ProjectHub löscht Benachrichtigungen nach 180, Projektaktivität nach 365 und Audit-Einträge nach 730 Tagen (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Teams → Person anonymisieren**.
+ProjectHub löscht Benachrichtigungen, Projektaktivität und Audit-Einträge nach 3 Jahren (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Teams → Person anonymisieren**.
 
 ## 5. Updates
 

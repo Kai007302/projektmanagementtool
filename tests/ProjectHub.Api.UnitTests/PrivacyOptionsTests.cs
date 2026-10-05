@@ -8,7 +8,7 @@ public class PrivacyOptionsTests
     [Fact]
     public void Retention_has_defaults_and_zero_keeps_data()
     {
-        Assert.Equal(new RetentionOptions(180, 365, 730), RetentionOptions.FromConfiguration(Configuration(new())));
+        Assert.Equal(new RetentionOptions(1095, 1095, 1095), RetentionOptions.FromConfiguration(Configuration(new())));
         Assert.Equal(
             new RetentionOptions(30, 0, 3650),
             RetentionOptions.FromConfiguration(Configuration(new()
