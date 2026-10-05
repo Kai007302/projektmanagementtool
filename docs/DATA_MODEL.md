@@ -180,7 +180,9 @@ Whiteboards sind Yjs-Dokumente (ADR 0004, ADR 0009). Die Tabellen halten den Inh
 - `whiteboard_update`: jedes angenommene Update mit fortlaufender `sequence_number` je Whiteboard, `created_by` und Zeitpunkt.
 - `whiteboard_snapshot`: zusammengeführter Stand bis einschließlich `sequence_number`; die Bytes liegen unter `storage_key` im Snapshot-Speicher (Development: `.data/whiteboards`). Die letzten zwei bleiben erhalten.
 - `whiteboard_reference`: welche Aufgabe auf welchem Objekt liegt. Wird bei der Compaction aus dem Dokument abgeleitet; nur aktive Aufgaben desselben Projekts.
-- Im Dokument: Root-Map `objects`, je Objekt eine Map mit `type` (`sticky`, `rect`, `ellipse`, `text`, `arrow`, `task`), `x`, `y`, `w`, `h` (Pfeile: `x2`, `y2`), `color`, `text` und bei Aufgabenkarten nur `taskId`.
+- Im Dokument: Root-Map `objects`, je Objekt eine Map mit `type` (`sticky`, `rect`, `ellipse`, `diamond`, `text`, `arrow`, `task`), `x`, `y`, `w`, `h` (Pfeile: `x2`, `y2`), `color`, `text` und bei Aufgabenkarten nur `taskId`.
+- Vorlagen (Mindmap, SWOT, Retrospektive usw.) sind nur Client-Code: Einfügen legt gewöhnliche Objekte in einer Transaktion an; es gibt keinen eigenen Vorlagen-Typ im Dokument. Ältere Clients überspringen unbekannte Typen wie `diamond`.
+- `color` ist eine von 16 Farben (`white`, `yellow`, `orange`, `red`, `pink`, `violet`, `blue`, `cyan`, `teal`, `green`, `lime`, `sand`, `gray`, `navy`, `purple`, `black`); unbekannte Werte zeigt der Client in der Standardfarbe des Typs.
 
 ## Cross-domain references
 

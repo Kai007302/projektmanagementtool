@@ -74,6 +74,14 @@ test('whiteboard', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Skizze' })).toBeVisible()
   await expect(page.getByText(/^Verbunden/)).toBeVisible()
   await expectAccessible(page)
+
+  await page.getByRole('button', { name: 'Vorlagen' }).click()
+  await expect(page.getByRole('region', { name: 'Vorlage einfügen' })).toBeVisible()
+  await expectAccessible(page)
+
+  await page.getByRole('button', { name: /^Notizfarbe und mehrere Notizen/ }).click()
+  await expect(page.getByRole('group', { name: 'Notizfarbe' })).toBeVisible()
+  await expectAccessible(page)
 })
 
 test('knowledge list, galaxy and an article', async ({ page }) => {

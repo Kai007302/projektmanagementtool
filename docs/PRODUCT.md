@@ -17,7 +17,7 @@ ProjectHub ist eine browserbasierte interne Projektmanagement- und Collaboration
 - Audit Log
 - Anhänge
 - Suche
-- kollaboratives Whiteboard
+- kollaboratives Whiteboard mit Vorlagen für gängige Darstellungen (Mindmap, Flussdiagramm, Retrospektive, SWOT u. a.) und einem Notizstapel wie in Miro (16 Farben, Ziehen aufs Board, Taste N, Notiz daneben per Klick, mehrere Notizen auf einmal)
 - Knowledge Hub
 - Knowledge Galaxy (animierte Knowledge-Graph-Darstellung)
 - Knowledge Articles, How-Tos, Best Practices, Prozesse, FAQs, Checklisten und Templates
