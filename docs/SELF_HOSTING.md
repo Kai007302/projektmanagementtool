@@ -1,6 +1,6 @@
 # ProjectHub auf einem eigenen Server (Docker)
 
-Anleitung für den Betrieb auf einem einzelnen Linux-Server mit Docker. Anmeldung über Microsoft Entra ID, TLS über Caddy mit Let's-Encrypt-Zertifikat. Architektur und Entscheidungen: ADR 0014. Für Azure (App Service, Container Apps) gilt `docs/OPERATIONS.md`.
+Anleitung für den Betrieb auf einem einzelnen Linux-Server mit Docker. Anmeldung über Microsoft Entra ID, TLS über Caddy mit Let's-Encrypt-Zertifikat. Architektur und Entscheidungen: ADR 0014. Als Portainer-Stack: Abschnitt „Variante: Portainer-Stack“ (ADR 0019). Für Azure (App Service, Container Apps) gilt `docs/OPERATIONS.md`.
 
 ```text
 Internet ──443──▶ caddy (TLS) ──▶ web (Nginx, Oberfläche) ──/api, /health──▶ api ──▶ postgres
@@ -48,6 +48,34 @@ Prüfen:
 docker compose -f docker-compose.prod.yml ps        # migrate: exited (0), alle anderen: running
 curl https://projecthub.example.com/health/ready    # Healthy
 ```
+
+### Variante: Portainer-Stack
+
+Ohne Checkout und ohne Bauen auf dem Server: `docker-compose.portainer.yml` nutzt fertige Images aus der GitHub Container Registry (`ghcr.io/kai007302/projecthub-api`, `-web`, `-caddy`), die GitHub Actions bei jedem Merge auf `main` baut (ADR 0019). Dienste und Einstellungen sind dieselben wie oben.
+
+1. **Ordner für Rechtstexte und Skripte** auf dem Server anlegen (per SSH, einmalig):
+
+   ```bash
+   sudo mkdir -p /opt/projecthub/legal /opt/projecthub/scripts
+   cd /opt/projecthub
+   sudo curl -fsSLo legal/datenschutz.html https://raw.githubusercontent.com/Kai007302/projektmanagementtool/main/deploy/legal/datenschutz.vorlage.html
+   sudo nano legal/datenschutz.html            # alle [eckigen Klammern] ausfüllen
+   for f in backup.sh restore.sh; do sudo curl -fsSLo scripts/$f https://raw.githubusercontent.com/Kai007302/projektmanagementtool/main/scripts/$f; done
+   sudo chmod +x scripts/*.sh
+   ```
+
+2. In Portainer **Stacks → Add stack**, Name **`projecthub`** (die Sicherungsskripte und Volume-Namen erwarten ihn).
+3. **Build method:** entweder **Web editor** und den Inhalt von `docker-compose.portainer.yml` einfügen, oder **Repository** mit `https://github.com/Kai007302/projektmanagementtool`, Referenz `refs/heads/main`, Compose-Pfad `docker-compose.portainer.yml` (dann holt Portainer Änderungen an der Datei selbst, optional mit „Automatic updates“).
+4. **Environment variables → Load variables from .env file:** `.env.prod.example` hochladen, dann im Formular ausfüllen: `PROJECTHUB_DOMAIN`, `POSTGRES_PASSWORD` (`openssl rand -base64 32`), `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, nach Bedarf KI (`PROJECTHUB_AI_PROVIDER`, `ANTHROPIC_API_KEY`) und Mail. `PROJECTHUB_LEGAL_DIR` zeigt auf den Ordner aus Schritt 1.
+5. **Deploy the stack.** `projecthub-migrate-1` steht danach auf „exited (0)“, alle anderen laufen; `https://<Domain>/health/ready` meldet `Healthy`.
+
+Hinweise:
+
+- **Ports 80 und 443** belegt Caddy. Läuft auf dem Server schon ein Reverse Proxy (Traefik, Nginx Proxy Manager …), den Dienst `caddy` aus der Datei löschen, beim Dienst `web` `ports: ["127.0.0.1:8080:8080"]` (oder das Netzwerk des Proxys) ergänzen und den Proxy mit TLS auf `web:8080` zeigen lassen, WebSockets erlaubt. Der Proxy muss `X-Forwarded-For`/`-Proto` setzen. Die Datenschutzhinweise liefert dann der Proxy oder die eigene Website (`PROJECTHUB_PRIVACY_NOTICE_URL` auf deren Adresse).
+- **Updates:** vorher sichern, dann im Stack **Pull and redeploy** (Web editor: „Update the stack“ mit „Re-pull image and redeploy“). `migrate` läuft vor der neuen API. Für kontrollierte Updates `PROJECTHUB_VERSION` auf einen Tag wie `sha-1a2b3c4` setzen statt `latest`.
+- **Sicherung:** `/opt/projecthub/scripts/backup.sh` per cron wie in Abschnitt 6; die Skripte finden die Container über den Stack-Namen (anderer Name: `PROJECTHUB_PROJECT=<Name>`). Sicherungen landen in `/opt/projecthub/backups`.
+- **Images privat?** Sind die Pakete in GitHub nicht öffentlich (DEC-043), unter **Registries** in Portainer `ghcr.io` mit GitHub-Benutzer und einem Token mit `read:packages` eintragen.
+- Einstellungen später ändern: im Stack unter **Environment variables**, dann **Update the stack**.
 
 ## 3. Erste Anmeldung
 
@@ -170,7 +198,7 @@ Das Skript hält Caddy, Oberfläche und API an, spielt Datenbank und Dateien ein
 - **Eine Instanz:** Fällt der Server aus, ist ProjectHub weg, bis er oder die Sicherung wieder läuft. Für mehrere Instanzen: `docs/OPERATIONS.md`, Skalierung.
 - **Dateien lokal:** Anhänge liegen im Docker-Volume `projecthub_projecthub-data` ohne Virenscan (DEC-017).
 - **Redis ohne Persistenz:** Es trägt nur Live-Nachrichten; ein Neustart verliert nichts.
-- Die Images werden auf dem Server gebaut. Dafür braucht der Server Zugriff auf Docker Hub, `mcr.microsoft.com`, NuGet und npm.
+- Mit `docker-compose.prod.yml` werden die Images auf dem Server gebaut. Dafür braucht der Server Zugriff auf Docker Hub, `mcr.microsoft.com`, NuGet und npm. Der Portainer-Stack braucht nur Docker Hub und `ghcr.io`.
 
 ## Fehlersuche
 
@@ -184,4 +212,6 @@ Das Skript hält Caddy, Oberfläche und API an, spielt Datenbank und Dateien ein
 | Microsoft meldet „AADSTS65001“ (Zustimmung fehlt) | Schritt 1.5: Administratorzustimmung erteilen |
 | Nach der Anmeldung „Anfrage fehlgeschlagen (401)“ | `ENTRA_TENANT_ID`/`ENTRA_CLIENT_ID` in `.env` passen nicht zur Registrierung, oder der Bereich heißt nicht `access_as_user` (dann `ENTRA_API_SCOPE` setzen) |
 | Nach der Anmeldung „Anfrage fehlgeschlagen (403)“ | Person ist gesperrt, `PROJECTHUB_USER_PROVISIONING=off`, oder ihre E-Mail-Adresse gehört schon zu einem anderen Konto: `docker compose -f docker-compose.prod.yml logs api` |
+| Portainer: Datenschutz-Link zeigt 404 | Im Ordner aus `PROJECTHUB_LEGAL_DIR` fehlt `datenschutz.html` (Variante Portainer, Schritt 1); Docker legt einen fehlenden Ordner leer an |
+| Portainer: „denied“ beim Pull von `ghcr.io` | Pakete sind privat: Registry in Portainer eintragen oder Pakete öffentlich stellen (DEC-043) |
 | `migrate` endet mit Fehler | `docker compose -f docker-compose.prod.yml logs migrate`; die API startet erst nach erfolgreicher Migration |
