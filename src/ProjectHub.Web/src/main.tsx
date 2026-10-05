@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { signIn } from './identity/signIn'
+import { storedTheme } from './ui/theme'
+
+// A stored light/dark choice wins over the system setting (index.css follows the system otherwise).
+const theme = storedTheme()
+if (theme) document.documentElement.dataset.theme = theme
 
 const root = createRoot(document.getElementById('root')!)
 

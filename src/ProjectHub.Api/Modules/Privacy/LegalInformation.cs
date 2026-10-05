@@ -1,7 +1,7 @@
 namespace ProjectHub.Api.Modules.Privacy;
 
 /// <summary>
-/// Links to the operator's privacy notice (Art. 13 GDPR) and imprint (§ 5 DDG), shown in the web app (ADR 0015).
+/// Links to the operator's privacy notice (Art. 13 GDPR) and imprint (§ 5 DDG), shown in the web app (ADR 0017).
 /// Public, so they can be read before signing in. Each is an https URL or a path on this host, or not set.
 /// </summary>
 public sealed record LegalInformation(string? PrivacyNoticeUrl, string? ImprintUrl)

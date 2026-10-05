@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Http;
@@ -33,24 +34,18 @@ public interface IKnowledgeSearch
     Task<IReadOnlyList<ArticleSummary>> SearchAsync(KnowledgeReader reader, KnowledgeQuery query, Paging paging, CancellationToken ct);
 }
 
-/// <summary>A passage of an authorized article, the unit a semantic retrieval or an AI answer works with.</summary>
-public sealed record KnowledgePassage(Guid ArticleId, string Title, string Text, double Score);
+/// <summary>A passage of an authorized article, the unit the assistant answers from (ADR 0015).</summary>
+public sealed record KnowledgePassage(Guid ArticleId, string Title, string? SpaceName, string Text, double Score);
 
 /// <summary>
-/// Semantic retrieval (embeddings). Not implemented yet: it needs the AI provider decision
-/// (docs/OPEN_DECISIONS.md). The reader is part of the contract, as for <see cref="IKnowledgeSearch"/>.
+/// Finds the passages of authorized knowledge that fit a question in natural language (retrieval for the AI
+/// assistant, ADR 0015). The reader is part of the contract, as for <see cref="IKnowledgeSearch"/>: an
+/// implementation never returns passages of articles the reader may not see. Embeddings can replace or
+/// complement the full-text implementation behind this interface later.
 /// </summary>
-public interface IKnowledgeSemanticSearch
+public interface IKnowledgeRetrieval
 {
     Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct);
-}
-
-public sealed record KnowledgeAnswer(string Text, IReadOnlyList<KnowledgePassage> Sources);
-
-/// <summary>Answers questions from authorized knowledge and always names its sources. Not implemented yet.</summary>
-public interface IKnowledgeAnswerService
-{
-    Task<KnowledgeAnswer> AnswerAsync(KnowledgeReader reader, string question, CancellationToken ct);
 }
 
 /// <summary>PostgreSQL full-text search (German stemming) over title, summary and the current content.</summary>
@@ -100,6 +95,67 @@ internal sealed class PostgresKnowledgeSearch(ProjectHubDbContext db, KnowledgeA
         var ids = await ordered.Skip(paging.Skip).Take(paging.Take + 1).Select(a => a.Id).ToListAsync(ct);
         return await KnowledgeSummaries.LoadAsync(db, ids, ct);
     }
+}
+
+/// <summary>
+/// Retrieval over the full-text index: a question matches articles that contain any of its words (OR instead of the
+/// AND of the search box, questions are long), ranked by cover density; the passages are PostgreSQL headlines around
+/// the matches. Only articles from <see cref="KnowledgeAccess.Visible"/> are considered.
+/// </summary>
+public sealed partial class PostgresKnowledgeRetrieval(ProjectHubDbContext db, KnowledgeAccess access) : IKnowledgeRetrieval
+{
+    public const int MaxLimit = 20;
+    private const int MaxTerms = 24;
+    private const string HeadlineOptions = "MaxFragments=3, MaxWords=45, MinWords=15, FragmentDelimiter=\" … \", StartSel=\"\", StopSel=\"\"";
+
+    public async Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct)
+    {
+        if (TermQuery(question) is not { } terms)
+        {
+            return [];
+        }
+
+        // The query is built inline: EF translates EF.Functions only inside the expression tree.
+        var rows = await (
+                from article in access.Visible(reader)
+                let query = EF.Functions.ToTsQuery(PostgresKnowledgeSearch.TextSearchConfiguration, terms)
+                where article.SearchVector.Matches(query)
+                join space in db.Set<KnowledgeSpace>() on article.KnowledgeSpaceId equals space.Id into spaces
+                from space in spaces.DefaultIfEmpty()
+                let score = article.SearchVector.RankCoverDensity(query)
+                orderby score descending, article.UpdatedAt descending
+                select new
+                {
+                    article.Id,
+                    article.Title,
+                    SpaceName = space == null ? null : space.Name,
+                    Text = query.GetResultHeadline((article.Summary ?? string.Empty) + "\n" + article.SearchText, HeadlineOptions),
+                    Score = score,
+                })
+            .Take(Math.Clamp(limit, 1, MaxLimit))
+            .ToListAsync(ct);
+
+        return rows.Select(r => new KnowledgePassage(r.Id, r.Title, r.SpaceName, r.Text.Trim(), r.Score)).ToList();
+    }
+
+    /// <summary>
+    /// "'wort1' | 'wort2' | …" from the letters and digits of the question; quoting keeps every word a plain lexeme,
+    /// so no input can form tsquery syntax. Stop words are dropped by the text search configuration.
+    /// </summary>
+    public static string? TermQuery(string question)
+    {
+        var words = Word().Matches(question)
+            .Select(m => m.Value.ToLowerInvariant())
+            .Where(w => w.Length >= 2)
+            .Distinct()
+            .Take(MaxTerms)
+            .Select(w => $"'{w}'")
+            .ToList();
+        return words.Count == 0 ? null : string.Join(" | ", words);
+    }
+
+    [GeneratedRegex(@"[\p{L}\p{N}]+")]
+    private static partial Regex Word();
 }
 
 internal static class KnowledgeSummaries

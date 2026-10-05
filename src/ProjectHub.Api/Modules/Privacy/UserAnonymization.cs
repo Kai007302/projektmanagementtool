@@ -14,7 +14,7 @@ using ProjectHub.Api.Modules.Users;
 namespace ProjectHub.Api.Modules.Privacy;
 
 /// <summary>
-/// Erasure of a person (Art. 17 GDPR, ADR 0015) by an organization admin. The user row stays, so tasks, comments,
+/// Erasure of a person (Art. 17 GDPR, ADR 0017) by an organization admin. The user row stays, so tasks, comments,
 /// versions and log entries keep a neutral author ("Ehemalige Person"); everything that identifies the person or
 /// only exists for them is overwritten or deleted. What other people wrote about the person is not touched.
 /// </summary>

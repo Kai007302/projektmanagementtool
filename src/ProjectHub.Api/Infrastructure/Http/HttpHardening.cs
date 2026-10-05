@@ -137,6 +137,9 @@ public static class HttpHardening
         return app;
     }
 
+    /// <summary>A fixed window per signed-in person (otherwise per client address), for modules with their own limit.</summary>
+    public static RateLimitPartition<string> PerPersonPerMinute(HttpContext context, int permits) => PerMinute(PartitionKey(context), permits);
+
     private static bool IsUnlimited(PathString path) => path.StartsWithSegments("/health");
 
     private static RateLimitPartition<string> PerMinute(string key, int permits) =>

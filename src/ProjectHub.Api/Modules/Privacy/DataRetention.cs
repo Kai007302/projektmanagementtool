@@ -6,7 +6,7 @@ using ProjectHub.Api.Modules.Notifications;
 namespace ProjectHub.Api.Modules.Privacy;
 
 /// <summary>
-/// How long personal data in logs and notifications is kept (Art. 5 (1) e GDPR, DEC-005, ADR 0015), in days.
+/// How long personal data in logs and notifications is kept (Art. 5 (1) e GDPR, DEC-005, ADR 0017), in days.
 /// 0 keeps the data forever. Default: three years each (Kai, 2026-10-05). Mail outbox and webhook events have their own fixed cleanup.
 /// </summary>
 public sealed record RetentionOptions(int NotificationDays, int ActivityLogDays, int AuditLogDays)

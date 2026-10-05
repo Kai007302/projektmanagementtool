@@ -1,7 +1,7 @@
 import { apiDownload, apiFetch, type Paged } from '../api/client'
 import type { User } from '../identity/api'
 
-/** Links the operator configured (ADR 0015); null when not set. */
+/** Links the operator configured (ADR 0017); null when not set. */
 export type LegalInformation = { privacyNoticeUrl: string | null; imprintUrl: string | null }
 
 export const fetchLegal = () => apiFetch<LegalInformation>('/api/v1/legal')

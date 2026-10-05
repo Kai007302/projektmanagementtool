@@ -8,7 +8,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-002 | Azure Hosting | offen | App Service oder Container Apps |
 | DEC-003 | System-Mailbox | offen | dediziertes Funktionspostfach |
 | DEC-004 | Entra Gruppenmodell | offen | Teams/Abteilungen über Entra Groups, wo sinnvoll |
-| DEC-005 | Datenretention | entschieden (Kai, 2026-10-05), vorerst | Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre (1095 Tage), einstellbar über `PROJECTHUB_RETENTION_*` (ADR 0015); Mail-Warteschlange 7/30 Tage, Webhook-Ereignisse 30 Tage, Sicherungen 14 Tage |
+| DEC-005 | Datenretention | entschieden (Kai, 2026-10-05), vorerst | Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre (1095 Tage), einstellbar über `PROJECTHUB_RETENTION_*` (ADR 0017); Mail-Warteschlange 7/30 Tage, Webhook-Ereignisse 30 Tage, Sicherungen 14 Tage |
 | DEC-006 | erlaubte Dateitypen | offen | Security/IT Vorgabe |
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
 | DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
@@ -37,9 +37,12 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-031 | Auslieferung der Oberfläche | offen | eigener Web-Container (Nginx) vor der API, eine Origin für Browser, TLS am Ingress (ADR 0012) |
 | DEC-032 | Performance-Ziele | offen | je API-Instanz: 95 % der Lesezugriffe unter 300 ms, unter 1 % Fehler; geprüft mit dem Lasttest `tests/load` (50 gleichzeitige Personen, 1000 Aufgaben, 300 Artikel). Ergebnis in `docs/OPERATIONS.md` |
 | DEC-033 | Redis in der Readiness | offen | heute: Redis nicht erreichbar → Instanz nicht bereit, die App ist weg, obwohl nur Realtime betroffen ist. Vorschlag: Redis nur als „beeinträchtigt“ melden und per Alarm sichtbar machen (`docs/OPERATIONS.md`) |
-| DEC-034 | Löschen einer Person | entschieden (Kai, 2026-10-05) | Anonymisieren statt Löschen: Name, E-Mail, Entra-Kennung und Abteilung werden überschrieben, Mitgliedschaften, Benachrichtigungen und Freigaben gelöscht, Aufgaben frei; eigene Kommentare und Inhalte bleiben mit „Ehemalige Person“. Nur Organisations-Admins (ADR 0015). Wann anonymisiert wird (z. B. beim Austritt), legt der Betreiber fest |
-| DEC-035 | Rechtstexte | offen | Datenschutzhinweise und Impressum als Links des Betreibers (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`); auf dem eigenen Server statische Seiten unter `/rechtliches/`. Vorlage in `deploy/legal/` (ADR 0015, `docs/LEGAL.md`) |
-| DEC-036 | Name und E-Mail aus Entra ID aktuell halten | entschieden (Kai, 2026-10-05) | bei jeder Anmeldung: weichen Name oder E-Mail im Token vom gespeicherten Wert ab, übernimmt ProjectHub sie (Art. 5 Abs. 1 lit. d DSGVO). Gehört die neue E-Mail schon einem anderen Konto, bleibt die alte (Warnung im Log). Abteilung kommt nicht aus dem Token (ADR 0015) |
+| DEC-034 | Was KI ändern darf | entschieden (Kai, 2026-10-05) | Alles, was die Person selbst darf, aber jede Änderung erst nach ihrer Freigabe: Der Assistent zeigt jede Änderung als Karte mit „Ausführen“ und „Ablehnen“; über MCP fragt der Client nach, Schreibwerkzeuge nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true` (ADR 0016) |
+| DEC-035 | Gespräche mit dem Assistenten | offen | werden nicht gespeichert: der Verlauf liegt nur im Browser-Tab, ein auf Freigabe wartender Schritt verschlüsselt im Browser (ADR 0016), Telemetrie ohne Prompts und Antworten (ADR 0015) |
+| DEC-036 | Embeddings für die Wissenssuche | offen | vorerst nicht: Volltextsuche mit agentischem Nachsuchen; pgvector hinter `IKnowledgeRetrieval`, wenn Antworten Umschreibungen nicht finden (ADR 0015) |
+| DEC-037 | Löschen einer Person | entschieden (Kai, 2026-10-05) | Anonymisieren statt Löschen: Name, E-Mail, Entra-Kennung und Abteilung werden überschrieben, Mitgliedschaften, Benachrichtigungen und Freigaben gelöscht, Aufgaben frei; eigene Kommentare und Inhalte bleiben mit „Ehemalige Person“. Nur Organisations-Admins (ADR 0017). Wann anonymisiert wird (z. B. beim Austritt), legt der Betreiber fest |
+| DEC-038 | Rechtstexte | offen | Datenschutzhinweise und Impressum als Links des Betreibers (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`); auf dem eigenen Server statische Seiten unter `/rechtliches/`. Vorlage in `deploy/legal/` (ADR 0017, `docs/LEGAL.md`) |
+| DEC-039 | Name und E-Mail aus Entra ID aktuell halten | entschieden (Kai, 2026-10-05) | bei jeder Anmeldung: weichen Name oder E-Mail im Token vom gespeicherten Wert ab, übernimmt ProjectHub sie (Art. 5 Abs. 1 lit. d DSGVO). Gehört die neue E-Mail schon einem anderen Konto, bleibt die alte (Warnung im Log). Abteilung kommt nicht aus dem Token (ADR 0017) |
 
 
 ## Knowledge / AI
@@ -50,9 +53,9 @@ Status: decided (ADR 0007)
 Canvas 2D with a d3-force layout in a Web Worker; measured against React Flow with 300, 800 and 2000 nodes.
 
 ### AI provider
-Status: open
+Status: proposed (ADR 0015)
 
-Choose between enterprise-approved Azure OpenAI / another approved provider. No external provider is assumed until company security/privacy approval.
+Provider-neutral behind `IChatClient` (Microsoft.Extensions.AI) and chosen per installation in `.env`: `off` by default, `anthropic` (Claude, default model `claude-opus-5-5`) or `openai` (any OpenAI-compatible endpoint, including a local model such as Ollama). An external provider is only switched on with the organization's approval; on Kai's own server Kai decides.
 
 ### Knowledge visibility model
 Status: decided (DEC-020)

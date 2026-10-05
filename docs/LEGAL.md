@@ -9,7 +9,7 @@
 - Gibt es einen **Betriebsrat**, muss er vor der Einführung zustimmen (§ 87 Abs. 1 Nr. 6 BetrVG): Aktivitätsprotokoll und Audit-Log sind objektiv geeignet, Verhalten und Leistung zu überwachen.
 - **Cookie-Banner** braucht ProjectHub nicht, solange nichts außer der Anmeldung im Browser gespeichert wird (§ 25 Abs. 2 Nr. 2 TDDDG).
 - Ein **Impressum** ist für ein internes Werkzeug hinter einer Anmeldung in der Regel nicht nötig (§ 5 DDG gilt für geschäftsmäßige, meist entgeltliche Angebote). Ein Link lässt sich trotzdem einblenden.
-- **KI-Funktionen** fallen unter die EU-KI-Verordnung (AI Act). Heute enthält ProjectHub keine; was beim Einbau gilt, steht unten.
+- Der **KI-Assistent** (ADR 0015, 0016; Standard aus) fällt unter die EU-KI-Verordnung (AI Act). Was beim Einschalten gilt, steht unten.
 - Nutzt jemand ProjectHub **rein privat oder familiär**, gilt die DSGVO nicht (Art. 2 Abs. 2 lit. c). Sobald eine Firma, ein Verein oder Kunden dabei sind, gilt sie.
 
 ## Was ProjectHub dafür mitbringt
@@ -18,14 +18,14 @@
 |---|---|---|---|
 | Informieren | Art. 13 DSGVO | Links „Datenschutz“ und „Impressum“ unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`). Auf dem eigenen Server liefert Caddy die Seiten unter `/rechtliches/` ohne Anmeldung aus. Vorlage: `deploy/legal/datenschutz.vorlage.html` | Vorlage ausfüllen und ablegen (siehe Checkliste) |
 | Auskunft, Datenübertragbarkeit | Art. 15, 20 DSGVO | „Meine Daten herunterladen“: alles, was ProjectHub zur Person speichert, als JSON (`GET /api/v1/me/data-export`). Jeder Export steht im Audit-Log | Anfragen binnen eines Monats beantworten; Daten in Entra ID, Microsoft 365, Webex und Sicherungen gehören zusätzlich dazu |
-| Berichtigung | Art. 16 DSGVO | Name und E-Mail kommen aus Entra ID und werden bei jeder Anmeldung aktualisiert, wenn sie sich dort geändert haben (DEC-036) | Berichtigungen in Entra ID vornehmen |
-| Löschung | Art. 17 DSGVO | Organisations-Admins anonymisieren Personen (Teams → „Person anonymisieren“). Name, E-Mail, Abteilung und Entra-Kennung werden überschrieben, Mitgliedschaften, Benachrichtigungen, Mails und Freigaben gelöscht, zugewiesene Aufgaben frei. Inhalte bleiben mit „Ehemalige Person“ als Autor (DEC-034) | Löschkonzept: wann wird wer anonymisiert (z. B. beim Austritt). Sicherungen enthalten die Person noch bis zu 14 Tage |
+| Berichtigung | Art. 16 DSGVO | Name und E-Mail kommen aus Entra ID und werden bei jeder Anmeldung aktualisiert, wenn sie sich dort geändert haben (DEC-039) | Berichtigungen in Entra ID vornehmen |
+| Löschung | Art. 17 DSGVO | Organisations-Admins anonymisieren Personen (Teams → „Person anonymisieren“). Name, E-Mail, Abteilung und Entra-Kennung werden überschrieben, Mitgliedschaften, Benachrichtigungen, Mails und Freigaben gelöscht, zugewiesene Aufgaben frei. Inhalte bleiben mit „Ehemalige Person“ als Autor (DEC-037) | Löschkonzept: wann wird wer anonymisiert (z. B. beim Austritt). Sicherungen enthalten die Person noch bis zu 14 Tage |
 | Speicherbegrenzung | Art. 5 Abs. 1 lit. e DSGVO | Löschfristen (DEC-005): Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre, einstellbar; versendete Mails 7, fehlgeschlagene 30 Tage; Webhook-Ereignisse 30 Tage; Sicherungen 14 Tage; Container-Logs höchstens 5 × 10 MB je Dienst | Fristen ins Verarbeitungsverzeichnis übernehmen |
 | Datenminimierung | Art. 5 Abs. 1 lit. c DSGVO | Mails und Webex-Nachrichten nur mit Titel und Link; Logs und Telemetrie nur mit IDs; Zugriffslog des Web-Containers ohne IP-Adresse und ohne Query-String (dort stünde sonst das Anmelde-Token der Live-Verbindungen) | – |
 | Sicherheit | Art. 32 DSGVO | Anmeldung über Entra ID (MFA dort), Rechte serverseitig, TLS/HSTS/CSP, Rate Limits, Audit-Log, Abhängigkeits-, Container- und Code-Scans (`docs/SECURITY.md`, ADR 0012) | TOMs dokumentieren (`docs/legal/verarbeitungsverzeichnis.md`), Server aktuell halten, Platte verschlüsseln, Sicherungen verschlüsselt außer Haus |
 | Verzeichnis der Verarbeitungstätigkeiten | Art. 30 DSGVO | Vorlage mit den Daten von ProjectHub: `docs/legal/verarbeitungsverzeichnis.md` | Eintrag anlegen |
-| Auftragsverarbeitung | Art. 28 DSGVO | – | Verträge mit Microsoft (Entra ID, Mail über Graph; DPA ist Teil der Produktbedingungen), Cisco (Webex, falls genutzt), dem Server-Hoster und dem Ziel der Sicherungen |
-| Drittländer | Art. 44 ff. DSGVO | ProjectHub selbst überträgt nichts außer an Microsoft und Webex | Microsoft und Cisco sind US-Unternehmen: Data Privacy Framework bzw. Standardvertragsklauseln prüfen; bei Microsoft die EU Data Boundary nutzen |
+| Auftragsverarbeitung | Art. 28 DSGVO | – | Verträge mit Microsoft (Entra ID, Mail über Graph; DPA ist Teil der Produktbedingungen), Cisco (Webex, falls genutzt), dem KI-Anbieter (falls eingeschaltet), dem Server-Hoster und dem Ziel der Sicherungen |
+| Drittländer | Art. 44 ff. DSGVO | ProjectHub selbst überträgt nichts außer an Microsoft, Webex und, wenn eingeschaltet, den KI-Anbieter | Microsoft und Cisco sind US-Unternehmen: Data Privacy Framework bzw. Standardvertragsklauseln prüfen; bei Microsoft die EU Data Boundary nutzen |
 | Datenschutz-Folgenabschätzung | Art. 35 DSGVO | – | Schwellwertprüfung. Bei Auswertungen über Personen oder KI-Funktionen wahrscheinlich nötig |
 | Datenpannen | Art. 33, 34 DSGVO | Audit-Log und Logs helfen bei der Aufklärung | Meldung an die Aufsicht binnen 72 Stunden; Ablauf festlegen |
 | Datenschutzbeauftragte | § 38 BDSG | – | Pflicht ab in der Regel 20 Personen, die ständig mit automatisierter Verarbeitung personenbezogener Daten beschäftigt sind |
@@ -39,7 +39,7 @@ Lange galt § 26 Abs. 1 BDSG als Grundlage. Seit dem Urteil des EuGH vom 30.03.2
 
 ### KI-Funktionen (EU-KI-Verordnung)
 
-ProjectHub enthält heute keine KI-Funktion. Für den geplanten Ausbau gilt:
+Der Assistent ist ausgeschaltet, bis `PROJECTHUB_AI_PROVIDER` gesetzt wird. Mit einem externen Anbieter (Anthropic, OpenAI) verlassen Fragen und gefundene Inhalte den Server. Gespräche speichert ProjectHub nicht (DEC-035), Änderungen macht der Assistent nur nach Freigabe (DEC-034). Vor dem Einschalten gilt:
 
 - **KI-Kompetenz** (Art. 4, seit 02.02.2025): Wer KI-Funktionen im Betrieb einsetzt, sorgt dafür, dass die Nutzenden ausreichend geschult sind.
 - **Transparenz** (Art. 50): Erkennbar machen, dass eine Antwort von einer KI stammt. Die Regel aus `AGENTS.md`, Antworten mit Quellen zu versehen, hilft zusätzlich.
@@ -64,4 +64,4 @@ ProjectHub enthält heute keine KI-Funktion. Für den geplanten Ausbau gilt:
 7. **Sicherungen** verschlüsselt an einen zweiten Ort (z. B. `restic`); Löschungen wirken dort erst, wenn alte Sicherungen herausfallen.
 8. **Entra ID:** „Zuweisung erforderlich“ einschalten, damit nur vorgesehene Personen ProjectHub nutzen (`docs/SELF_HOSTING.md`, Schritt 1.7).
 
-Technische Entscheidungen: ADR 0015.
+Technische Entscheidungen: ADR 0017.

@@ -1,4 +1,4 @@
--- Data protection (ADR 0015).
+-- Data protection (ADR 0017).
 
 -- Art. 17 GDPR: an admin can anonymize a person. The row stays so that tasks, comments and audit entries keep
 -- a (neutral) author; name, e-mail, department and Entra object id are overwritten.

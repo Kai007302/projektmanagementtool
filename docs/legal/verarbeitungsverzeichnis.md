@@ -1,6 +1,6 @@
 # Vorlage: Eintrag im Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)
 
-> Keine Rechtsberatung. Vorlage mit dem, was ProjectHub technisch tut (Stand ADR 0015). Stellen in `[eckigen Klammern]` füllt der Betreiber aus.
+> Keine Rechtsberatung. Vorlage mit dem, was ProjectHub technisch tut (Stand ADR 0017). Stellen in `[eckigen Klammern]` füllt der Betreiber aus.
 
 | Feld | Inhalt |
 |---|---|

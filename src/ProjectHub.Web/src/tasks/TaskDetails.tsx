@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails, ProjectMember } from '../projects/api'
+import { celebrate } from '../ui/confetti'
 import { CalendarActions } from '../calendar/CalendarActions'
 import { downloadTaskCalendar } from '../calendar/calendar'
 import { fetchTaskWhiteboards, type TaskWhiteboard } from '../whiteboard/api'
@@ -171,7 +172,9 @@ function TaskForm({ task, members, onSaved, onStale }: TaskFormProps) {
     ) as TaskChanges
     if (Object.keys(changes).length === 0) return
     try {
-      onSaved(await updateTask(task.id, task.version, changes))
+      const saved = await updateTask(task.id, task.version, changes)
+      if (changes.status === 'done') celebrate()
+      onSaved(saved)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         onStale()

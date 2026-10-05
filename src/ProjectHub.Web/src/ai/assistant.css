@@ -1,0 +1,183 @@
+/* Assistant (ADR 0015). Uses the shared design tokens, with fallbacks for older token sets. */
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 52rem;
+}
+
+.assistant h2 {
+  margin: 0;
+}
+
+.assistant-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.assistant-note {
+  margin: 0;
+}
+
+.assistant-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 12rem;
+}
+
+.assistant-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.assistant-turn {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 0.75rem);
+  background: var(--surface);
+}
+
+.assistant-turn p {
+  margin: 0;
+}
+
+.assistant-question {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--accent-soft, #eef2ff);
+  border-color: transparent;
+  white-space: pre-wrap;
+}
+
+.assistant-answer {
+  align-self: stretch;
+}
+
+.answer-text > * + * {
+  margin-top: 0.5rem;
+}
+
+.answer-text ul,
+.answer-text ol {
+  margin-bottom: 0;
+  padding-left: 1.25rem;
+}
+
+.answer-text code {
+  padding: 0 0.25rem;
+  border-radius: var(--radius-sm, 0.375rem);
+  background: var(--surface-muted, #f1f5f9);
+}
+
+.assistant-activity {
+  font-style: italic;
+}
+
+.assistant-sources {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.assistant-sources h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
+}
+
+.assistant-sources ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.assistant-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  position: sticky;
+  bottom: 0;
+  padding: 0.5rem 0;
+  background: var(--bg, #f7f8fa);
+}
+
+.assistant-form textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 2.75rem;
+}
+
+/* A change the assistant proposes (ADR 0016): nothing happens until the person approves it. */
+.assistant-action {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--accent, #4f46e5);
+  border-radius: var(--radius, 0.5rem);
+  background: var(--accent-soft, #eef2ff);
+}
+
+.assistant-action.destructive {
+  border-color: var(--danger-border, #fecaca);
+  background: var(--danger-soft, #fef2f2);
+}
+
+.assistant-action h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.assistant-action dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.assistant-action dl > div {
+  display: contents;
+}
+
+.assistant-action dt {
+  color: var(--muted, #64748b);
+}
+
+.assistant-action dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-action-text {
+  max-height: 16rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 0.375rem);
+  background: var(--surface);
+  white-space: pre-wrap;
+  font-size: 0.875rem;
+}
+
+.assistant-action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.assistant-approve {
+  border-color: var(--accent, #4f46e5);
+  background: var(--accent, #4f46e5);
+  color: #ffffff;
+}
+
+.assistant-approve:hover:not(:disabled) {
+  border-color: var(--accent-hover, #4338ca);
+  background: var(--accent-hover, #4338ca);
+}
+
+.assistant-action-state {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}

@@ -16,7 +16,7 @@ using ProjectHub.Api.Modules.Whiteboard;
 namespace ProjectHub.Api.Modules.Privacy;
 
 /// <summary>
-/// Everything ProjectHub stores about the signed-in person (Art. 15 and 20 GDPR, ADR 0015), as one machine-readable
+/// Everything ProjectHub stores about the signed-in person (Art. 15 and 20 GDPR, ADR 0017), as one machine-readable
 /// document. Content of other people (task descriptions, their comments) is left out; tasks and articles appear with
 /// their title, because the person is assignee, creator or owner.
 /// </summary>

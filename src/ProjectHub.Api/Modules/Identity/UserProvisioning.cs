@@ -25,7 +25,7 @@ public sealed record UserProvisioningOptions(bool OnFirstSignIn, string? Allowed
 /// <summary>
 /// Creates the organization of the configured tenant and the signed-in person's user. The first person of an
 /// organization becomes its admin, everyone after that a member. Existing users only get a changed name or e-mail
-/// from the token (RefreshProfileAsync, DEC-036); role and status are never changed: an inactive
+/// from the token (RefreshProfileAsync, DEC-039); role and status are never changed: an inactive
 /// user stays inactive, so deactivating someone keeps them out.
 /// </summary>
 internal sealed class UserProvisioning(
@@ -89,7 +89,7 @@ internal sealed class UserProvisioning(
     }
 
     /// <summary>
-    /// Takes over a changed name or e-mail address from the token (DEC-036, Art. 5 (1) d GDPR), so corrections in
+    /// Takes over a changed name or e-mail address from the token (DEC-039, Art. 5 (1) d GDPR), so corrections in
     /// Entra ID reach ProjectHub at the next sign-in. An address that already belongs to another user stays unchanged.
     /// Returns the context with the stored values.
     /// </summary>

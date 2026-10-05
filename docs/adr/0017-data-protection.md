@@ -1,4 +1,4 @@
-# ADR 0015 — Datenschutzfunktionen: Export, Anonymisierung, Löschfristen, Rechtstexte
+# ADR 0017 — Datenschutzfunktionen: Export, Anonymisierung, Löschfristen, Rechtstexte
 
 ## Status
 Proposed
@@ -24,11 +24,11 @@ ProjectHub verarbeitet Daten von Beschäftigten; DSGVO und BDSG gelten (Überbli
 - `POST /api/v1/admin/users/{id}/anonymize`, nur Organisations-Admins, nie die eigene Person (so bleibt immer ein Admin). Wiederholen ändert nichts.
 - Die Zeile in `app_user` bleibt, damit Aufgaben, Kommentare, Versionen und Protokolle gültige Autoren behalten. Überschrieben werden Name („Ehemalige Person“), E-Mail (`anonymized-<id>@invalid`), Entra-Kennung, Abteilung, letzter Login; Status `inactive`, Rolle `member`, `anonymized_at` gesetzt (Migration 012).
 - Gelöscht werden Benachrichtigungen, Einstellungen, Mails in der Warteschlange, Team- und Projektmitgliedschaften und persönliche Freigaben für Wissensartikel. Zugewiesene Aufgaben werden frei; Artikel und Wissensbereiche verlieren ihre verantwortliche Person.
-- Inhalte, die die Person geschrieben hat, und was andere über sie geschrieben haben, bleiben unverändert (DEC-034).
+- Inhalte, die die Person geschrieben hat, und was andere über sie geschrieben haben, bleiben unverändert (DEC-037).
 - `/users` liefert anonymisierte Personen nicht mehr. Meldet sich das Microsoft-Konto später wieder an, entsteht bei `first-sign-in` ein neues, leeres Konto.
 - Oberfläche: Teams → „Person anonymisieren“ mit Suche und Bestätigung.
 
-### Richtigkeit: Name und E-Mail aus Entra ID (DEC-036)
+### Richtigkeit: Name und E-Mail aus Entra ID (DEC-039)
 
 - Bei jeder Anfrage vergleicht die API Name und E-Mail im Token mit dem gespeicherten Benutzer. Weichen sie ab, übernimmt sie die neuen Werte (Art. 5 Abs. 1 lit. d DSGVO). Das ergänzt ADR 0014, nach der bestehende Benutzer nie verändert wurden; Rolle und Status bleiben weiterhin unangetastet.
 - Gehört die neue E-Mail schon einem anderen Benutzer der Organisation, bleibt die alte (Warnung im Log, ohne Adresse).

@@ -3,7 +3,7 @@ import type { User } from '../identity/api'
 import { anonymizeUser, searchUsers } from './api'
 
 /**
- * For organization admins: erases a person on request (Art. 17 DSGVO, ADR 0015). Name, e-mail and memberships are
+ * For organization admins: erases a person on request (Art. 17 DSGVO, ADR 0017). Name, e-mail and memberships are
  * removed; tasks, comments and articles stay with "Ehemalige Person" as author.
  */
 export function AnonymizePersonForm({ myId }: { myId: string }) {

@@ -4,7 +4,7 @@
 
 server_tokens off;
 
-# Access log without client address and query string (ADR 0015): the hubs carry the access token in the query
+# Access log without client address and query string (ADR 0017): the hubs carry the access token in the query
 # string, and the address is personal data nobody here needs. $uri is the path without the query.
 log_format projecthub '$time_iso8601 "$request_method $uri" $status $body_bytes_sent $request_time';
 
@@ -44,6 +44,14 @@ server {
         proxy_set_header Connection $connection_upgrade;
         proxy_read_timeout 1h;
         proxy_request_buffering off;
+    }
+
+    # MCP clients find the authorization server here (RFC 9728, ADR 0015).
+    location /.well-known/oauth-protected-resource {
+        proxy_pass ${PROJECTHUB_API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $forwarded_for;
+        proxy_set_header X-Forwarded-Proto $forwarded_proto;
     }
 
     location /health/ {

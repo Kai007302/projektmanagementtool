@@ -6,7 +6,7 @@ using ProjectHub.Api.Modules.Identity;
 
 namespace ProjectHub.Api.Modules.Privacy;
 
-/// <summary>Data protection functions (ADR 0015): legal links, own data export, anonymization, retention.</summary>
+/// <summary>Data protection functions (ADR 0017): legal links, own data export, anonymization, retention.</summary>
 public static class PrivacyEndpoints
 {
     public static IServiceCollection AddPrivacyModule(this IServiceCollection services, IConfiguration configuration)

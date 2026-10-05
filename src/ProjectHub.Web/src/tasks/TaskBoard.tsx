@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
-import { createTask, fetchTasks, taskPriorities, taskStatuses, type Task } from './api'
+import { createTask, fetchTasks, taskStatuses, type Task } from './api'
+import { PriorityBadge } from './PriorityBadge'
 import { TaskDetails } from './TaskDetails'
 import { useLatest } from '../api/useLatest'
 
@@ -51,11 +52,8 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
             >
               <span className={`task-status status-${task.status}`}>{taskStatuses[task.status]}</span>
               <span className="task-title">{task.title}</span>
-              <span className="card-meta">
-                {taskPriorities[task.priority]}
-                {task.assigneeName && ` · ${task.assigneeName}`}
-                {task.progress > 0 && ` · ${task.progress} %`}
-              </span>
+              <PriorityBadge priority={task.priority} />
+              <span className="card-meta">{[task.assigneeName, task.progress > 0 ? `${task.progress} %` : null].filter(Boolean).join(' · ')}</span>
             </button>
             {renderTasks(task.id)}
           </li>

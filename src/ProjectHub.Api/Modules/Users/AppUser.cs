@@ -17,7 +17,7 @@ public sealed class AppUser
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
 
-    /// <summary>Set when the person was anonymized (Art. 17 GDPR, ADR 0015); the row then identifies nobody.</summary>
+    /// <summary>Set when the person was anonymized (Art. 17 GDPR, ADR 0017); the row then identifies nobody.</summary>
     public DateTimeOffset? AnonymizedAt { get; set; }
     public long Version { get; set; }
 }

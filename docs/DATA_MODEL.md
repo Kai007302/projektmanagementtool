@@ -14,7 +14,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `008_whiteboard_updates.sql`: `whiteboard_update` (angenommene Yjs-Updates seit dem letzten Snapshot) und Indizes für Whiteboards je Projekt und Verweise je Aufgabe
 - `009_mail_outbox.sql`: `mail_outbox` (Benachrichtigungsmails bis zum Versand, ADR 0010)
 - `010_webex.sql`: `project_webex_link` (Webex-Räume und Besprechungslinks je Projekt), `mail_outbox.channel` (`email`/`webex`) und `webhook_event` (empfangene Webhooks zur Deduplizierung, ADR 0011)
-- `012_privacy.sql`: `app_user.anonymized_at` (anonymisierte Personen, ADR 0015) und Indizes über `created_at` für die Löschfristen von Benachrichtigungen, Aktivität und Audit-Log
+- `012_privacy.sql`: `app_user.anonymized_at` (anonymisierte Personen, ADR 0017) und Indizes über `created_at` für die Löschfristen von Benachrichtigungen, Aktivität und Audit-Log
 - `011_knowledge_search_vector.sql`: `knowledge_article.search_vector`, von PostgreSQL generierter Suchvektor mit GIN-Index; ersetzt den Ausdrucksindex aus 006 (ADR 0013)
 
 ## Regeln

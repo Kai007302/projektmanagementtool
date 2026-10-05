@@ -20,6 +20,19 @@ export const articleTypes: Record<ArticleType, string> = {
   glossary: 'Glossar',
 }
 
+/** Icon per article type, shown next to the type everywhere (decorative; the label stays). */
+export const articleTypeEmoji: Record<ArticleType, string> = {
+  article: '📄',
+  how_to: '📘',
+  best_practice: '⭐',
+  process: '🔄',
+  policy: '📜',
+  faq: '❓',
+  template: '🧾',
+  checklist: '✅',
+  glossary: '🔤',
+}
+
 export const articleStatuses: Record<ArticleStatus, string> = {
   draft: 'Entwurf',
   review: 'In Prüfung',

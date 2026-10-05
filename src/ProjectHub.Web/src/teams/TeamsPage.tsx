@@ -3,6 +3,7 @@ import type { Me } from '../identity/api'
 import { AnonymizePersonForm } from '../privacy/AnonymizePersonForm'
 import { createTeam, fetchTeams, type TeamSummary } from './api'
 import { TeamDetailsPanel } from './TeamDetailsPanel'
+import { EmptyState } from '../ui/EmptyState'
 
 export function TeamsPage({ me }: { me: Me }) {
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -27,7 +28,9 @@ export function TeamsPage({ me }: { me: Me }) {
       {teams === null ? (
         <p>Teams werden geladen …</p>
       ) : teams.length === 0 ? (
-        <p>Noch keine Teams.</p>
+        <EmptyState emoji="👥" hint="Leg oben das erste Team an.">
+          Noch keine Teams.
+        </EmptyState>
       ) : (
         <ul className="team-list">
           {teams.map((team) => (

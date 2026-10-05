@@ -38,6 +38,16 @@ Ein zentraler Bot (ADR 0011). `WEBEX_BOT_TOKEN` und `WEBEX_WEBHOOK_SECRET` komme
 
 Webhooks validieren (HMAC-SHA1-Signatur, Vergleich in konstanter Zeit, ohne Secret wird nichts angenommen), deduplizieren und idempotent verarbeiten. Meeting- und Raum-Links nur als `https` auf `webex.com`.
 
+## KI (ADR 0015)
+
+- Ohne Konfiguration aus. `ANTHROPIC_API_KEY` und `PROJECTHUB_AI_API_KEY` nur aus dem Secret Store bzw. `.env`, nie im Browser oder Log.
+- Jedes Werkzeug läuft als die angemeldete Person über die vorhandenen Services; Wissen wird in der Datenbankabfrage gefiltert. Ein Modell sieht und tut nichts, was die Person nicht darf.
+- Prompt Injection: Werkzeugergebnisse gelten als Daten. Jede Änderung durch den Assistenten braucht die Freigabe der Person in der Oberfläche; über MCP gibt es Schreibwerkzeuge nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true`, und der Client fragt nach (ADR 0016).
+- Der auf Freigabe wartende Schritt geht verschlüsselt und signiert an den Browser (Data Protection, an die Person gebunden, 30 Minuten, einmal verwendbar); freigegeben wird genau, was die Karte zeigt. Die Oberfläche macht nur Links auf ProjectHub-Artikel klickbar und lädt keine Bilder, damit kein Inhalt Daten an fremde Server schicken kann.
+- Gespräche werden nicht gespeichert; Telemetrie enthält Modell, Tokens und Werkzeugnamen, keine Prompts oder Antworten.
+- Eigenes Rate Limit je Person für den Assistenten; Eingaben sind in Anzahl und Länge begrenzt.
+- MCP: nur Entra-ID-Token des Mandanten; der Endpunkt liegt unter `/api/v1` mit derselben Autorisierung.
+
 ## Logging
 
 Nicht loggen:
@@ -82,4 +92,4 @@ Mindestens:
 
 DSGVO und interne Richtlinien mit IT/Datenschutz/Security abstimmen. Die AI darf rechtliche Freigaben nicht voraussetzen.
 
-Überblick über die rechtlichen Anforderungen und eine Checkliste für Betreiber: `docs/LEGAL.md`. Umgesetzt (ADR 0015): Export der eigenen Daten, Anonymisieren von Personen durch Organisations-Admins, Löschfristen für Benachrichtigungen, Aktivität und Audit-Log, Links auf Datenschutzhinweise und Impressum. Zugriffslogs des Web-Containers enthalten weder IP-Adresse noch Query-String (dort stünde das Token der Hubs).
+Überblick über die rechtlichen Anforderungen und eine Checkliste für Betreiber: `docs/LEGAL.md`. Umgesetzt (ADR 0017): Export der eigenen Daten, Anonymisieren von Personen durch Organisations-Admins, Löschfristen für Benachrichtigungen, Aktivität und Audit-Log, Links auf Datenschutzhinweise und Impressum. Zugriffslogs des Web-Containers enthalten weder IP-Adresse noch Query-String (dort stünde das Token der Hubs).

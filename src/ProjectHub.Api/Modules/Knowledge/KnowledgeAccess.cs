@@ -65,6 +65,9 @@ public sealed class KnowledgeAccess(ProjectHubDbContext db)
                                 || (p.PrincipalType == "team" && teamIds.Contains(p.PrincipalId)))));
     }
 
+    /// <summary>Knowledge spaces; names are not restricted, the articles in them are.</summary>
+    public IQueryable<KnowledgeSpace> Spaces() => db.Set<KnowledgeSpace>().AsNoTracking();
+
     public async Task<KnowledgeRight> RightAsync(KnowledgeReader reader, KnowledgeArticle article, CancellationToken ct)
     {
         if (article.OrganizationId != reader.OrganizationId || article.DeletedAt is not null)

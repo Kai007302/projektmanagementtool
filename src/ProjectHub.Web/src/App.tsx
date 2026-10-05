@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
+import { fetchAiStatus, type AiStatus } from './ai/api'
+import { AssistantPage } from './ai/AssistantPage'
 import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
+import { initials } from './identity/initials'
 import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import type { Notification } from './notifications/api'
@@ -10,6 +13,7 @@ import { NotificationBell } from './notifications/NotificationBell'
 import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
+import { ThemeToggle } from './ui/ThemeToggle'
 import './App.css'
 
 const statusText: Record<ApiStatus, string> = {
@@ -23,11 +27,11 @@ const roleText: Record<Me['organizationRole'], string> = {
   member: 'Mitglied',
 }
 
-type Session = { me: Me; organization: Organization }
+type Session = { me: Me; organization: Organization; ai: AiStatus | null }
 
-type Tab = 'projects' | 'knowledge' | 'teams'
+type Tab = 'projects' | 'knowledge' | 'teams' | 'assistant'
 
-const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', teams: 'Teams' }
+const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', teams: 'Teams', assistant: 'Assistent' }
 
 function App() {
   const [status, setStatus] = useState<ApiStatus>('checking')
@@ -47,8 +51,8 @@ function App() {
 
   useEffect(() => {
     let current = true
-    Promise.all([fetchMe(), fetchOrganization()]).then(
-      ([me, organization]) => current && setSession({ me, organization }),
+    Promise.all([fetchMe(), fetchOrganization(), fetchAiStatus().catch(() => null)]).then(
+      ([me, organization, ai]) => current && setSession({ me, organization, ai }),
       (e: Error) => current && setError(e.message),
     )
     return () => {
@@ -89,7 +93,7 @@ function App() {
           </div>
           {session && (
             <nav className="main-nav" aria-label="Bereiche">
-              {(Object.keys(tabText) as Tab[]).map((value) => (
+              {(Object.keys(tabText) as Tab[]).filter((value) => value !== 'assistant' || session.ai?.enabled).map((value) => (
                 <button
                   key={value}
                   type="button"
@@ -107,6 +111,7 @@ function App() {
             </nav>
           )}
           <div className="account">
+            <ThemeToggle />
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
               <div className="account-row">
@@ -146,6 +151,16 @@ function App() {
             )}
             {tab === 'knowledge' && <KnowledgePage key={`${session.me.id}:${openArticle}`} me={session.me} initialArticleId={openArticle} />}
             {tab === 'teams' && <TeamsPage key={session.me.id} me={session.me} />}
+            {tab === 'assistant' && session.ai?.enabled && (
+              <AssistantPage
+                key={session.me.id}
+                status={session.ai}
+                onOpenArticle={(id) => {
+                  setOpenArticle(id)
+                  setTab('knowledge')
+                }}
+              />
+            )}
           </>
         )}
       </main>
@@ -157,16 +172,6 @@ function App() {
       </footer>
     </div>
   )
-}
-
-/** Up to two initials for the avatar, e.g. "Ada Admin" → "AA". */
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('')
 }
 
 export default App
