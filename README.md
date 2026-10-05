@@ -136,7 +136,7 @@ PROJECTHUB_E2E_BASE_URL=http://localhost:8080 npm run e2e
 
 `docker compose --profile app up --build` baut und startet API und Web-Container (ADR 0012); die App läuft dann auf http://localhost:8080. Standard ist Development mit den synthetischen Benutzern. Der Web-Container liefert den Produktions-Build mit Sicherheits-Headern aus und leitet `/api` und `/health` an die API weiter, damit der Browser nur eine Adresse kennt. TLS übernimmt im Betrieb der Ingress davor. Konfiguration, Probes, Backup und Restore, Ausfälle und den Lasttest beschreibt `docs/OPERATIONS.md`.
 
-Für den Betrieb auf einem eigenen Server (Anmeldung mit Microsoft Entra ID, TLS über Caddy, Sicherung per Skript) gibt es `docker-compose.prod.yml`; Schritt für Schritt in `docs/SELF_HOSTING.md`.
+Für den Betrieb auf einem eigenen Server (Anmeldung mit Microsoft Entra ID, TLS über Caddy, Sicherung per Skript) gibt es `docker-compose.prod.yml`; Schritt für Schritt in `docs/SELF_HOSTING.md`. Als Portainer-Stack mit fertigen Images aus GHCR: `docker-compose.portainer.yml` (ADR 0019).
 
 ### Projektstruktur
 

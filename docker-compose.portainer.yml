@@ -1,0 +1,145 @@
+# ProjectHub as a Portainer stack (docs/SELF_HOSTING.md "Portainer", ADR 0019). Same services as
+# docker-compose.prod.yml, but nothing is built and nothing is read from a repository checkout:
+#   - the images come prebuilt from GHCR (.github/workflows/images.yml), the Caddyfile is baked into projecthub-caddy;
+#   - the only bind mount is the folder with the privacy notice, by absolute path (PROJECTHUB_LEGAL_DIR).
+# Paste this file into Portainer's web editor (or point a Git stack at it) and load .env.prod.example as environment
+# variables. Name the stack "projecthub", so volume names match scripts/backup.sh and scripts/restore.sh.
+# Keep the environment of the api service identical to docker-compose.prod.yml (CI compares both).
+# Caddy terminates TLS (Let's Encrypt) and is the only service with public ports. Migrations run once in the
+# "migrate" service before the API starts; the API itself never migrates (PROJECTHUB_APPLY_MIGRATIONS=false).
+name: projecthub
+
+x-database: &database
+  PROJECTHUB_DB_CONNECTION: Host=postgres;Port=5432;Database=projecthub;Username=projecthub;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt};GSS Encryption Mode=Disable
+
+# Container logs on disk: at most 5 x 10 MB per service, then the oldest is overwritten (ADR 0017).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
+services:
+  caddy:
+    image: ${PROJECTHUB_IMAGE_REGISTRY:-ghcr.io/kai007302}/projecthub-caddy:${PROJECTHUB_VERSION:-latest}
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PROJECTHUB_DOMAIN: ${PROJECTHUB_DOMAIN:?PROJECTHUB_DOMAIN fehlt}
+    volumes:
+      # Privacy notice and imprint as static pages under /rechtliches/ (docs/LEGAL.md). A folder on the host.
+      - ${PROJECTHUB_LEGAL_DIR:-/opt/projecthub/legal}:/srv/legal:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+  web:
+    image: ${PROJECTHUB_IMAGE_REGISTRY:-ghcr.io/kai007302}/projecthub-web:${PROJECTHUB_VERSION:-latest}
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - api
+
+  api:
+    image: ${PROJECTHUB_IMAGE_REGISTRY:-ghcr.io/kai007302}/projecthub-api:${PROJECTHUB_VERSION:-latest}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      <<: *database
+      ASPNETCORE_ENVIRONMENT: Production
+      REDIS_CONNECTION: redis:6379
+      PROJECTHUB_APPLY_MIGRATIONS: "false"
+      PROJECTHUB_SEED_DEVELOPMENT_DATA: "false"
+      # Caddy -> web (nginx) -> api: the API sees exactly one forwarding proxy entry, Caddy's.
+      PROJECTHUB_TRUST_FORWARDED_HEADERS: "true"
+      PROJECTHUB_APP_URL: https://${PROJECTHUB_DOMAIN}
+      PROJECTHUB_PUBLIC_API_URL: https://${PROJECTHUB_DOMAIN}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?ENTRA_TENANT_ID fehlt}
+      ENTRA_CLIENT_ID: ${ENTRA_CLIENT_ID:?ENTRA_CLIENT_ID fehlt}
+      ENTRA_API_SCOPE: ${ENTRA_API_SCOPE:-}
+      PROJECTHUB_USER_PROVISIONING: ${PROJECTHUB_USER_PROVISIONING:-first-sign-in}
+      PROJECTHUB_ORGANIZATION_NAME: ${PROJECTHUB_ORGANIZATION_NAME:-ProjectHub}
+      PROJECTHUB_MAIL_TRANSPORT: ${PROJECTHUB_MAIL_TRANSPORT:-fake}
+      MICROSOFT_GRAPH_TENANT_ID: ${MICROSOFT_GRAPH_TENANT_ID:-}
+      MICROSOFT_GRAPH_CLIENT_ID: ${MICROSOFT_GRAPH_CLIENT_ID:-}
+      MICROSOFT_GRAPH_CLIENT_SECRET: ${MICROSOFT_GRAPH_CLIENT_SECRET:-}
+      MICROSOFT_GRAPH_SENDER_MAILBOX: ${MICROSOFT_GRAPH_SENDER_MAILBOX:-}
+      PROJECTHUB_WEBEX_TRANSPORT: ${PROJECTHUB_WEBEX_TRANSPORT:-off}
+      WEBEX_BOT_TOKEN: ${WEBEX_BOT_TOKEN:-}
+      WEBEX_WEBHOOK_SECRET: ${WEBEX_WEBHOOK_SECRET:-}
+      PROJECTHUB_AI_PROVIDER: ${PROJECTHUB_AI_PROVIDER:-off}
+      PROJECTHUB_AI_MODEL: ${PROJECTHUB_AI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      PROJECTHUB_AI_API_KEY: ${PROJECTHUB_AI_API_KEY:-}
+      PROJECTHUB_AI_BASE_URL: ${PROJECTHUB_AI_BASE_URL:-}
+      PROJECTHUB_AI_EFFORT: ${PROJECTHUB_AI_EFFORT:-medium}
+      PROJECTHUB_AI_MAX_OUTPUT_TOKENS: ${PROJECTHUB_AI_MAX_OUTPUT_TOKENS:-16000}
+      PROJECTHUB_AI_RATE_LIMIT_PER_MINUTE: ${PROJECTHUB_AI_RATE_LIMIT_PER_MINUTE:-10}
+      PROJECTHUB_AI_WRITE_TOOLS: ${PROJECTHUB_AI_WRITE_TOOLS:-true}
+      PROJECTHUB_MCP: ${PROJECTHUB_MCP:-off}
+      PROJECTHUB_MCP_WRITE_TOOLS: ${PROJECTHUB_MCP_WRITE_TOOLS:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Data protection (docs/LEGAL.md, ADR 0017)
+      PROJECTHUB_PRIVACY_NOTICE_URL: ${PROJECTHUB_PRIVACY_NOTICE_URL:-}
+      PROJECTHUB_IMPRINT_URL: ${PROJECTHUB_IMPRINT_URL:-}
+      PROJECTHUB_RETENTION_NOTIFICATION_DAYS: ${PROJECTHUB_RETENTION_NOTIFICATION_DAYS:-1095}
+      PROJECTHUB_RETENTION_ACTIVITY_DAYS: ${PROJECTHUB_RETENTION_ACTIVITY_DAYS:-1095}
+      PROJECTHUB_RETENTION_AUDIT_DAYS: ${PROJECTHUB_RETENTION_AUDIT_DAYS:-1095}
+    volumes:
+      - projecthub-data:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  migrate:
+    # Same image as the API; only migrates and exits.
+    image: ${PROJECTHUB_IMAGE_REGISTRY:-ghcr.io/kai007302}/projecthub-api:${PROJECTHUB_VERSION:-latest}
+    command: ["--migrate"]
+    restart: "no"
+    logging: *logging
+    environment:
+      <<: *database
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_DB: projecthub
+      POSTGRES_USER: projecthub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U projecthub -d projecthub"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Realtime fan-out only (ADR 0003): nothing to persist.
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres:
+  projecthub-data:
+  caddy-data:
+  caddy-config:

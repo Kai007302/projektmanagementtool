@@ -46,6 +46,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-040 | Benachrichtigungen beim Import von Aufgaben | offen | keine Benachrichtigung je zugewiesener Aufgabe, damit ein Import mit vielen Zeilen keine Mailflut auslöst; die Aufgaben erscheinen im Board und im Aktivitätsfeed (ADR 0018) |
 | DEC-041 | Inhalt des Kalender-Abos | offen | der Person zugewiesene Aufgaben mit Termin und Meilensteine ihrer Projekte, ab 90 Tagen zurück; Titel mit Projektname, keine Beschreibung. Wer die Adresse kennt, sieht das; kein Schalter für Betreiber, der Abos verbietet (ADR 0018) |
 | DEC-042 | Was der Import von Aufgaben anlegt | offen | immer neue Aufgaben der obersten Ebene, alle Zeilen oder keine. Kein Aktualisieren über die ID, keine Unteraufgaben aus „Übergeordnete Aufgabe“ (ADR 0018) |
+| DEC-043 | Veröffentlichte Images | offen | öffentlich in GHCR (`ghcr.io/kai007302/projecthub-*`), wie das Repository selbst; enthalten keine Secrets und keine Konfiguration. Privat ginge auch, dann braucht der Server Zugangsdaten für GHCR (ADR 0019) |
 
 
 ## Knowledge / AI
