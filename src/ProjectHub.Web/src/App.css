@@ -1529,6 +1529,129 @@ fieldset.block-fields {
   text-align: center;
 }
 
+.sticky-stack {
+  position: relative;
+  display: inline-flex;
+}
+
+.sticky-stack-pile {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  cursor: grab;
+}
+
+.sticky-stack-sheets {
+  position: relative;
+  width: 1.4rem;
+  height: 1.25rem;
+}
+
+.sticky-stack-sheets span {
+  position: absolute;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid var(--sheet-stroke);
+  border-radius: 2px;
+  background: var(--sheet-fill);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.15);
+}
+
+.sticky-stack-sheets span:nth-child(1) {
+  top: 0.2rem;
+  left: 0.3rem;
+  transform: rotate(6deg);
+}
+
+.sticky-stack-sheets span:nth-child(2) {
+  top: 0.1rem;
+  left: 0.15rem;
+  transform: rotate(-4deg);
+}
+
+.sticky-stack-sheets span:nth-child(3) {
+  top: 0;
+  left: 0;
+}
+
+.sticky-stack-toggle {
+  margin-left: -1px;
+  padding-inline: 0.5rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.sticky-swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 1px solid;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--border-strong);
+  vertical-align: middle;
+}
+
+.sticky-stack-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 16rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.sticky-swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.4rem;
+}
+
+.sticky-swatches .sticky-swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.sticky-swatches .sticky-swatch[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sticky-stack-popover label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.board-quick-add {
+  cursor: copy;
+}
+
+.board-quick-add circle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.board-quick-add path {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
 .board-templates {
   margin-top: 0.75rem;
   padding: 0.75rem 1rem 1rem;

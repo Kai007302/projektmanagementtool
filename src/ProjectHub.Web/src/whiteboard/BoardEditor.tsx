@@ -7,9 +7,11 @@ import { TaskDetails } from '../tasks/TaskDetails'
 import { fetchWhiteboardTasks, type Whiteboard, type WhiteboardTask } from './api'
 import {
   addObject,
+  addNextTo,
   addObjects,
   boundsOf,
   colors,
+  isColor,
   describe,
   localOrigin,
   moveBy,
@@ -17,13 +19,16 @@ import {
   objectTypes,
   readObjects,
   removeObject,
+  stickyGrid,
   updateObject,
   type BoardObject,
   type Changes,
   type Color,
+  type NewObject,
   type ObjectType,
 } from './model'
-import { diamondPoints, fills, strokes } from './palette'
+import { diamondPoints, fills, strokes, textColor } from './palette'
+import { StickyStack, stickyDragType } from './StickyStack'
 import { connectWhiteboard, type Peer, type SyncStatus, type WhiteboardSync } from './sync'
 import { TemplatePicker } from './TemplatePicker'
 import type { Template } from './templates'
@@ -54,7 +59,19 @@ const statusText: Record<SyncStatus, string> = {
   offline: 'Offline. Änderungen werden gesendet, sobald die Verbindung zurück ist.',
 }
 
-const addable: ObjectType[] = ['sticky', 'rect', 'ellipse', 'diamond', 'text', 'arrow']
+const addable: ObjectType[] = ['rect', 'ellipse', 'diamond', 'text', 'arrow']
+
+const stickyColorKey = 'projecthub.stickyColor'
+
+/** The last sticky color someone picked is remembered in this browser, like in Miro. */
+function rememberedStickyColor(): Color {
+  try {
+    const stored = localStorage.getItem(stickyColorKey)
+    return isColor(stored) ? stored : 'yellow'
+  } catch {
+    return 'yellow'
+  }
+}
 
 const minZoom = 0.25
 const maxZoom = 3
@@ -74,6 +91,8 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const [message, setMessage] = useState<string | null>(null)
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false })
   const [showTemplates, setShowTemplates] = useState(false)
+  const [stickyColor, setStickyColor] = useState<Color>(rememberedStickyColor)
+  const [focusTextOf, setFocusTextOf] = useState<string | null>(null)
   const docRef = useRef<Y.Doc | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
   const syncRef = useRef<WhiteboardSync | null>(null)
@@ -165,6 +184,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function select(id: string | null) {
     setSelectedId(id)
+    setFocusTextOf(null)
     syncRef.current?.sendPresence(null, null, id)
   }
 
@@ -175,18 +195,17 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   }
 
   /**
-   * Places a template as one undo step: in the middle of the view on an empty board, otherwise to the right of
+   * Places several objects as one undo step: in the middle of the view on an empty board, otherwise to the right of
    * everything already there so nothing is covered. Then zooms so all of it is visible.
    */
-  function insertTemplate(template: Template) {
+  function place(items: NewObject[]) {
     undoRef.current?.stopCapturing()
-    const size = boundsOf(template.items)
+    const size = boundsOf(items)
     const existing = objects.length > 0 ? boundsOf(objects) : null
     const center = existing ? { x: existing.x + existing.w + 120 + size.w / 2, y: existing.y + size.h / 2 } : viewCenter()
-    const { bounds } = addObjects(doc(), template.items, center)
+    const { bounds } = addObjects(doc(), items, center)
     undoRef.current?.stopCapturing()
     select(null)
-    setShowTemplates(false)
     const svg = svgRef.current
     const width = svg?.clientWidth || 600
     const height = svg?.clientHeight || 400
@@ -194,6 +213,45 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     const zoom = clampZoom(Math.min(1, (width - 2 * margin) / bounds.w, (height - 2 * margin) / bounds.h))
     setView({ zoom, x: width / 2 - (bounds.x + bounds.w / 2) * zoom, y: height / 2 - (bounds.y + bounds.h / 2) * zoom })
     svg?.focus()
+  }
+
+  function insertTemplate(template: Template) {
+    setShowTemplates(false)
+    place(template.items)
+  }
+
+  function chooseStickyColor(color: Color) {
+    setStickyColor(color)
+    try {
+      localStorage.setItem(stickyColorKey, color)
+    } catch {
+      // Remembering the color is a convenience only.
+    }
+  }
+
+  /**
+   * An empty sticky note centered on the point (default: the middle of the view), ready for typing. Notes added
+   * one after another at the same spot fan out instead of hiding each other.
+   */
+  function addSticky(center = viewCenter(), color = stickyColor) {
+    undoRef.current?.stopCapturing()
+    const at = { ...center }
+    for (let i = 0; i < 20 && objects.some((o) => Math.abs(o.x + o.w / 2 - at.x) < 12 && Math.abs(o.y + o.h / 2 - at.y) < 12); i++) {
+      at.x += 24
+      at.y += 24
+    }
+    const { ids } = addObjects(doc(), [{ type: 'sticky', x: 0, y: 0, color, text: '' }], at)
+    undoRef.current?.stopCapturing()
+    select(ids[0])
+    setFocusTextOf(ids[0])
+  }
+
+  function addStickyNextTo(object: BoardObject, direction: 'right' | 'below') {
+    undoRef.current?.stopCapturing()
+    const id = addNextTo(doc(), object, direction)
+    undoRef.current?.stopCapturing()
+    select(id)
+    setFocusTextOf(id)
   }
 
   function change(id: string, changes: Changes) {
@@ -283,6 +341,11 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       select(null)
       return
     }
+    if (canEdit && !mod && !event.altKey && event.key.toLowerCase() === 'n') {
+      event.preventDefault()
+      addSticky()
+      return
+    }
     if (!selected || !canEdit) return
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
@@ -316,6 +379,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       <div className="board-toolbar" role="toolbar" aria-label="Werkzeuge">
         {canEdit && (
           <>
+            <StickyStack color={stickyColor} onColor={chooseStickyColor} onAdd={() => addSticky()} onBulk={(lines) => place(stickyGrid(lines, stickyColor))} />
             {addable.map((type) => (
               <button key={type} type="button" onClick={() => add(type)}>
                 + {objectTypes[type]}
@@ -375,6 +439,18 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
           onPointerCancel={onPointerUp}
           onPointerLeave={onPointerLeave}
           onKeyDown={onKeyDown}
+          onDragOver={(event) => {
+            if (canEdit && event.dataTransfer.types.includes(stickyDragType)) {
+              event.preventDefault()
+              event.dataTransfer.dropEffect = 'copy'
+            }
+          }}
+          onDrop={(event) => {
+            const color = event.dataTransfer.getData(stickyDragType)
+            if (!canEdit || !color) return
+            event.preventDefault()
+            addSticky(toWorld(event.clientX, event.clientY), isColor(color) ? color : stickyColor)
+          }}
         >
           <defs>
             <marker id={`arrow-head-${board.id}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
@@ -393,6 +469,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
                 markerId={`arrow-head-${board.id}`}
                 onDown={(event) => onObjectDown(event, object)}
                 onHandleDown={(event, kind) => onHandleDown(event, object, kind)}
+                onAddNext={(direction) => addStickyNextTo(object, direction)}
               />
             ))}
             {peerList.map((peer) =>
@@ -415,6 +492,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
               object={selected}
               task={selected.taskId ? tasks.get(selected.taskId) : undefined}
               editable={canEdit}
+              focusText={focusTextOf === selected.id}
               project={project}
               me={me}
               onChange={(changes) => {
@@ -520,6 +598,7 @@ type ShapeProps = {
   markerId: string
   onDown: (event: PointerEvent) => void
   onHandleDown: (event: PointerEvent, kind: 'resize' | 'start' | 'end') => void
+  onAddNext: (direction: 'right' | 'below') => void
 }
 
 const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
@@ -530,7 +609,7 @@ const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   text: 'board-text large',
 }
 
-function ObjectShape({ object, task, selected, peerSelected, editable, markerId, onDown, onHandleDown }: ShapeProps) {
+function ObjectShape({ object, task, selected, peerSelected, editable, markerId, onDown, onHandleDown, onAddNext }: ShapeProps) {
   const { x, y, w, h } = object
   const fill = fills[object.color]
   const stroke = strokes[object.color]
@@ -588,11 +667,19 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
             )}
           </div>
         ) : (
-          <div className={textClass[object.type]}>{object.text}</div>
+          <div className={textClass[object.type]} style={object.type === 'text' ? undefined : { color: textColor(object.color) }}>
+            {object.text}
+          </div>
         )}
       </foreignObject>
       {outline && <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} fill="none" stroke={outline} strokeDasharray="6 4" strokeWidth={2} />}
       {selected && editable && <rect className="board-handle" x={x + w - 6} y={y + h - 6} width={12} height={12} onPointerDown={(event) => onHandleDown(event, 'resize')} />}
+      {selected && editable && object.type === 'sticky' && (
+        <>
+          <QuickAdd cx={x + w + 18} cy={y + h / 2} label="Notiz rechts daneben" onAdd={() => onAddNext('right')} />
+          <QuickAdd cx={x + w / 2} cy={y + h + 18} label="Notiz darunter" onAdd={() => onAddNext('below')} />
+        </>
+      )}
     </g>
   )
 }
@@ -603,6 +690,23 @@ type ListProps = {
   selectedId: string | null
   onSelect: (id: string) => void
   onTemplates?: () => void
+}
+
+/** Miro's blue dots: a click puts a new note of the same color next to the selected one. */
+function QuickAdd({ cx, cy, label, onAdd }: { cx: number; cy: number; label: string; onAdd: () => void }) {
+  return (
+    <g
+      className="board-quick-add"
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        if (event.button === 0) onAdd()
+      }}
+    >
+      <title>{label}</title>
+      <circle cx={cx} cy={cy} r={10} />
+      <path d={`M ${cx - 5} ${cy} H ${cx + 5} M ${cx} ${cy - 5} V ${cy + 5}`} />
+    </g>
+  )
 }
 
 function ObjectList({ objects, tasks, selectedId, onSelect, onTemplates }: ListProps) {
@@ -645,6 +749,7 @@ type FormProps = {
   object: BoardObject
   task: WhiteboardTask | undefined
   editable: boolean
+  focusText: boolean
   project: ProjectDetails
   me: Me
   onChange: (changes: Changes) => void
@@ -653,7 +758,7 @@ type FormProps = {
   onChanged: () => void
 }
 
-function ObjectForm({ object, task, editable, project, me, onChange, onCommit, onRemove, onChanged }: FormProps) {
+function ObjectForm({ object, task, editable, focusText, project, me, onChange, onCommit, onRemove, onChanged }: FormProps) {
   const [details, setDetails] = useState(false)
   const number = (label: string, field: 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2') => (
     <label>
@@ -687,7 +792,7 @@ function ObjectForm({ object, task, editable, project, me, onChange, onCommit, o
       {object.type !== 'task' && object.type !== 'arrow' && (
         <label className="stacked">
           Text
-          <textarea value={object.text} disabled={!editable} rows={3} maxLength={2000} onChange={(event) => onChange({ text: event.target.value })} onBlur={onCommit} />
+          <textarea value={object.text} disabled={!editable} autoFocus={focusText} rows={3} maxLength={2000} onChange={(event) => onChange({ text: event.target.value })} onBlur={onCommit} />
         </label>
       )}
       {object.type !== 'task' && (

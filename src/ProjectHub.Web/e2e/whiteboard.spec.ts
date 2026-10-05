@@ -41,10 +41,10 @@ test('two people draw together, a viewer follows and the board survives a reload
   const evaPage = await openWhiteboards(browser, 'dev-eva', name)
   await expect(claraPage.getByText(/^Verbunden · Gerade dabei: .*Ben Projektleiter/)).toBeVisible()
   await expect(evaPage.getByText(/Nur ansehen/)).toBeVisible()
-  await expect(evaPage.getByRole('button', { name: '+ Notiz' })).toHaveCount(0)
+  await expect(evaPage.getByRole('button', { name: 'Notiz hinzufügen' })).toHaveCount(0)
 
   // Ben writes a note; Clara and Eva see it without reloading.
-  await ben.getByRole('button', { name: '+ Notiz' }).click()
+  await ben.getByRole('button', { name: 'Notiz hinzufügen' }).click()
   await ben.getByLabel('Text').fill('Suche nach oben')
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
   await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' })).toBeVisible()
@@ -64,6 +64,10 @@ test('two people draw together, a viewer follows and the board survives a reload
   await ben.getByRole('region', { name: 'Vorlage einfügen' }).getByRole('button', { name: /^Retrospektive/ }).click()
   await expect(objectList(claraPage).getByRole('button', { name: 'Rechteck: Was lief gut?' })).toBeVisible()
   await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Daily auf 15 Minuten begrenzen' })).toBeVisible()
+
+  // A note dragged from the sticky stack lands on the board for everyone.
+  await ben.getByRole('button', { name: 'Notiz hinzufügen' }).dragTo(ben.getByRole('application'))
+  await expect(objectList(claraPage).getByRole('button', { name: 'Notiz (Gelb)' })).toBeVisible()
 
   // The viewer cannot change the note.
   await objectList(evaPage).getByRole('button', { name: 'Notiz: Suche nach oben' }).click()

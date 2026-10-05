@@ -9,7 +9,23 @@ export const objectsKey = 'objects'
 
 export type ObjectType = 'sticky' | 'rect' | 'ellipse' | 'diamond' | 'text' | 'arrow' | 'task'
 
-export type Color = 'yellow' | 'green' | 'blue' | 'pink' | 'gray' | 'white'
+export type Color =
+  | 'white'
+  | 'yellow'
+  | 'orange'
+  | 'red'
+  | 'pink'
+  | 'violet'
+  | 'blue'
+  | 'cyan'
+  | 'teal'
+  | 'green'
+  | 'lime'
+  | 'sand'
+  | 'gray'
+  | 'navy'
+  | 'purple'
+  | 'black'
 
 export type BoardObject = {
   id: string
@@ -36,14 +52,27 @@ export const objectTypes: Record<ObjectType, string> = {
   task: 'Aufgabe',
 }
 
+/** The sixteen colors in palette order, like the sticky notes in Miro; the last three are dark with light text. */
 export const colors: Record<Color, string> = {
-  yellow: 'Gelb',
-  green: 'Grün',
-  blue: 'Blau',
-  pink: 'Rosa',
-  gray: 'Grau',
   white: 'Weiß',
+  yellow: 'Gelb',
+  orange: 'Orange',
+  red: 'Rot',
+  pink: 'Rosa',
+  violet: 'Violett',
+  blue: 'Blau',
+  cyan: 'Hellblau',
+  teal: 'Türkis',
+  green: 'Grün',
+  lime: 'Hellgrün',
+  sand: 'Sand',
+  gray: 'Grau',
+  navy: 'Dunkelblau',
+  purple: 'Dunkelviolett',
+  black: 'Schwarz',
 }
+
+export const isColor = (value: unknown): value is Color => typeof value === 'string' && Object.hasOwn(colors, value)
 
 const defaults: Record<ObjectType, { w: number; h: number; color: Color; text: string }> = {
   sticky: { w: 180, h: 120, color: 'yellow', text: 'Neue Notiz' },
@@ -86,7 +115,7 @@ export function readObjects(doc: Y.Doc): BoardObject[] {
       h: Math.max(minSize, numberOr(value.get('h'), base.h)),
       x2: numberOr(value.get('x2'), x + 120),
       y2: numberOr(value.get('y2'), y),
-      color: color in colors ? (color as Color) : base.color,
+      color: isColor(color) ? color : base.color,
       text: stringOr(value.get('text'), ''),
       taskId: typeof value.get('taskId') === 'string' ? (value.get('taskId') as string) : null,
     })
@@ -178,6 +207,24 @@ export function addObjects(doc: Y.Doc, items: NewObject[], center: { x: number; 
     }
   }, localOrigin)
   return { ids, bounds: { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h } }
+}
+
+/** A new sticky note next to the given one (Miro's quick add): same size and color, empty, with a small gap. */
+export function addNextTo(doc: Y.Doc, object: BoardObject, direction: 'right' | 'below'): string {
+  const gap = 20
+  const x = direction === 'right' ? object.x + object.w + gap : object.x
+  const y = direction === 'below' ? object.y + object.h + gap : object.y
+  const { ids } = addObjects(doc, [{ type: 'sticky', x, y, w: object.w, h: object.h, color: object.color, text: '' }], { x: x + object.w / 2, y: y + object.h / 2 })
+  return ids[0]
+}
+
+/** Bulk mode: one sticky note per non-empty line, in a grid around the given point. At most 100 notes. */
+export function stickyGrid(lines: string[], color: Color): NewObject[] {
+  const texts = lines.map((line) => line.trim()).filter(Boolean).slice(0, 100)
+  const columns = Math.ceil(Math.sqrt(texts.length))
+  const { w, h } = defaults.sticky
+  const gap = 20
+  return texts.map((text, i) => ({ type: 'sticky', x: (i % columns) * (w + gap), y: Math.floor(i / columns) * (h + gap), w, h, color, text }))
 }
 
 export type Changes = Partial<Pick<BoardObject, 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2' | 'color' | 'text'>>

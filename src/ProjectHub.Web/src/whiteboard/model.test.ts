@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { addObject, addObjects, localOrigin, describe as describeObject, moveBy, objectsOf, readObjects, removeObject, updateObject } from './model'
+import { addNextTo, addObject, addObjects, isColor, localOrigin, stickyGrid, describe as describeObject, moveBy, objectsOf, readObjects, removeObject, updateObject } from './model'
 import { templates } from './templates'
 
 describe('whiteboard model', () => {
@@ -87,6 +87,36 @@ describe('whiteboard model', () => {
     ])
     undo.undo()
     expect(readObjects(doc)).toEqual([])
+  })
+})
+
+describe('sticky notes', () => {
+  it('adds an empty note of the same size and color next to another one', () => {
+    const doc = new Y.Doc()
+    addObjects(doc, [{ type: 'sticky', x: 0, y: 0, w: 100, h: 80, color: 'navy', text: 'A' }], { x: 50, y: 40 })
+    const [first] = readObjects(doc)
+    addNextTo(doc, first, 'right')
+    addNextTo(doc, first, 'below')
+
+    expect(readObjects(doc)).toEqual([
+      expect.objectContaining({ x: 0, y: 0, text: 'A' }),
+      expect.objectContaining({ x: 120, y: 0, w: 100, h: 80, color: 'navy', text: '' }),
+      expect.objectContaining({ x: 0, y: 100, w: 100, h: 80, color: 'navy', text: '' }),
+    ])
+  })
+
+  it('lays out one note per non-empty line in a grid', () => {
+    const items = stickyGrid(['Eins', ' ', 'Zwei', 'Drei', 'Vier', 'Fünf'], 'teal')
+    expect(items.map((i) => i.text)).toEqual(['Eins', 'Zwei', 'Drei', 'Vier', 'Fünf'])
+    expect(items.map((i) => [i.x, i.y])).toEqual([[0, 0], [200, 0], [400, 0], [0, 140], [200, 140]])
+    expect(items.every((i) => i.color === 'teal' && i.type === 'sticky')).toBe(true)
+    expect(stickyGrid(Array.from({ length: 150 }, (_, i) => `${i}`), 'yellow')).toHaveLength(100)
+  })
+
+  it('accepts only known colors', () => {
+    expect(isColor('purple')).toBe(true)
+    expect(isColor('toString')).toBe(false)
+    expect(isColor(3)).toBe(false)
   })
 })
 

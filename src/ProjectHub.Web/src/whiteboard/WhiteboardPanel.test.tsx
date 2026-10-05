@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
@@ -47,6 +47,8 @@ const current = () => sessions[sessions.length - 1]
 
 async function connect(canEdit: boolean) {
   await screen.findByRole('application')
+  // The sync session starts in an effect, which can run a moment after the canvas is in the page.
+  await waitFor(() => expect(current()).toBeDefined())
   act(() => current().handlers.onStatus('online', canEdit))
 }
 
@@ -82,7 +84,7 @@ describe('WhiteboardPanel', () => {
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
 
-    await userEvent.click(screen.getByRole('button', { name: '+ Notiz' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz hinzufügen' }))
     const text = screen.getByLabelText('Text')
     await userEvent.clear(text)
     await userEvent.type(text, 'Idee')
@@ -128,6 +130,42 @@ describe('WhiteboardPanel', () => {
     expect(readObjects(current().doc)).toEqual([])
   })
 
+  it('adds sticky notes like Miro: stack with colors, N key, notes next to the selected one and several at once', async () => {
+    localStorage.removeItem('projecthub.stickyColor')
+    fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
+    const { container } = render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    await connect(true)
+
+    await userEvent.click(screen.getByRole('button', { name: /^Notizfarbe und mehrere Notizen/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Orange' }))
+    expect(screen.getByRole('button', { name: 'Notizfarbe und mehrere Notizen (Orange)' })).toHaveAttribute('aria-expanded', 'false')
+    expect(localStorage.getItem('projecthub.stickyColor')).toBe('orange')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz hinzufügen' }))
+    expect(readObjects(current().doc)).toEqual([expect.objectContaining({ type: 'sticky', color: 'orange', text: '' })])
+    expect(screen.getByLabelText('Text')).toHaveFocus()
+    await userEvent.keyboard('Erste')
+    const first = readObjects(current().doc)[0]
+    expect(first.text).toBe('Erste')
+
+    // The dot to the right puts an empty note of the same color and size next to it.
+    fireEvent.pointerDown(container.querySelector('.board-quick-add')!, { button: 0 })
+    const next = readObjects(current().doc).find((o) => o.id !== first.id)!
+    expect(next).toMatchObject({ x: first.x + first.w + 20, y: first.y, color: 'orange', text: '' })
+
+    screen.getByRole('application').focus()
+    await userEvent.keyboard('n')
+    expect(readObjects(current().doc)).toHaveLength(3)
+
+    await userEvent.click(screen.getByRole('button', { name: /^Notizfarbe und mehrere Notizen/ }))
+    await userEvent.type(screen.getByLabelText('Mehrere Notizen, eine pro Zeile'), 'Eins{Enter}{Enter}Zwei{Enter}Drei')
+    await userEvent.click(screen.getByRole('button', { name: 'Notizen einfügen' }))
+    expect(readObjects(current().doc).filter((o) => ['Eins', 'Zwei', 'Drei'].includes(o.text))).toHaveLength(3)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }))
+    expect(readObjects(current().doc)).toHaveLength(3)
+  })
+
   it('shows changes and people from others live', async () => {
     fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
@@ -169,7 +207,7 @@ describe('WhiteboardPanel', () => {
     await connect(false)
     act(() => void addObject(current().doc, 'sticky', { x: 0, y: 0 }))
 
-    expect(screen.queryByRole('button', { name: '+ Notiz' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notiz hinzufügen' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Vorlagen' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Neues Whiteboard')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Umbenennen' })).not.toBeInTheDocument()
