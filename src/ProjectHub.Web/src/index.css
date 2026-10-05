@@ -13,6 +13,11 @@
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-soft: #eef2ff;
+  --accent-text: #4f46e5;
+  --header-bg: rgb(255 255 255 / 0.9);
+  --segment-bg: #e9eef5;
+  --chip-fg: #475569;
+  --danger-border: #fecaca;
   --danger: #b91c1c;
   --danger-soft: #fef2f2;
   --success: #15803d;
@@ -34,6 +39,65 @@
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode: follows the system unless a choice is stored (data-theme on <html>, see ui/theme.ts). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b1020;
+    --surface: #121a2b;
+    --surface-muted: #1a2336;
+    --border: #243049;
+    --border-strong: #334260;
+    --text: #e6e9f2;
+    --muted: #9aa6bd;
+    --accent: #4f46e5;
+    --accent-hover: #5b5cf0;
+    --accent-soft: rgb(129 140 248 / 0.16);
+    --accent-text: #a5b4fc;
+    --danger: #f87171;
+    --danger-soft: rgb(248 113 113 / 0.12);
+    --danger-border: rgb(248 113 113 / 0.35);
+    --success: #4ade80;
+    --success-soft: rgb(74 222 128 / 0.12);
+    --warning: #facc15;
+    --warning-soft: rgb(250 204 21 / 0.12);
+    --header-bg: rgb(18 26 43 / 0.85);
+    --segment-bg: #0b1020;
+    --chip-fg: #c3cad8;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #0b1020;
+  --surface: #121a2b;
+  --surface-muted: #1a2336;
+  --border: #243049;
+  --border-strong: #334260;
+  --text: #e6e9f2;
+  --muted: #9aa6bd;
+  --accent: #4f46e5;
+  --accent-hover: #5b5cf0;
+  --accent-soft: rgb(129 140 248 / 0.16);
+  --accent-text: #a5b4fc;
+  --danger: #f87171;
+  --danger-soft: rgb(248 113 113 / 0.12);
+  --danger-border: rgb(248 113 113 / 0.35);
+  --success: #4ade80;
+  --success-soft: rgb(74 222 128 / 0.12);
+  --warning: #facc15;
+  --warning-soft: rgb(250 204 21 / 0.12);
+  --header-bg: rgb(18 26 43 / 0.85);
+  --segment-bg: #0b1020;
+  --chip-fg: #c3cad8;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
 }
 
 body {
@@ -64,7 +128,7 @@ h4 {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 

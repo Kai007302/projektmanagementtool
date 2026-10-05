@@ -39,6 +39,7 @@ import {
   type Zoom,
 } from './timeline'
 import { useLatest } from '../api/useLatest'
+import { EmptyState } from '../ui/EmptyState'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -231,7 +232,7 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
           </ul>
         </section>
       )}
-      {rows.length === 0 && <p className="muted">Noch keine Aufgaben. Lege im Board oder in der Liste Aufgaben an.</p>}
+      {rows.length === 0 && <EmptyState emoji="📊">Noch keine Aufgaben. Lege im Board oder in der Liste Aufgaben an.</EmptyState>}
       <div className="gantt-chart">
         <ol className="gantt-labels" aria-label="Aufgaben">
           <li className="gantt-label-spacer" style={{ height: headerHeight }} aria-hidden="true" />

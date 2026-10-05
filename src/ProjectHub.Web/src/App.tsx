@@ -10,6 +10,7 @@ import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
+import { ThemeToggle } from './ui/ThemeToggle'
 import './App.css'
 
 const statusText: Record<ApiStatus, string> = {
@@ -107,6 +108,7 @@ function App() {
             </nav>
           )}
           <div className="account">
+            <ThemeToggle />
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
               <div className="account-row">

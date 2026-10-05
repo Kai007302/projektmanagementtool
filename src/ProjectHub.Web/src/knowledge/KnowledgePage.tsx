@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { Me } from '../identity/api'
+import { EmptyState } from '../ui/EmptyState'
 import {
   articleStatuses,
+  articleTypeEmoji,
   articleTypes,
   createArticle,
   createSpace,
@@ -17,6 +19,7 @@ import {
   type Visibility,
 } from './api'
 import { ArticleView } from './ArticleView'
+import { typeColors } from './galaxy/graph'
 import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
 
 type Props = { me: Me; initialArticleId?: string | null }
@@ -97,7 +100,9 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
               {articles === null ? (
                 <p>Artikel werden geladen …</p>
               ) : articles.length === 0 ? (
-                <p>Keine Artikel gefunden.</p>
+                <EmptyState emoji="🔍" hint="Probier einen anderen Suchbegriff oder Filter.">
+                  Keine Artikel gefunden.
+                </EmptyState>
               ) : (
                 <ul className="card-list" aria-label="Artikel">
                   {articles.map((article) => (
@@ -121,8 +126,16 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
 
 export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOpen: () => void }) {
   return (
-    <button type="button" className="card article-card" onClick={onOpen}>
+    <button
+      type="button"
+      className="card article-card"
+      style={{ ['--article-type' as string]: typeColors[article.articleType] }}
+      onClick={onOpen}
+    >
       <span className="card-title">
+        <span className="article-type-icon" aria-hidden="true">
+          {articleTypeEmoji[article.articleType]}
+        </span>{' '}
         {article.title}
         {article.visibility === 'restricted' && <span aria-label="eingeschränkt"> 🔒</span>}
       </span>

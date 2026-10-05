@@ -1,10 +1,7 @@
+import { today } from '../ui/personality'
+
 const format = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' })
 const formatLong = new Intl.DateTimeFormat('de-DE', { dateStyle: 'full' })
-
-function today() {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
 
 /** Due date as a chip ("14. Okt."); overdue open tasks are marked red. Dates are calendar days (YYYY-MM-DD). */
 export function DueDate({ date, done }: { date: string; done: boolean }) {

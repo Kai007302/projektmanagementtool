@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import {
+  articleTypeEmoji,
   articleStatuses,
   articleTypes,
   changeStatus,
@@ -110,7 +111,7 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
         <div>
           <h2 id="article-heading">{article.title}</h2>
           <p className="muted">
-            {articleTypes[article.articleType]} · <span className={`article-status status-${article.status}`}>{articleStatuses[article.status]}</span>
+            <span aria-hidden="true">{articleTypeEmoji[article.articleType]}</span> {articleTypes[article.articleType]} · <span className={`article-status status-${article.status}`}>{articleStatuses[article.status]}</span>
             {article.visibility === 'restricted' && ' · 🔒 eingeschränkt'}
             {article.spaceName && ` · ${article.spaceName}`}
             {article.ownerName && ` · verantwortlich: ${article.ownerName}`}
