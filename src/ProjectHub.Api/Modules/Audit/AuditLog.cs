@@ -27,6 +27,8 @@ public static class AuditActions
     public const string KnowledgeVisibilityChanged = "KnowledgeVisibilityChanged";
     public const string KnowledgePermissionsChanged = "KnowledgePermissionsChanged";
     public const string KnowledgeArticleDeleted = "KnowledgeArticleDeleted";
+    public const string PersonalDataExported = "PersonalDataExported";
+    public const string UserAnonymized = "UserAnonymized";
 }
 
 public interface IAuditLog

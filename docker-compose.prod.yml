@@ -8,10 +8,18 @@ name: projecthub
 x-database: &database
   PROJECTHUB_DB_CONNECTION: Host=postgres;Port=5432;Database=projecthub;Username=projecthub;Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt in .env};GSS Encryption Mode=Disable
 
+# Container logs on disk: at most 5 x 10 MB per service, then the oldest is overwritten (ADR 0017).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *logging
     ports:
       - "80:80"
       - "443:443"
@@ -20,6 +28,8 @@ services:
       PROJECTHUB_DOMAIN: ${PROJECTHUB_DOMAIN:?PROJECTHUB_DOMAIN fehlt in .env}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Privacy notice and imprint as static pages under /rechtliches/ (docs/LEGAL.md).
+      - ./legal:/srv/legal:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
@@ -32,6 +42,7 @@ services:
         VITE_DEV_IDENTITY: "false"
     image: projecthub-web:local
     restart: unless-stopped
+    logging: *logging
     depends_on:
       - api
 
@@ -41,6 +52,7 @@ services:
       dockerfile: src/ProjectHub.Api/Dockerfile
     image: projecthub-api:local
     restart: unless-stopped
+    logging: *logging
     environment:
       <<: *database
       ASPNETCORE_ENVIRONMENT: Production
@@ -76,6 +88,12 @@ services:
       PROJECTHUB_MCP: ${PROJECTHUB_MCP:-off}
       PROJECTHUB_MCP_WRITE_TOOLS: ${PROJECTHUB_MCP_WRITE_TOOLS:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # Data protection (docs/LEGAL.md, ADR 0017)
+      PROJECTHUB_PRIVACY_NOTICE_URL: ${PROJECTHUB_PRIVACY_NOTICE_URL:-}
+      PROJECTHUB_IMPRINT_URL: ${PROJECTHUB_IMPRINT_URL:-}
+      PROJECTHUB_RETENTION_NOTIFICATION_DAYS: ${PROJECTHUB_RETENTION_NOTIFICATION_DAYS:-1095}
+      PROJECTHUB_RETENTION_ACTIVITY_DAYS: ${PROJECTHUB_RETENTION_ACTIVITY_DAYS:-1095}
+      PROJECTHUB_RETENTION_AUDIT_DAYS: ${PROJECTHUB_RETENTION_AUDIT_DAYS:-1095}
     volumes:
       - projecthub-data:/data
     depends_on:
@@ -90,6 +108,7 @@ services:
     pull_policy: never
     command: ["--migrate"]
     restart: "no"
+    logging: *logging
     environment:
       <<: *database
     depends_on:
@@ -99,6 +118,7 @@ services:
   postgres:
     image: postgres:18
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: projecthub
       POSTGRES_USER: projecthub
@@ -115,6 +135,7 @@ services:
   redis:
     image: redis:8-alpine
     restart: unless-stopped
+    logging: *logging
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

@@ -2223,4 +2223,49 @@ fieldset.block-fields {
 }
 :root[data-theme='dark'] .priority-urgent {
   --priority-fg: #fca5a5;
+
+/* Legal links and own data export (ADR 0017) */
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.75rem;
+}
+
+.legal-links a,
+.legal-links .link-button {
+  color: var(--muted);
+  font-size: inherit;
+}
+
+.anonymize-person {
+  margin: 1rem 0;
+}
+
+.anonymize-person summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.anonymize-person form,
+.anonymize-person li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.anonymize-person ul {
+  list-style: none;
+  padding: 0;
 }

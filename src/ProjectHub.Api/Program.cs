@@ -18,6 +18,7 @@ using ProjectHub.Api.Modules.Kanban;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Organizations;
+using ProjectHub.Api.Modules.Privacy;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Realtime;
 using ProjectHub.Api.Modules.Tasks;
@@ -69,6 +70,7 @@ builder.Services.AddAiModule(builder.Configuration, builder.Environment);
 builder.Services.AddRealtimeModule(settings);
 builder.Services.AddAttachmentsModule(builder.Configuration, builder.Environment);
 builder.Services.AddWhiteboardModule(builder.Configuration, builder.Environment);
+builder.Services.AddPrivacyModule(builder.Configuration);
 
 var app = builder.Build();
 
@@ -117,7 +119,8 @@ app.MapApiV1()
     .MapNotificationEndpoints()
     .MapWhiteboardEndpoints()
     .MapKnowledgeEndpoints()
-    .MapAiEndpoints();
+    .MapAiEndpoints()
+    .MapPrivacyEndpoints();
 
 app.MapRealtimeEndpoints();
 app.MapNotificationHub();

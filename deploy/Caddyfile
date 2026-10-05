@@ -2,6 +2,21 @@
 # the domain must point at this server and ports 80 and 443 must be reachable.
 {$PROJECTHUB_DOMAIN} {
 	encode zstd gzip
-	# The web container serves the app and forwards /api (including WebSockets) and /health to the API.
-	reverse_proxy web:8080
+
+	# The operator's privacy notice and imprint from ./legal (docs/LEGAL.md), readable without signing in.
+	handle_path /rechtliches/* {
+		root * /srv/legal
+		header {
+			Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'"
+			X-Content-Type-Options nosniff
+			Referrer-Policy no-referrer
+			Strict-Transport-Security "max-age=31536000"
+		}
+		file_server
+	}
+
+	# Everything else: the web container serves the app and forwards /api (including WebSockets) and /health to the API.
+	handle {
+		reverse_proxy web:8080
+	}
 }

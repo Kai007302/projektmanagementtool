@@ -112,6 +112,12 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Der Realtime-Hub `/api/v1/hubs/notifications` stellt nur an die angemeldete Person zu und überträgt nur den Zähler.
 - Den Zustand der Mail-Warteschlange (`/admin/mail-outbox`) sehen nur Organisations-Admins, und nur für ihre Organisation. Antworten enthalten weder Adressen noch Betreff. Erneutes Versenden einer fehlgeschlagenen Mail steht im `audit_log`.
 
+## Datenschutz
+
+- Den Export der eigenen Daten (`/me/data-export`) bekommt jede angemeldete Person, nur für sich selbst. Jeder Export steht im `audit_log`.
+- Personen anonymisieren (`/admin/users/{id}/anonymize`) dürfen nur Organisations-Admins, nur in ihrer Organisation (sonst 404) und nie sich selbst (400). Die Anonymisierung steht im `audit_log`.
+- Die Links auf Datenschutzhinweise und Impressum (`/legal`) sind ohne Anmeldung lesbar.
+
 ## Webex
 
 - Webex-Links eines Projekts sieht, wer das Projekt sehen darf (View). Links hinzufügen, entfernen und einen Projektraum anlegen braucht Edit.
@@ -131,4 +137,4 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Außerhalb von Development: Microsoft Entra ID. Die API validiert Bearer-Tokens gegen `https://login.microsoftonline.com/{ENTRA_TENANT_ID}/v2.0` mit Audience `ENTRA_CLIENT_ID`. Die App-Registrierung selbst ist ein Human Review Gate; ohne sie ist kein Login möglich (401). Der Login-Flow im Frontend (MSAL) folgt, sobald die Registrierung existiert.
 - Development: ein gekapselter Development-Identity-Provider meldet einen der synthetischen Benutzer aus `DevelopmentSeedData` an (Header `X-Dev-User`, Standard `dev-ada`). Er stellt dieselben Claims wie Entra aus (`oid`, `tid`, `name`, `preferred_username`) und verweigert den Start außerhalb von Development.
 - Realtime (SignalR, `/api/v1/hubs/projects`): Browser können bei WebSockets keine Header senden. Mit Entra kommt das Token deshalb als `access_token` in der Query, im Development-Modus der synthetische Benutzer als `devUser`. Beides gilt nur für Pfade unter `/api/v1/hubs`. Nachrichten enthalten nur die Projekt-ID; Inhalte lädt der Client über die autorisierte API.
-- Benutzer werden nur angelegt, wenn `PROJECTHUB_USER_PROVISIONING=first-sign-in` gesetzt ist (DEC-013, ADR 0014): dann beim ersten Login, die erste Person einer Organisation als `admin`, alle weiteren als `member`. Sonst und für gesperrte (`inactive`) Benutzer gilt: Authentifizierte Konten ohne aktiven ProjectHub-Benutzer erhalten 403.
+- Benutzer werden nur angelegt, wenn `PROJECTHUB_USER_PROVISIONING=first-sign-in` gesetzt ist (DEC-013, ADR 0014): dann beim ersten Login, die erste Person einer Organisation als `admin`, alle weiteren als `member`. Name und E-Mail übernimmt die API bei jeder Anmeldung aus dem Token, wenn sie sich in Entra geändert haben (DEC-039); Rolle und Status nie. Sonst und für gesperrte (`inactive`) Benutzer gilt: Authentifizierte Konten ohne aktiven ProjectHub-Benutzer erhalten 403.

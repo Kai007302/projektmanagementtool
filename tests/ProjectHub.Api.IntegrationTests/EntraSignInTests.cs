@@ -151,4 +151,20 @@ public sealed class EntraSignInTests(InfrastructureFixture infrastructure)
         Assert.Single(people.Select(p => p!.OrganizationId).Distinct());
         Assert.Single(people, p => p!.OrganizationRole == "admin");
     }
+
+    [Fact]
+    public async Task Changed_names_and_addresses_from_Entra_are_taken_over_unless_the_address_is_taken()
+    {
+        await using var factory = Production(provisioning: true);
+        var objectId = Guid.NewGuid().ToString();
+        var first = await Client(factory, Token(objectId, "Anna Alt", "anna.alt@example.com")).GetFromJsonAsync<MeResponse>("/api/v1/me");
+        await Client(factory, Token(Guid.NewGuid().ToString(), "Bernd", "bernd@example.com")).GetFromJsonAsync<MeResponse>("/api/v1/me");
+
+        var renamed = await Client(factory, Token(objectId, "Anna Neu", "anna.neu@example.com")).GetFromJsonAsync<MeResponse>("/api/v1/me");
+        var taken = await Client(factory, Token(objectId, "Anna Neu", "bernd@example.com")).GetFromJsonAsync<MeResponse>("/api/v1/me");
+
+        Assert.Equal(first!.Id, renamed!.Id);
+        Assert.Equal(("Anna Neu", "anna.neu@example.com"), (renamed.DisplayName, renamed.Email));
+        Assert.Equal(("Anna Neu", "anna.neu@example.com"), (taken!.DisplayName, taken.Email));
+    }
 }

@@ -8,7 +8,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-002 | Azure Hosting | offen | App Service oder Container Apps |
 | DEC-003 | System-Mailbox | offen | dediziertes Funktionspostfach |
 | DEC-004 | Entra Gruppenmodell | offen | Teams/Abteilungen über Entra Groups, wo sinnvoll |
-| DEC-005 | Datenretention | offen | Unternehmensrichtlinie |
+| DEC-005 | Datenretention | entschieden (Kai, 2026-10-05), vorerst | Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre (1095 Tage), einstellbar über `PROJECTHUB_RETENTION_*` (ADR 0017); Mail-Warteschlange 7/30 Tage, Webhook-Ereignisse 30 Tage, Sicherungen 14 Tage |
 | DEC-006 | erlaubte Dateitypen | offen | Security/IT Vorgabe |
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
 | DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
@@ -40,6 +40,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-034 | Was KI ändern darf | entschieden (Kai, 2026-10-05) | Alles, was die Person selbst darf, aber jede Änderung erst nach ihrer Freigabe: Der Assistent zeigt jede Änderung als Karte mit „Ausführen“ und „Ablehnen“; über MCP fragt der Client nach, Schreibwerkzeuge nur mit `PROJECTHUB_MCP_WRITE_TOOLS=true` (ADR 0016) |
 | DEC-035 | Gespräche mit dem Assistenten | offen | werden nicht gespeichert: der Verlauf liegt nur im Browser-Tab, ein auf Freigabe wartender Schritt verschlüsselt im Browser (ADR 0016), Telemetrie ohne Prompts und Antworten (ADR 0015) |
 | DEC-036 | Embeddings für die Wissenssuche | offen | vorerst nicht: Volltextsuche mit agentischem Nachsuchen; pgvector hinter `IKnowledgeRetrieval`, wenn Antworten Umschreibungen nicht finden (ADR 0015) |
+| DEC-037 | Löschen einer Person | entschieden (Kai, 2026-10-05) | Anonymisieren statt Löschen: Name, E-Mail, Entra-Kennung und Abteilung werden überschrieben, Mitgliedschaften, Benachrichtigungen und Freigaben gelöscht, Aufgaben frei; eigene Kommentare und Inhalte bleiben mit „Ehemalige Person“. Nur Organisations-Admins (ADR 0017). Wann anonymisiert wird (z. B. beim Austritt), legt der Betreiber fest |
+| DEC-038 | Rechtstexte | offen | Datenschutzhinweise und Impressum als Links des Betreibers (`PROJECTHUB_PRIVACY_NOTICE_URL`, `PROJECTHUB_IMPRINT_URL`); auf dem eigenen Server statische Seiten unter `/rechtliches/`. Vorlage in `deploy/legal/` (ADR 0017, `docs/LEGAL.md`) |
+| DEC-039 | Name und E-Mail aus Entra ID aktuell halten | entschieden (Kai, 2026-10-05) | bei jeder Anmeldung: weichen Name oder E-Mail im Token vom gespeicherten Wert ab, übernimmt ProjectHub sie (Art. 5 Abs. 1 lit. d DSGVO). Gehört die neue E-Mail schon einem anderen Konto, bleibt die alte (Warnung im Log). Abteilung kommt nicht aus dem Token (ADR 0017) |
 
 
 ## Knowledge / AI

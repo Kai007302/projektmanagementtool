@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Modules.Identity.Authorization;
+using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.Modules.Identity;
 
@@ -23,7 +24,8 @@ public sealed record UserProvisioningOptions(bool OnFirstSignIn, string? Allowed
 
 /// <summary>
 /// Creates the organization of the configured tenant and the signed-in person's user. The first person of an
-/// organization becomes its admin, everyone after that a member. Existing users are never changed: an inactive
+/// organization becomes its admin, everyone after that a member. Existing users only get a changed name or e-mail
+/// from the token (RefreshProfileAsync, DEC-039); role and status are never changed: an inactive
 /// user stays inactive, so deactivating someone keeps them out.
 /// </summary>
 internal sealed class UserProvisioning(
@@ -84,5 +86,61 @@ internal sealed class UserProvisioning(
         {
             logger.LogWarning("First sign-in was not provisioned: the account or its e-mail address already has a user.");
         }
+    }
+
+    /// <summary>
+    /// Takes over a changed name or e-mail address from the token (DEC-039, Art. 5 (1) d GDPR), so corrections in
+    /// Entra ID reach ProjectHub at the next sign-in. An address that already belongs to another user stays unchanged.
+    /// Returns the context with the stored values.
+    /// </summary>
+    public async Task<UserContext> RefreshProfileAsync(UserContext user, ICurrentUser caller, CancellationToken ct)
+    {
+        var name = caller.DisplayName is { Length: > 0 } n ? n.Trim() : user.DisplayName;
+        var email = caller.Email is { Length: > 0 } e ? e.Trim() : user.Email;
+        if (name == user.DisplayName && email == user.Email)
+        {
+            return user;
+        }
+
+        var stored = await db.Set<AppUser>().SingleOrDefaultAsync(u => u.Id == user.UserId, ct);
+        if (stored is null)
+        {
+            return user;
+        }
+
+        if (email != stored.Email)
+        {
+            var normalized = email.ToLowerInvariant();
+            var taken = await db.Set<AppUser>().AnyAsync(
+                u => u.OrganizationId == user.OrganizationId && u.Id != user.UserId && u.Email.ToLower() == normalized, ct);
+            if (taken)
+            {
+                logger.LogWarning("The changed e-mail address of user {UserId} belongs to another user and was not taken over.", user.UserId);
+                email = stored.Email;
+            }
+        }
+
+        if (name == stored.DisplayName && email == stored.Email)
+        {
+            return user with { DisplayName = stored.DisplayName, Email = stored.Email };
+        }
+
+        stored.DisplayName = name;
+        stored.Email = email;
+        stored.UpdatedAt = DateTimeOffset.UtcNow;
+        stored.Version++;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            // A parallel request updated the user, or someone took the address meanwhile; the next request tries again.
+            db.ChangeTracker.Clear();
+            return user;
+        }
+
+        logger.LogInformation("Updated name or e-mail address of user {UserId} from Entra ID.", user.UserId);
+        return user with { DisplayName = name, Email = email };
     }
 }

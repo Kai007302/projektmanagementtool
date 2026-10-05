@@ -36,6 +36,7 @@ internal sealed class UserContextMiddleware(RequestDelegate next)
             return;
         }
 
+        userContext = await provisioning.RefreshProfileAsync(userContext, currentUser, httpContext.RequestAborted);
         httpContext.Items[ItemKey] = userContext;
         await next(httpContext);
     }

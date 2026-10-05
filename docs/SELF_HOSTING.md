@@ -55,7 +55,7 @@ curl https://projecthub.example.com/health/ready    # Healthy
 
 Deshalb: Gleich nach der Installation selbst als Erste/r anmelden. Wer nur bestimmte Personen zulassen will, schaltet in Entra „Zuweisung erforderlich“ ein (Schritt 1.7).
 
-Eine Person sperren (eine Oberfläche dafür gibt es noch nicht):
+Eine Person sperren (eine Oberfläche dafür gibt es noch nicht; zum Löschen nach DSGVO gibt es „Person anonymisieren“, siehe Abschnitt Rechtliches):
 
 ```bash
 docker compose -f docker-compose.prod.yml exec postgres \
@@ -121,6 +121,20 @@ Anmeldung: Der Server verlangt ein Entra-ID-Token für den Bereich `api://<Clien
 - Andere Clients bekommen die Client-ID von ProjectHub (`ENTRA_CLIENT_ID`) eingetragen. Ihre Redirect-URI kommt in der App-Registrierung unter **Authentifizierung → Plattform hinzufügen → Mobile- und Desktopanwendungen** dazu, und **Öffentliche Clientflows zulassen** steht auf **Ja**.
 
 In der Entwicklung (ohne Entra) meldet der Header `X-Dev-User: dev-ben` am MCP-Endpunkt eine Testperson an, z. B. für den MCP Inspector.
+
+## Rechtliches und Datenschutz
+
+Überblick und Checkliste: `docs/LEGAL.md` (keine Rechtsberatung). Kurz:
+
+```bash
+mkdir -p legal
+cp deploy/legal/datenschutz.vorlage.html legal/datenschutz.html
+nano legal/datenschutz.html                         # alle [eckigen Klammern] ausfüllen
+```
+
+Caddy zeigt die Datei unter `https://<Domain>/rechtliches/datenschutz.html`, die App verlinkt sie unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`). Ein Impressum kommt genauso nach `legal/impressum.html` und wird über `PROJECTHUB_IMPRINT_URL=/rechtliches/impressum.html` eingeblendet. Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
+
+ProjectHub löscht Benachrichtigungen, Projektaktivität und Audit-Einträge nach 3 Jahren (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Teams → Person anonymisieren**.
 
 ## 5. Updates
 

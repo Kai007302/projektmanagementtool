@@ -163,7 +163,8 @@ Vor jeder Implementierung zuerst lesen:
 5. `docs/DATA_MODEL.md`
 6. `docs/OPEN_DECISIONS.md`
 7. für Betrieb und Deployment: `docs/OPERATIONS.md`, für einen eigenen Server mit Docker: `docs/SELF_HOSTING.md`
-8. den relevanten Sprint-Prompt unter `ai/prompts/`
+8. für Datenschutz und rechtliche Anforderungen: `docs/LEGAL.md`
+9. den relevanten Sprint-Prompt unter `ai/prompts/`
 
 ## Entwicklungsreihenfolge
 

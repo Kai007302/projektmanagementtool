@@ -16,3 +16,5 @@ TestResults/
 .DS_Store
 .data/
 /backups/
+# The operator's own privacy notice and imprint (docker-compose.prod.yml, docs/LEGAL.md)
+/legal/
