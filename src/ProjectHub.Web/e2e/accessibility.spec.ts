@@ -102,3 +102,18 @@ test('notifications and teams', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'Benachrichtigungen' })).toBeVisible()
   await expectAccessible(page)
 })
+
+test.describe('in dark mode', () => {
+  test.use({ colorScheme: 'dark' })
+
+  test('start page, Kanban board and knowledge keep their contrast', async ({ page }) => {
+    await openProject(page, 'Board')
+    await expect(page.getByText('Analyse').first()).toBeVisible()
+    await expectAccessible(page)
+
+    await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Wissen', exact: true }).click()
+    await searchArticles(page, 'Deployment-Prozess')
+    await expect(page.getByRole('button', { name: /^Deployment-Prozess/ }).first()).toBeVisible()
+    await expectAccessible(page)
+  })
+})

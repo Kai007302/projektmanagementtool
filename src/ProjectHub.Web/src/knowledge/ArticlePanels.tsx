@@ -27,6 +27,7 @@ import {
   type VersionSummary,
 } from './api'
 import { ArticlePicker, ProjectPicker, TaskPicker } from './BlockEditor'
+import { EmptyState } from '../ui/EmptyState'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -426,7 +427,7 @@ export function ArticleComments({ articleId, me, canModerate }: { articleId: str
     <section className="panel article-comments" aria-labelledby="article-comments-heading">
       <h3 id="article-comments-heading">Kommentare</h3>
       {error && <p role="alert">{error}</p>}
-      {comments.length === 0 && <p className="muted">Noch keine Kommentare.</p>}
+      {comments.length === 0 && <EmptyState emoji="💬">Noch keine Kommentare.</EmptyState>}
       <ul className="plain-list">
         {comments.map((comment) => (
           <li key={comment.id} className="comment">

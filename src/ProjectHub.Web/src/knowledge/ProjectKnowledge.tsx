@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { articleTypes, fetchLinkedKnowledge, type ArticleSummary } from './api'
+import { articleTypeEmoji, articleTypes, fetchLinkedKnowledge, type ArticleSummary } from './api'
+import { EmptyState } from '../ui/EmptyState'
 
 type Props = { projectId: string; revision: number; onOpenArticle?: (id: string) => void }
 
@@ -17,7 +18,7 @@ export function ProjectKnowledge({ projectId, revision, onOpenArticle }: Props) 
       {articles === null ? (
         <p>Wird geladen …</p>
       ) : articles.length === 0 ? (
-        <p className="muted">Noch keine Artikel mit diesem Projekt verknüpft.</p>
+        <EmptyState emoji="📚">Noch keine Artikel mit diesem Projekt verknüpft.</EmptyState>
       ) : (
         <ul className="plain-list">
           {articles.map((article) => (
@@ -29,7 +30,9 @@ export function ProjectKnowledge({ projectId, revision, onOpenArticle }: Props) 
               ) : (
                 article.title
               )}{' '}
-              <small className="muted">{articleTypes[article.articleType]}</small>
+              <small className="muted">
+                <span aria-hidden="true">{articleTypeEmoji[article.articleType]}</span> {articleTypes[article.articleType]}
+              </small>
             </li>
           ))}
         </ul>

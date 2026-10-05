@@ -5,6 +5,7 @@ import type { ProjectDetails } from '../projects/api'
 import { createWhiteboard, deleteWhiteboard, fetchWhiteboards, renameWhiteboard, type Whiteboard } from './api'
 import { BoardEditor } from './BoardEditor'
 import { useLatest } from '../api/useLatest'
+import { EmptyState } from '../ui/EmptyState'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -84,7 +85,7 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
       {boards === null ? (
         <p className="muted">Whiteboards werden geladen …</p>
       ) : !selected ? (
-        <p className="muted">{canEdit ? 'Noch kein Whiteboard. Lege oben das erste an.' : 'Dieses Projekt hat noch kein Whiteboard.'}</p>
+        <EmptyState emoji="🎨">{canEdit ? 'Noch kein Whiteboard. Lege oben das erste an.' : 'Dieses Projekt hat noch kein Whiteboard.'}</EmptyState>
       ) : (
         <BoardEditor
           key={selected.id}

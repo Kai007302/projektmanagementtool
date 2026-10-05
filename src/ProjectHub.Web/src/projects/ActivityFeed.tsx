@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { fetchActivity, type Activity } from './api'
 import { useLatest } from '../api/useLatest'
+import { initials } from '../identity/initials'
+import { EmptyState } from '../ui/EmptyState'
+import { relativeTime } from '../ui/personality'
 
 const actionText: Record<string, string> = {
   ProjectCreated: 'hat das Projekt angelegt',
@@ -34,6 +37,22 @@ const actionText: Record<string, string> = {
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
 
+/** Icon per kind of event, picked by the action's prefix and verb. */
+function iconOf(action: string): string {
+  if (action.endsWith('Deleted') || action.endsWith('Removed')) return '🗑️'
+  if (action === 'TaskMoved') return '➡️'
+  if (action.startsWith('Comment')) return '💬'
+  if (action.startsWith('Attachment')) return '📎'
+  if (action.startsWith('Member')) return '👤'
+  if (action.startsWith('Milestone')) return '🏁'
+  if (action.startsWith('Dependency')) return '🔗'
+  if (action.startsWith('Whiteboard')) return '🎨'
+  if (action.startsWith('Webex')) return '🎥'
+  if (action.startsWith('BoardColumn')) return '🗂️'
+  if (action.endsWith('Created')) return '✨'
+  return '✏️'
+}
+
 function describe(entry: Activity): string {
   const name = entry.metadata.Title ?? entry.metadata.Name
   const title = typeof name === 'string' ? ` „${name}“` : ''
@@ -52,15 +71,29 @@ export function ActivityFeed({ projectId, revision }: { projectId: string; revis
   return (
     <section className="panel" aria-labelledby="activity-heading">
       <h3 id="activity-heading">Aktivität</h3>
-      <ol className="plain-list activity">
-        {entries.map((entry) => (
-          <li key={entry.id}>
-            <strong>{entry.actorName ?? 'Unbekannt'}</strong> {describe(entry)}
-            <br />
-            <small className="muted">{dateFormat.format(new Date(entry.createdAt))}</small>
-          </li>
-        ))}
-      </ol>
+      {entries.length === 0 ? (
+        <EmptyState emoji="🕊️">Noch nichts passiert.</EmptyState>
+      ) : (
+        <ol className="plain-list activity">
+          {entries.map((entry) => (
+            <li key={entry.id}>
+              <span className="activity-avatar" aria-hidden="true">
+                <span className="avatar small">{initials(entry.actorName ?? '?')}</span>
+                <span className="activity-icon">{iconOf(entry.action)}</span>
+              </span>
+              <span>
+                <strong>{entry.actorName ?? 'Unbekannt'}</strong> {describe(entry)}
+                <br />
+                <small className="muted">
+                  <time dateTime={entry.createdAt} title={dateFormat.format(new Date(entry.createdAt))}>
+                    {relativeTime(entry.createdAt)}
+                  </time>
+                </small>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   )
 }

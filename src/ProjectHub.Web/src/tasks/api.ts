@@ -47,6 +47,9 @@ export const taskStatuses: Record<TaskStatus, string> = { todo: 'Offen', in_prog
 
 export const taskPriorities: Record<TaskPriority, string> = { low: 'Niedrig', normal: 'Normal', high: 'Hoch', urgent: 'Dringend' }
 
+/** Emoji per priority: quick to scan on cards. */
+export const priorityEmoji: Record<TaskPriority, string> = { low: '🌿', normal: '📌', high: '🔥', urgent: '🚨' }
+
 /** All tasks of a project (top level and subtasks), at most 100 for now. */
 export const fetchTasks = (projectId: string) => apiFetch<Paged<Task>>(`/api/v1/projects/${projectId}/tasks?limit=100`)
 

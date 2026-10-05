@@ -10,6 +10,7 @@ import {
   type Notification,
   type NotificationPreferences,
 } from './api'
+import { EmptyState } from '../ui/EmptyState'
 
 type Props = { onOpen: (notification: Notification) => void }
 
@@ -119,7 +120,7 @@ export function NotificationBell({ onOpen }: Props) {
           {items === null ? (
             <p className="muted">Wird geladen …</p>
           ) : items.length === 0 ? (
-            <p className="muted">Keine Benachrichtigungen.</p>
+            <EmptyState emoji="🔔">Keine Benachrichtigungen. Alles im Blick ✨</EmptyState>
           ) : (
             <ul className="notification-list">
               {items.map((notification) => (
