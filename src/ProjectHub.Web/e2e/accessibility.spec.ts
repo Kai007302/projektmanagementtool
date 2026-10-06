@@ -96,6 +96,12 @@ test('knowledge list, galaxy and an article', async ({ page }) => {
   await expect(page.getByRole('img', { name: /^Wissensgalaxie/ })).toHaveAttribute('data-layout', 'done')
   await expectAccessible(page)
 
+  // The article opened beside the galaxy.
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Deployment-Prozess' })
+  await page.getByRole('region', { name: 'Deployment-Prozess' }).getByRole('button', { name: 'Artikel öffnen' }).click()
+  await expect(page.getByRole('button', { name: 'Ganze Seite öffnen' })).toBeVisible()
+  await expectAccessible(page)
+
   await views.getByRole('button', { name: 'Artikel' }).click()
   await searchArticles(page, 'Deployment-Prozess')
   await article.click()

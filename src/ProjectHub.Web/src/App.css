@@ -827,10 +827,95 @@ fieldset.block-fields {
   align-items: start;
 }
 
+/* An open article takes more room beside the galaxy. */
+.galaxy-layout.reading {
+  grid-template-columns: minmax(0, 3fr) minmax(20rem, 2fr);
+}
+
 @media (max-width: 48rem) {
-  .galaxy-layout {
+  .galaxy-layout,
+  .galaxy-layout.reading {
     grid-template-columns: 1fr;
   }
+
+  .galaxy-layout .galaxy-reader {
+    position: static;
+    max-height: none;
+  }
+}
+
+.galaxy-reader {
+  position: sticky;
+  top: 4.5rem;
+  max-height: 600px;
+  overflow-y: auto;
+  border-top: 4px solid var(--article-type, var(--accent));
+  font-size: 0.9375rem;
+}
+
+.project-side .panel.galaxy-reader h3 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.25rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+}
+
+.galaxy-reader-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.galaxy-reader-type {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.galaxy-reader-close {
+  padding: 0 0.5rem;
+  border: none;
+  background: none;
+  box-shadow: none;
+  font-size: 1.25rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.galaxy-reader-close:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.galaxy-reader h4 {
+  margin: 1.25rem 0 0.25rem;
+}
+
+.galaxy-reader-relations {
+  margin-bottom: 1rem;
+}
+
+/* In full screen the article lies over the galaxy on the right. */
+.galaxy-overlay-reader {
+  position: absolute;
+  top: 3.75rem;
+  right: 1rem;
+  bottom: 2.5rem;
+  width: min(28rem, calc(100% - 2rem));
+  pointer-events: none;
+}
+
+.galaxy-overlay-reader .galaxy-reader {
+  position: static;
+  max-height: 100%;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.galaxy-overlay-reader .galaxy-reader h3 {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.25rem;
 }
 
 .galaxy-canvas {

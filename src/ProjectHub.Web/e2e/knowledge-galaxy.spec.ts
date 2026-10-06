@@ -48,9 +48,35 @@ test('the galaxy is drawn and navigable with the mouse', async ({ page }) => {
   await page.mouse.wheel(0, 400)
   await expect.poll(() => paintedPixels(page)).toBeGreaterThan(1000)
 
-  // Opening the article leaves the galaxy.
+  // "Artikel öffnen" shows it beside the galaxy; the full page is one more click.
   await page.getByRole('region', { name: 'Störungen melden' }).getByRole('button', { name: 'Artikel öffnen' }).click()
+  const reader = page.getByRole('region', { name: 'Störungen melden' })
+  await expect(reader.getByRole('button', { name: 'Artikel schließen' })).toBeVisible()
+  await reader.getByRole('button', { name: 'Ganze Seite öffnen' }).click()
   await expect(page.getByRole('heading', { name: 'Störungen melden', level: 2 })).toBeVisible()
+})
+
+test('double-clicking or zooming into a planet opens its article beside the galaxy', async ({ page }) => {
+  const canvas = await openGalaxy(page)
+
+  // Focus puts the planet in the middle; a double click there opens it.
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Deployment-Prozess' })
+  await expect(canvas).toHaveAttribute('data-view', 'idle')
+  const box = (await canvas.boundingBox())!
+  await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2)
+  const reader = page.getByRole('region', { name: 'Deployment-Prozess' })
+  await expect(reader.getByRole('button', { name: 'Artikel schließen' })).toBeVisible()
+  await expect(reader.getByRole('heading', { name: 'Verbunden mit' })).toBeVisible()
+  await reader.getByRole('button', { name: 'Artikel schließen' }).click()
+  await expect(page.getByRole('region', { name: 'Legende' })).toBeVisible()
+
+  // Scrolling into a planet opens it as well.
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Störungen melden' })
+  await expect(canvas).toHaveAttribute('data-view', 'idle')
+  const now = (await canvas.boundingBox())!
+  await page.mouse.move(now.x + now.width / 2, now.y + now.height / 2)
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -300)
+  await expect(page.getByRole('region', { name: 'Störungen melden' }).getByRole('button', { name: 'Artikel schließen' })).toBeVisible()
 })
 
 test('the galaxy works with the keyboard and as a list', async ({ page }) => {
