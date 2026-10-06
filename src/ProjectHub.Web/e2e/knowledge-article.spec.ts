@@ -34,7 +34,7 @@ test('an article is written, reviewed and published, and only then visible to th
   await expectAlertFree(clara)
 
   // A second edit is a new version; the first stays in the history.
-  await clara.getByRole('button', { name: 'Bearbeiten' }).click()
+  await clara.getByRole('button', { name: 'Bearbeiten', exact: true }).click()
   await editor.getByLabel('Neuer Block').selectOption('callout')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()
   await editor.getByLabel('Hinweis 4').fill('Fragen gerne im Team-Kanal stellen.')
@@ -68,7 +68,7 @@ test('an article is written, reviewed and published, and only then visible to th
   await eva.getByRole('button', { name: new RegExp(title) }).click()
   await expect(eva.getByRole('heading', { name: title, level: 2 })).toBeVisible()
   await expect(eva.getByText('Fragen gerne im Team-Kanal stellen.')).toBeVisible()
-  await expect(eva.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0)
+  await expect(eva.getByRole('button', { name: 'Bearbeiten', exact: true })).toHaveCount(0)
   await expect(eva.getByRole('button', { name: 'Archivieren' })).toHaveCount(0)
 
   await eva.getByRole('textbox', { name: 'Kommentar' }).fill('Sehr hilfreich, danke!')
