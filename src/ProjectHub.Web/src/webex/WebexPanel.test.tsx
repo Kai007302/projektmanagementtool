@@ -35,6 +35,7 @@ describe('WebexPanel', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(screen.getByText(/getrennt/)).toBeInTheDocument()
     expect(screen.queryByRole('form', { name: 'Webex-Link hinzufügen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Webex-Link' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Projektraum in Webex anlegen' })).not.toBeInTheDocument()
   })
 
@@ -47,7 +48,8 @@ describe('WebexPanel', () => {
     const onChanged = vi.fn()
     render(<WebexPanel project={project(true)} revision={0} onChanged={onChanged} />)
 
-    const form = await screen.findByRole('form', { name: 'Webex-Link hinzufügen' })
+    await userEvent.click(await screen.findByRole('button', { name: '+ Webex-Link' }))
+    const form = screen.getByRole('form', { name: 'Webex-Link hinzufügen' })
     await userEvent.type(screen.getByLabelText('Titel'), 'Jour fixe')
     await userEvent.type(screen.getByLabelText('Link'), 'https://evil.example/meet')
     await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }))

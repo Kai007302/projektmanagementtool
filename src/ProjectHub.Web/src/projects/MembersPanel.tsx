@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { User } from '../identity/api'
 import { fetchUsers } from '../teams/api'
 import { addProjectMember, changeProjectMember, projectRoles, removeProjectMember, type ProjectDetails, type ProjectRole } from './api'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; onChanged: () => void }
 
@@ -53,10 +54,17 @@ export function MembersPanel({ project, onChanged }: Props) {
         ))}
       </ul>
       {canManage && (
-        <AddMemberForm
-          excluded={project.members.map((m) => m.userId)}
-          onAdd={(userId, role) => run(() => addProjectMember(project.id, userId, role))}
-        />
+        <Reveal label="Person hinzufügen">
+          {(close) => (
+            <AddMemberForm
+              excluded={project.members.map((m) => m.userId)}
+              onAdd={(userId, role) => {
+                close()
+                return run(() => addProjectMember(project.id, userId, role))
+              }}
+            />
+          )}
+        </Reveal>
       )}
     </section>
   )
@@ -94,7 +102,7 @@ function AddMemberForm({ excluded, onAdd }: { excluded: string[]; onAdd: (userId
     <form className="stacked-form" onSubmit={submit}>
       <label>
         Person hinzufügen
-        <select value={userId} onChange={(event) => setUserId(event.target.value)} required>
+        <select value={userId} onChange={(event) => setUserId(event.target.value)} required autoFocus>
           <option value="">Bitte wählen</option>
           {users
             .filter((user) => !excluded.includes(user.id))

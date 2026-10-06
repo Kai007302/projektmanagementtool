@@ -81,7 +81,7 @@ describe('KanbanBoard', () => {
     renderBoard()
 
     await screen.findByRole('region', { name: 'Offen' })
-    expect(column('Offen').getAllByRole('button', { name: /Design|Texte/ })).toHaveLength(2)
+    expect(column('Offen').getAllByRole('button', { name: /^(Design|Texte)$/ })).toHaveLength(2)
     expect(column('In Arbeit').getByText('1 / 1')).not.toHaveClass('over')
     expect(column('Erledigt').queryAllByRole('listitem')).toHaveLength(0)
   })
@@ -98,7 +98,8 @@ describe('KanbanBoard', () => {
     })
     const onChanged = renderBoard()
 
-    await userEvent.selectOptions(await screen.findByLabelText('„Design“ verschieben nach'), 'c-done')
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen für „Design“' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Nach „Erledigt“ verschieben' }))
 
     expect(await column('Erledigt').findByRole('button', { name: 'Design' })).toBeInTheDocument()
     expect(bodyOf(api, 'POST /api/v1/tasks/t-1/move')).toEqual({ version: 3, columnId: 'c-done', index: 0 })
@@ -145,7 +146,8 @@ describe('KanbanBoard', () => {
     })
     renderBoard()
 
-    await userEvent.selectOptions(await screen.findByLabelText('„Design“ verschieben nach'), 'c-done')
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen für „Design“' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Nach „Erledigt“ verschieben' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('inzwischen geändert')
     expect(await column('Offen').findByRole('button', { name: 'Design' })).toBeInTheDocument()
@@ -158,10 +160,10 @@ describe('KanbanBoard', () => {
 
     const cardItem = (await screen.findByRole('button', { name: 'Design' })).closest('li')!
     expect(cardItem).toHaveAttribute('draggable', 'false')
-    expect(screen.queryByLabelText(/verschieben nach/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Aktionen für/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Spalte/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /bearbeiten/ })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Neue Spalte')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Neue Aufgabe')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Aufgabe$/ })).not.toBeInTheDocument()
   })
 
   it('lets editors add a column', async () => {
@@ -175,11 +177,34 @@ describe('KanbanBoard', () => {
     })
     renderBoard()
 
-    await userEvent.type(await screen.findByLabelText('Neue Spalte'), 'Review')
-    await userEvent.click(screen.getByRole('button', { name: 'Spalte anlegen' }))
+    await userEvent.click(await screen.findByRole('button', { name: '+ Spalte' }))
+    await userEvent.type(screen.getByLabelText('Name der neuen Spalte'), 'Review{Enter}')
 
     expect(await screen.findByRole('region', { name: 'Review' })).toBeInTheDocument()
     expect(bodyOf(api, 'POST /api/v1/projects/p-1/board/columns')).toEqual({ name: 'Review', taskStatus: 'in_progress' })
+  })
+
+  it('creates a task right in a column', async () => {
+    const created = card('t-9', 'Review vorbereiten', { status: 'in_progress', version: 1 })
+    let reloads = 0
+    const api = fakeApi({
+      'GET /api/v1/projects/p-1/board': () => {
+        reloads++
+        const current = board()
+        if (reloads > 1) current.columns[1].cards.push(created)
+        return json(current)
+      },
+      'POST /api/v1/projects/p-1/tasks': () => json(created, 201),
+    })
+    renderBoard()
+
+    await screen.findByRole('region', { name: 'In Arbeit' })
+    await userEvent.click(column('In Arbeit').getByRole('button', { name: '+ Aufgabe' }))
+    await userEvent.type(column('In Arbeit').getByLabelText('Neue Aufgabe in In Arbeit'), 'Review vorbereiten{Enter}')
+
+    expect(await column('In Arbeit').findByRole('button', { name: 'Review vorbereiten' })).toBeInTheDocument()
+    expect(bodyOf(api, 'POST /api/v1/projects/p-1/tasks')).toEqual({ title: 'Review vorbereiten', parentTaskId: null, status: 'in_progress' })
+    expect(column('In Arbeit').getByLabelText('Neue Aufgabe in In Arbeit')).toHaveValue('')
   })
 
   it('renames a column and sends only what changed', async () => {
@@ -189,11 +214,11 @@ describe('KanbanBoard', () => {
     })
     renderBoard()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Spalte „Erledigt“ bearbeiten' }))
-    const name = column('Erledigt').getByLabelText('Spaltenname')
+    await screen.findByRole('region', { name: 'Erledigt' })
+    await userEvent.click(column('Erledigt').getByRole('button', { name: 'Erledigt' }))
+    const name = column('Erledigt').getByLabelText('Spaltenname „Erledigt“')
     await userEvent.clear(name)
-    await userEvent.type(name, 'Fertig')
-    await userEvent.click(column('Erledigt').getByRole('button', { name: 'Spalte speichern' }))
+    await userEvent.type(name, 'Fertig{Enter}')
 
     await vi.waitFor(() => expect(api.calls.some((c) => c.key === 'PATCH /api/v1/board-columns/c-done')).toBe(true))
     expect(bodyOf(api, 'PATCH /api/v1/board-columns/c-done')).toEqual({ version: 1, name: 'Fertig' })
@@ -208,8 +233,8 @@ describe('KanbanBoard', () => {
     vi.stubGlobal('confirm', () => true)
     renderBoard()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Spalte „Erledigt“ bearbeiten' }))
-    await userEvent.click(column('Erledigt').getByRole('button', { name: 'Spalte löschen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Spalte „Erledigt“' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Spalte löschen' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Jeder Status braucht mindestens eine Spalte.')
   })

@@ -8,13 +8,13 @@ test('an article is written, reviewed and published, and only then visible to th
   // Clara writes a draft with several block types.
   const clara = await browser.newPage()
   await signInAs(clara, 'dev-clara')
-  const create = clara.getByRole('region', { name: 'Neuer Artikel' })
-  await create.getByLabel('Titel').fill(title)
-  await create.getByLabel('Art').selectOption('how_to')
-  await create.getByLabel('Bereich').selectOption({ label: 'Projektmethodik' })
-  await create.getByRole('button', { name: 'Artikel anlegen' }).click()
+  await clara.getByRole('button', { name: '+ Artikel' }).click()
 
+  // The draft opens in the editor right away; title, type and space are set there.
   const editor = clara.getByRole('form', { name: 'Artikel bearbeiten' })
+  await editor.getByLabel('Titel').fill(title)
+  await editor.getByRole('combobox', { name: /^Art/ }).selectOption('how_to')
+  await editor.getByRole('combobox', { name: /^Bereich/ }).selectOption({ label: 'Projektmethodik' })
   await editor.getByLabel('Zusammenfassung').fill('Die ersten Tage im Projektteam.')
   await editor.getByLabel('Neuer Block').selectOption('heading')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()
@@ -34,7 +34,7 @@ test('an article is written, reviewed and published, and only then visible to th
   await expectAlertFree(clara)
 
   // A second edit is a new version; the first stays in the history.
-  await clara.getByRole('button', { name: 'Bearbeiten' }).click()
+  await clara.getByRole('button', { name: 'Bearbeiten', exact: true }).click()
   await editor.getByLabel('Neuer Block').selectOption('callout')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()
   await editor.getByLabel('Hinweis 4').fill('Fragen gerne im Team-Kanal stellen.')
@@ -68,7 +68,7 @@ test('an article is written, reviewed and published, and only then visible to th
   await eva.getByRole('button', { name: new RegExp(title) }).click()
   await expect(eva.getByRole('heading', { name: title, level: 2 })).toBeVisible()
   await expect(eva.getByText('Fragen gerne im Team-Kanal stellen.')).toBeVisible()
-  await expect(eva.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0)
+  await expect(eva.getByRole('button', { name: 'Bearbeiten', exact: true })).toHaveCount(0)
   await expect(eva.getByRole('button', { name: 'Archivieren' })).toHaveCount(0)
 
   await eva.getByRole('textbox', { name: 'Kommentar' }).fill('Sehr hilfreich, danke!')

@@ -11,6 +11,7 @@ import {
   type WebexLinkKind,
 } from './api'
 import { useLatest } from '../api/useLatest'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; revision: number; onChanged: () => void }
 
@@ -105,29 +106,33 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
         </button>
       )}
       {canEdit && webex && (
-        <form className="webex-form" aria-label="Webex-Link hinzufügen" onSubmit={add}>
-          <label>
-            Art
-            <select value={kind} onChange={(event) => setKind(event.target.value as WebexLinkKind)}>
-              {Object.entries(webexKinds).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Titel
-            <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={200} />
-          </label>
-          <label>
-            Link
-            <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} required placeholder="https://firma.webex.com/meet/…" />
-          </label>
-          <button type="submit" disabled={busy}>
-            Hinzufügen
-          </button>
-        </form>
+        <Reveal label="Webex-Link">
+          {() => (
+            <form className="webex-form" aria-label="Webex-Link hinzufügen" onSubmit={add}>
+              <label>
+                Art
+                <select value={kind} onChange={(event) => setKind(event.target.value as WebexLinkKind)} autoFocus>
+                  {Object.entries(webexKinds).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Titel
+                <input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={200} />
+              </label>
+              <label>
+                Link
+                <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} required placeholder="https://firma.webex.com/meet/…" />
+              </label>
+              <button type="submit" disabled={busy}>
+                Hinzufügen
+              </button>
+            </form>
+          )}
+        </Reveal>
       )}
     </section>
   )

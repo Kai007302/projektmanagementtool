@@ -84,3 +84,35 @@ export const FitIcon = () => (
     <path d="M3 7 V3 H7 M13 3 H17 V7 M17 13 V17 H13 M7 17 H3 V13" />
   </Icon>
 )
+
+export const PencilIcon = () => (
+  <Icon>
+    <path d="M4 16 L4.8 12.6 L13 4.4 a1.6 1.6 0 0 1 2.3 0 l0.3 0.3 a1.6 1.6 0 0 1 0 2.3 L7.4 15.2 Z" />
+    <path d="M11.8 5.6 L14.4 8.2" />
+  </Icon>
+)
+
+export const TrashIcon = () => (
+  <Icon>
+    <path d="M4 6 H16" />
+    <path d="M8 6 V4.5 H12 V6" />
+    <path d="M5.5 6 L6.3 16 H13.7 L14.5 6" />
+  </Icon>
+)
+
+export const OpenIcon = () => (
+  <Icon>
+    <path d="M11 4 H16 V9" />
+    <path d="M16 4 L9.5 10.5" />
+    <path d="M14 12 V16 H4 V6 H8" />
+  </Icon>
+)
+
+export const ListIcon = () => (
+  <Icon>
+    <path d="M7 5.5 H16 M7 10 H16 M7 14.5 H16" />
+    <circle cx="4" cy="5.5" r="0.6" fill="currentColor" />
+    <circle cx="4" cy="10" r="0.6" fill="currentColor" />
+    <circle cx="4" cy="14.5" r="0.6" fill="currentColor" />
+  </Icon>
+)

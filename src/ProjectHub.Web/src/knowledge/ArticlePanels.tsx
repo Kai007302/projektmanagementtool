@@ -28,6 +28,7 @@ import {
 } from './api'
 import { ArticlePicker, ProjectPicker, TaskPicker } from './BlockEditor'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -81,14 +82,18 @@ export function TagsPanel({ details, onChanged }: PanelProps) {
         </p>
       )}
       {details.capabilities.canEdit && (
-        <form className="stacked-form" onSubmit={submit}>
-          <label>
-            Tags (mit Komma getrennt)
-            <input value={value} onChange={(event) => setValue(event.target.value)} />
-          </label>
-          <button type="submit">Tags speichern</button>
-          {error && <p role="alert">{error}</p>}
-        </form>
+        <Reveal label="Tags bearbeiten" plus={false}>
+          {() => (
+            <form className="stacked-form" onSubmit={submit}>
+              <label>
+                Tags (mit Komma getrennt)
+                <input value={value} onChange={(event) => setValue(event.target.value)} />
+              </label>
+              <button type="submit">Tags speichern</button>
+              {error && <p role="alert">{error}</p>}
+            </form>
+          )}
+        </Reveal>
       )}
     </section>
   )
@@ -129,21 +134,25 @@ export function RelationsPanel({ details, onChanged, onOpenArticle }: PanelProps
         </ul>
       )}
       {details.capabilities.canEdit && (
-        <form className="stacked-form" onSubmit={submit}>
-          <label>
-            Beziehung
-            <select value={type} onChange={(event) => setType(event.target.value as RelationType)}>
-              {Object.entries(relationTypes).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label.outgoing}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ArticlePicker label="Zielartikel" value={target} onChange={setTarget} exclude={details.article.id} />
-          <button type="submit">Beziehung hinzufügen</button>
-          {error && <p role="alert">{error}</p>}
-        </form>
+        <Reveal label="Beziehung">
+          {() => (
+            <form className="stacked-form" onSubmit={submit}>
+              <label>
+                Beziehung
+                <select value={type} onChange={(event) => setType(event.target.value as RelationType)}>
+                  {Object.entries(relationTypes).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label.outgoing}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <ArticlePicker label="Zielartikel" value={target} onChange={setTarget} exclude={details.article.id} />
+              <button type="submit">Beziehung hinzufügen</button>
+              {error && <p role="alert">{error}</p>}
+            </form>
+          )}
+        </Reveal>
       )}
     </section>
   )
@@ -181,30 +190,34 @@ export function ReferencesPanel({ details, onChanged }: PanelProps) {
         </ul>
       )}
       {details.capabilities.canEdit && (
-        <form className="stacked-form" onSubmit={submit}>
-          <label>
-            Art
-            <select
-              value={type}
-              onChange={(event) => {
-                setType(event.target.value as ResourceType)
-                setResourceId('')
-              }}
-            >
-              {Object.entries(resourceTypes).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {type === 'project' && <ProjectPicker label="Projekt" value={resourceId} onChange={setResourceId} />}
-          {type === 'task' && <TaskPicker label="Verknüpfung" value={resourceId} onChange={setResourceId} />}
-          {type === 'team' && <TeamPicker value={resourceId} onChange={setResourceId} />}
-          {type === 'whiteboard' && <WhiteboardPicker value={resourceId} onChange={setResourceId} />}
-          <button type="submit">Verknüpfen</button>
-          {error && <p role="alert">{error}</p>}
-        </form>
+        <Reveal label="Verknüpfung">
+          {() => (
+            <form className="stacked-form" onSubmit={submit}>
+              <label>
+                Art
+                <select
+                  value={type}
+                  onChange={(event) => {
+                    setType(event.target.value as ResourceType)
+                    setResourceId('')
+                  }}
+                >
+                  {Object.entries(resourceTypes).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {type === 'project' && <ProjectPicker label="Projekt" value={resourceId} onChange={setResourceId} />}
+              {type === 'task' && <TaskPicker label="Verknüpfung" value={resourceId} onChange={setResourceId} />}
+              {type === 'team' && <TeamPicker value={resourceId} onChange={setResourceId} />}
+              {type === 'whiteboard' && <WhiteboardPicker value={resourceId} onChange={setResourceId} />}
+              <button type="submit">Verknüpfen</button>
+              {error && <p role="alert">{error}</p>}
+            </form>
+          )}
+        </Reveal>
       )}
     </section>
   )
@@ -368,31 +381,35 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
           ))}
         </ul>
       )}
-      <form className="stacked-form" onSubmit={submit}>
-        <label>
-          Person oder Team
-          <select value={principal} onChange={(event) => setPrincipal(event.target.value)} required>
-            <option value="">Wählen …</option>
-            {principals.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Recht
-          <select value={grant} onChange={(event) => setGrant(event.target.value as Grant)}>
-            {Object.entries(grants).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">Freigeben</button>
-        {error && <p role="alert">{error}</p>}
-      </form>
+      <Reveal label="Freigabe">
+        {() => (
+          <form className="stacked-form" onSubmit={submit}>
+            <label>
+              Person oder Team
+              <select value={principal} onChange={(event) => setPrincipal(event.target.value)} required>
+                <option value="">Wählen …</option>
+                {principals.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Recht
+              <select value={grant} onChange={(event) => setGrant(event.target.value as Grant)}>
+                {Object.entries(grants).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit">Freigeben</button>
+            {error && <p role="alert">{error}</p>}
+          </form>
+        )}
+      </Reveal>
     </section>
   )
 }

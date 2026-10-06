@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import { GanttChart } from '../gantt/GanttChart'
@@ -12,6 +12,8 @@ import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 import { WebexPanel } from '../webex/WebexPanel'
 import { useLatest } from '../api/useLatest'
+import { InlineEdit } from '../ui/InlineEdit'
+import { Menu } from '../ui/Menu'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
@@ -51,6 +53,22 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
     }
   }
 
+  /** Saves one field right away; a conflict loads the current state and says so. */
+  async function save(changes: { name?: string; status?: ProjectStatus }) {
+    if (!project) return
+    setError(null)
+    try {
+      await updateProject(project.id, project.version, changes)
+    } catch (e) {
+      setError(
+        e instanceof ApiError && e.status === 409
+          ? 'Jemand anderes hat das Projekt inzwischen geändert. Der aktuelle Stand wurde geladen.'
+          : (e as Error).message,
+      )
+    }
+    changed()
+  }
+
   return (
     <section className="project-view" aria-labelledby="project-heading">
       <button type="button" className="link-button" onClick={onBack}>
@@ -63,19 +81,31 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
         <>
           <header className="project-header">
             <div>
-              <h2 id="project-heading">{project.name}</h2>
-              <p className="muted">
-                {projectStatuses[project.status]}
-                {project.description && ` · ${project.description}`}
+              <h2 id="project-heading">
+                <InlineEdit key={project.name} value={project.name} label="Projektname" editable={project.capabilities.canEdit} onSave={(name) => save({ name })} />
+              </h2>
+              <p className="muted project-subline">
+                {project.capabilities.canEdit ? (
+                  <select
+                    className={`status-chip project-status-${project.status}`}
+                    aria-label="Projektstatus"
+                    value={project.status}
+                    onChange={(event) => void save({ status: event.target.value as ProjectStatus })}
+                  >
+                    {Object.entries(projectStatuses).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  projectStatuses[project.status]
+                )}
+                {project.description && <span>{project.description}</span>}
               </p>
             </div>
-            {project.capabilities.canManage && (
-              <button type="button" className="danger" onClick={remove}>
-                Projekt löschen
-              </button>
-            )}
+            {project.capabilities.canManage && <Menu label="Weitere Aktionen zum Projekt" items={[{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }]} />}
           </header>
-          {project.capabilities.canEdit && <ProjectEditForm project={project} onSaved={changed} />}
           <nav className="tabs" aria-label="Ansicht">
             {(Object.keys(viewText) as View[]).map((value) => (
               <button
@@ -104,48 +134,5 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
         </>
       )}
     </section>
-  )
-}
-
-function ProjectEditForm({ project, onSaved }: { project: ProjectDetails; onSaved: () => void }) {
-  const [name, setName] = useState(project.name)
-  const [status, setStatus] = useState<ProjectStatus>(project.status)
-  const [message, setMessage] = useState<string | null>(null)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setMessage(null)
-    try {
-      await updateProject(project.id, project.version, { name, status })
-      onSaved()
-    } catch (e) {
-      setMessage(
-        e instanceof ApiError && e.status === 409
-          ? 'Jemand anderes hat das Projekt inzwischen geändert. Der aktuelle Stand wurde geladen.'
-          : (e as Error).message,
-      )
-      if (e instanceof ApiError && e.status === 409) onSaved()
-    }
-  }
-
-  return (
-    <form className="inline-form" onSubmit={submit}>
-      <label>
-        Name
-        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
-      </label>
-      <label>
-        Status
-        <select value={status} onChange={(event) => setStatus(event.target.value as ProjectStatus)}>
-          {Object.entries(projectStatuses).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit">Speichern</button>
-      {message && <p role="alert">{message}</p>}
-    </form>
   )
 }

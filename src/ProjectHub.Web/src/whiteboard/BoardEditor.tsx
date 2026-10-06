@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import * as Y from 'yjs'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
@@ -28,11 +28,13 @@ import {
   type NewObject,
   type ObjectType,
 } from './model'
-import { ArrowIcon, DiamondIcon, EllipseIcon, FitIcon, MinusIcon, PlusIcon, RectIcon, RedoIcon, TaskIcon, TemplatesIcon, TextIcon, UndoIcon } from './icons'
+import { ArrowIcon, DiamondIcon, EllipseIcon, FitIcon, ListIcon, MinusIcon, OpenIcon, PencilIcon, PlusIcon, RectIcon, RedoIcon, TaskIcon, TemplatesIcon, TextIcon, TrashIcon, UndoIcon } from './icons'
 import { diamondPoints, fills, strokes, textColor } from './palette'
 import { StickyStack, stickyDragType } from './StickyStack'
 import { connectWhiteboard, type Peer, type SyncStatus, type WhiteboardSync } from './sync'
 import { TemplatePicker } from './TemplatePicker'
+import { InlineEdit } from '../ui/InlineEdit'
+import { Menu } from '../ui/Menu'
 import type { Template } from './templates'
 
 type Props = {
@@ -100,7 +102,9 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false })
   const [showTemplates, setShowTemplates] = useState(false)
   const [stickyColor, setStickyColor] = useState<Color>(rememberedStickyColor)
-  const [focusTextOf, setFocusTextOf] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [showList, setShowList] = useState(false)
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const docRef = useRef<Y.Doc | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
   const syncRef = useRef<WhiteboardSync | null>(null)
@@ -192,8 +196,21 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function select(id: string | null) {
     setSelectedId(id)
-    setFocusTextOf(null)
+    setEditingId((current) => (current === id ? current : null))
     syncRef.current?.sendPresence(null, null, id)
+  }
+
+  /** Opens the text of an object for typing right on the canvas, like a double click in Miro. */
+  function startEditing(id: string) {
+    select(id)
+    setEditingId(id)
+  }
+
+  /** Ends typing in one object; a blur from a new note opening elsewhere leaves that note open. */
+  function stopEditing(id: string, backToCanvas: boolean) {
+    undoRef.current?.stopCapturing()
+    setEditingId((current) => (current === id ? null : current))
+    if (backToCanvas) svgRef.current?.focus({ preventScroll: true })
   }
 
   function add(type: ObjectType, taskId?: string) {
@@ -261,16 +278,14 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     }
     const { ids } = addObjects(doc(), [{ type: 'sticky', x: 0, y: 0, color, text: '' }], at)
     undoRef.current?.stopCapturing()
-    select(ids[0])
-    setFocusTextOf(ids[0])
+    startEditing(ids[0])
   }
 
   function addStickyNextTo(object: BoardObject, direction: 'right' | 'below') {
     undoRef.current?.stopCapturing()
     const id = addNextTo(doc(), object, direction)
     undoRef.current?.stopCapturing()
-    select(id)
-    setFocusTextOf(id)
+    startEditing(id)
   }
 
   function change(id: string, changes: Changes) {
@@ -293,7 +308,8 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   function onObjectDown(event: PointerEvent, object: BoardObject) {
     if (event.button !== 0) return
     select(object.id)
-    svgRef.current?.focus()
+    // Without preventScroll the canvas scrolls into view under the pointer and a double click hits the background.
+    svgRef.current?.focus({ preventScroll: true })
     if (canEdit) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
     else event.stopPropagation()
   }
@@ -371,12 +387,21 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       remove(selected.id)
       return
     }
+    if ((event.key === 'Enter' || event.key === 'F2') && hasText(selected)) {
+      event.preventDefault()
+      startEditing(selected.id)
+      return
+    }
     const step = event.shiftKey ? 1 : 10
     const deltas: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }
     const delta = deltas[event.key]
     if (delta) {
       event.preventDefault()
-      change(selected.id, moveBy(selected, delta[0], delta[1]))
+      const [dx, dy] = delta
+      // Alt with the arrow keys resizes, so the keyboard can do everything the handles do.
+      if (!event.altKey) change(selected.id, moveBy(selected, dx, dy))
+      else if (selected.type === 'arrow') change(selected.id, { x2: selected.x2 + dx, y2: selected.y2 + dy })
+      else change(selected.id, { w: selected.w + dx, h: selected.h + dy })
     }
   }
 
@@ -418,7 +443,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             className={drag?.kind === 'pan' ? 'board-canvas panning' : 'board-canvas'}
             role="application"
             aria-roledescription="Whiteboard"
-            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen. Pfeiltasten verschieben, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Die Objektliste daneben bietet dasselbe per Formular.`}
+            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Doppelklick oder Enter bearbeitet den Text. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Die Objektliste oben rechts wählt Objekte per Tastatur.`}
             tabIndex={0}
             onPointerDown={onBackgroundDown}
             onPointerMove={onPointerMove}
@@ -426,6 +451,10 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             onPointerCancel={onPointerUp}
             onPointerLeave={onPointerLeave}
             onKeyDown={onKeyDown}
+            // Pointer capture makes the canvas the target of the double click; the press before it selected the object.
+            onDoubleClick={() => {
+              if (selected && canEdit && hasText(selected)) startEditing(selected.id)
+            }}
             onDragOver={(event) => {
               if (canEdit && event.dataTransfer.types.includes(stickyDragType)) {
                 event.preventDefault()
@@ -453,10 +482,13 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
                   selected={object.id === selectedId}
                   peerSelected={peerList.find((p) => p.selectedObjectId === object.id)}
                   editable={canEdit}
+                  editing={object.id === editingId && canEdit}
                   markerId={`arrow-head-${board.id}`}
                   onDown={(event) => onObjectDown(event, object)}
                   onHandleDown={(event, kind) => onHandleDown(event, object, kind)}
                   onAddNext={(direction) => addStickyNextTo(object, direction)}
+                  onText={(text) => change(object.id, { text })}
+                  onStopEditing={(backToCanvas) => stopEditing(object.id, backToCanvas)}
                 />
               ))}
               {peerList.map((peer) =>
@@ -500,6 +532,37 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
               </>
             )}
           </div>
+          {objects.length === 0 && canEdit && !showTemplates && (
+            <div className="board-empty">
+              <p>Leeres Whiteboard. Drück N für eine Notiz oder</p>
+              <button type="button" onClick={() => setShowTemplates(true)}>
+                Mit einer Vorlage starten
+              </button>
+            </div>
+          )}
+          {selected && !(drag && drag.kind !== 'pan') && (
+            <ObjectBar
+              key={selected.id}
+              object={selected}
+              view={view}
+              editable={canEdit}
+              hasTask={Boolean(selected.taskId && tasks.get(selected.taskId))}
+              onColor={(color) => {
+                change(selected.id, { color })
+                undoRef.current?.stopCapturing()
+              }}
+              onEditText={() => startEditing(selected.id)}
+              onOpenTask={() => setOpenTaskId(selected.taskId)}
+              onRemove={() => remove(selected.id)}
+            />
+          )}
+          <div className="board-corner board-corner-top">
+            <button type="button" className="board-tool board-list-toggle" aria-expanded={showList} title="Objektliste" onClick={() => setShowList(!showList)}>
+              <ListIcon />
+              <span>Objekte ({objects.length})</span>
+            </button>
+          </div>
+          {showList && <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} />}
           <div className="board-corner board-corner-right">
             <button type="button" className="board-tool" aria-label="Verkleinern" title="Verkleinern" onClick={() => zoomBy(1 / 1.25)}>
               <MinusIcon />
@@ -515,27 +578,21 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             </button>
           </div>
         </div>
-        <aside className="board-side">
-          <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} onTemplates={canEdit ? () => setShowTemplates(true) : undefined} />
-          {selected && (
-            <ObjectForm
-              key={selected.id}
-              object={selected}
-              task={selected.taskId ? tasks.get(selected.taskId) : undefined}
-              editable={canEdit}
-              focusText={focusTextOf === selected.id}
-              project={project}
-              me={me}
-              onChange={(changes) => {
-                change(selected.id, changes)
-              }}
-              onCommit={() => undoRef.current?.stopCapturing()}
-              onRemove={() => remove(selected.id)}
-              onChanged={onChanged}
-            />
-          )}
-        </aside>
       </div>
+      {openTaskId && (
+        <TaskDetails
+          key={openTaskId}
+          taskId={openTaskId}
+          project={project}
+          me={me}
+          onChanged={onChanged}
+          onDeleted={() => {
+            setOpenTaskId(null)
+            onChanged()
+          }}
+          onClose={() => setOpenTaskId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -543,45 +600,13 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 type HeaderProps = { board: Whiteboard; canManage: boolean; onRename: (name: string) => Promise<void>; onDelete: () => void; children: ReactNode }
 
 function BoardHeader({ board, canManage, onRename, onDelete, children }: HeaderProps) {
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(board.name)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    await onRename(name)
-    setEditing(false)
-  }
-
   return (
     <header className="board-header">
-      {editing ? (
-        <form className="inline-form" onSubmit={submit}>
-          <label>
-            Name
-            <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
-          </label>
-          <button type="submit">Speichern</button>
-          <button type="button" onClick={() => setEditing(false)}>
-            Abbrechen
-          </button>
-        </form>
-      ) : (
-        <h3>{board.name}</h3>
-      )}
+      <h3>
+        <InlineEdit key={board.name} value={board.name} label="Name des Whiteboards" editable={canManage} onSave={onRename} />
+      </h3>
       {children}
-      {canManage && !editing && (
-        <span className="board-header-actions">
-          <button type="button" className="link-button" onClick={() => {
-              setName(board.name)
-              setEditing(true)
-            }}>
-            Umbenennen
-          </button>{' '}
-          <button type="button" className="link-button danger-link" onClick={onDelete}>
-            Löschen
-          </button>
-        </span>
-      )}
+      {canManage && <Menu label="Weitere Aktionen zum Whiteboard" items={[{ label: 'Whiteboard löschen', danger: true, onSelect: onDelete }]} />}
     </header>
   )
 }
@@ -649,11 +674,17 @@ type ShapeProps = {
   selected: boolean
   peerSelected: Peer | undefined
   editable: boolean
+  editing: boolean
   markerId: string
   onDown: (event: PointerEvent) => void
   onHandleDown: (event: PointerEvent, kind: 'resize' | 'start' | 'end') => void
   onAddNext: (direction: 'right' | 'below') => void
+  onText: (text: string) => void
+  onStopEditing: (backToCanvas: boolean) => void
 }
+
+/** Notes, shapes and text boxes carry text; arrows and task cards do not. */
+const hasText = (object: BoardObject) => object.type !== 'arrow' && object.type !== 'task'
 
 const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   sticky: 'board-text',
@@ -663,7 +694,7 @@ const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   text: 'board-text large',
 }
 
-function ObjectShape({ object, task, selected, peerSelected, editable, markerId, onDown, onHandleDown, onAddNext }: ShapeProps) {
+function ObjectShape({ object, task, selected, peerSelected, editable, editing, markerId, onDown, onHandleDown, onAddNext, onText, onStopEditing }: ShapeProps) {
   const { x, y, w, h } = object
   const fill = fills[object.color]
   const stroke = strokes[object.color]
@@ -707,7 +738,7 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
   return (
     <g className="board-object" data-object-id={object.id} onPointerDown={onDown}>
       {shape}
-      <foreignObject x={x} y={y} width={w} height={h} pointerEvents="none">
+      <foreignObject x={x} y={y} width={w} height={h} pointerEvents={editing ? undefined : 'none'}>
         {object.type === 'task' ? (
           <div className="board-task">
             {task ? (
@@ -720,6 +751,27 @@ function ObjectShape({ object, task, selected, peerSelected, editable, markerId,
               <span className="muted">Aufgabe nicht verfügbar</span>
             )}
           </div>
+        ) : editing ? (
+          <textarea
+            className={`${textClass[object.type]} board-text-input`}
+            style={object.type === 'text' ? undefined : { color: textColor(object.color) }}
+            aria-label="Text"
+            value={object.text}
+            maxLength={2000}
+            autoFocus
+            onFocus={(event) => event.currentTarget.setSelectionRange(object.text.length, object.text.length)}
+            onChange={(event) => onText(event.target.value)}
+            onBlur={() => onStopEditing(false)}
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              // Typing stays in the note: Delete, N or the arrow keys must not reach the canvas shortcuts.
+              event.stopPropagation()
+              if (event.key === 'Escape' || (event.key === 'Enter' && (event.ctrlKey || event.metaKey))) {
+                event.preventDefault()
+                onStopEditing(true)
+              }
+            }}
+          />
         ) : (
           <div className={textClass[object.type]} style={object.type === 'text' ? undefined : { color: textColor(object.color) }}>
             {object.text}
@@ -756,7 +808,6 @@ type ListProps = {
   tasks: Map<string, WhiteboardTask>
   selectedId: string | null
   onSelect: (id: string) => void
-  onTemplates?: () => void
 }
 
 /** Miro's blue dots: a click puts a new note of the same color next to the selected one. */
@@ -776,22 +827,13 @@ function QuickAdd({ cx, cy, label, onAdd }: { cx: number; cy: number; label: str
   )
 }
 
-function ObjectList({ objects, tasks, selectedId, onSelect, onTemplates }: ListProps) {
+/** Every object as a button, so the board works with the keyboard and a screen reader too. */
+function ObjectList({ objects, tasks, selectedId, onSelect }: ListProps) {
   return (
-    <section aria-labelledby="board-objects-heading">
+    <section className="board-list" aria-labelledby="board-objects-heading">
       <h4 id="board-objects-heading">Objekte ({objects.length})</h4>
       {objects.length === 0 ? (
-        <p className="muted">
-          Noch leer.
-          {onTemplates && (
-            <>
-              {' '}
-              <button type="button" className="link-button" onClick={onTemplates}>
-                Mit einer Vorlage starten
-              </button>
-            </>
-          )}
-        </p>
+        <p className="muted">Noch leer.</p>
       ) : (
         <ul className="board-object-list">
           {objects.map((object) => (
@@ -812,116 +854,93 @@ function ObjectList({ objects, tasks, selectedId, onSelect, onTemplates }: ListP
   )
 }
 
-type FormProps = {
+type BarProps = {
   object: BoardObject
-  task: WhiteboardTask | undefined
+  view: View
   editable: boolean
-  focusText: boolean
-  project: ProjectDetails
-  me: Me
-  onChange: (changes: Changes) => void
-  onCommit: () => void
+  hasTask: boolean
+  onColor: (color: Color) => void
+  onEditText: () => void
+  onOpenTask: () => void
   onRemove: () => void
-  onChanged: () => void
 }
 
-function ObjectForm({ object, task, editable, focusText, project, me, onChange, onCommit, onRemove, onChanged }: FormProps) {
-  const [details, setDetails] = useState(false)
-  const number = (label: string, field: 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2') => (
-    <label>
-      {label}
-      <input
-        type="number"
-        value={Math.round(object[field])}
-        disabled={!editable}
-        onChange={(event) => {
-          const value = event.target.valueAsNumber
-          if (Number.isFinite(value)) onChange({ [field]: value })
-        }}
-        onBlur={onCommit}
-      />
-    </label>
-  )
+/**
+ * Miro's context bar: a small floating bar right above the selected object with what fits it (color, text, open the
+ * task, delete). Below the object when there is no room above.
+ */
+function ObjectBar({ object, view, editable, hasTask, onColor, onEditText, onOpenTask, onRemove }: BarProps) {
+  const [colorsOpen, setColorsOpen] = useState(false)
+  const top = object.type === 'arrow' ? Math.min(object.y, object.y2) : object.y
+  const bottom = object.type === 'arrow' ? Math.max(object.y, object.y2) : object.y + object.h
+  const centerX = object.type === 'arrow' ? (object.x + object.x2) / 2 : object.x + object.w / 2
+  const left = view.x + centerX * view.zoom
+  const above = view.y + top * view.zoom
+  const below = above < 64
+  const y = below ? view.y + bottom * view.zoom + 14 : above - 14
+  const kind = objectTypes[object.type]
+
+  if (!editable && !(object.type === 'task' && hasTask)) return null
 
   return (
-    <section className="board-form" aria-labelledby="board-form-heading">
-      <h4 id="board-form-heading">{objectTypes[object.type]}</h4>
-      {object.type === 'task' && (
-        <>
-          <p>{task ? `${task.title} · ${taskStatuses[task.status]}` : 'Die Aufgabe ist gelöscht oder für dich nicht sichtbar.'}</p>
-          {task && (
-            <button type="button" className="link-button" aria-expanded={details} onClick={() => setDetails(!details)}>
-              {details ? 'Aufgabe schließen' : 'Aufgabe öffnen'}
-            </button>
+    <div
+      className={below ? 'board-objectbar below' : 'board-objectbar'}
+      role="toolbar"
+      aria-label={`${kind} bearbeiten`}
+      style={{ left, top: y }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && colorsOpen) {
+          event.stopPropagation()
+          setColorsOpen(false)
+        }
+      }}
+    >
+      {editable && object.type !== 'task' && (
+        <span className="board-tool-group">
+          <button type="button" className="board-tool" aria-label={`Farbe: ${colors[object.color]}`} title="Farbe" aria-expanded={colorsOpen} onClick={() => setColorsOpen(!colorsOpen)}>
+            <span className="board-color-dot" style={{ background: fills[object.color], borderColor: strokes[object.color] }} />
+          </button>
+          {colorsOpen && (
+            <div className="board-popover board-objectbar-colors">
+              <div className="sticky-swatches" role="group" aria-label="Farbe">
+                {(Object.entries(colors) as [Color, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="sticky-swatch"
+                    aria-label={label}
+                    aria-pressed={value === object.color}
+                    title={label}
+                    style={{ background: fills[value], borderColor: strokes[value] }}
+                    onClick={() => {
+                      onColor(value)
+                      setColorsOpen(false)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        </>
+        </span>
       )}
-      {object.type !== 'task' && object.type !== 'arrow' && (
-        <div className="board-text-field">
-          {/* A separate label keeps the field's name "Text" instead of label plus content. */}
-          <label htmlFor="board-object-text">Text</label>
-          <textarea
-            id="board-object-text"
-            value={object.text}
-            disabled={!editable}
-            autoFocus={focusText}
-            rows={3}
-            maxLength={2000}
-            onChange={(event) => onChange({ text: event.target.value })}
-            onBlur={onCommit}
-          />
-        </div>
-      )}
-      {object.type !== 'task' && (
-        <div className="board-color-field">
-          <span id="board-color-label">Farbe: {colors[object.color]}</span>
-          <div className="sticky-swatches" role="group" aria-labelledby="board-color-label">
-            {(Object.entries(colors) as [Color, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className="sticky-swatch"
-                aria-label={label}
-                aria-pressed={value === object.color}
-                title={label}
-                disabled={!editable}
-                style={{ background: fills[value], borderColor: strokes[value] }}
-                onClick={() => {
-                  onChange({ color: value })
-                  onCommit()
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-      <details className="board-geometry">
-        <summary>Position und Größe</summary>
-        <div className="board-fields">
-          {number(object.type === 'arrow' ? 'Start X' : 'X', 'x')}
-          {number(object.type === 'arrow' ? 'Start Y' : 'Y', 'y')}
-          {object.type === 'arrow' ? (
-            <>
-              {number('Ende X', 'x2')}
-              {number('Ende Y', 'y2')}
-            </>
-          ) : (
-            <>
-              {number('Breite', 'w')}
-              {number('Höhe', 'h')}
-            </>
-          )}
-        </div>
-      </details>
-      {editable && (
-        <button type="button" className="danger" onClick={onRemove}>
-          {objectTypes[object.type]} entfernen
+      {editable && hasText(object) && (
+        <button type="button" className="board-tool" aria-label="Text bearbeiten" title="Text bearbeiten (Doppelklick)" onClick={onEditText}>
+          <PencilIcon />
         </button>
       )}
-      {details && task && <TaskDetails taskId={task.id} project={project} me={me} onChanged={onChanged} onDeleted={() => {
-            setDetails(false)
-            onChanged()
-          }} />}
-    </section>
+      {object.type === 'task' && hasTask && (
+        <button type="button" className="board-tool" aria-label="Aufgabe öffnen" title="Aufgabe öffnen" onClick={onOpenTask}>
+          <OpenIcon />
+        </button>
+      )}
+      {editable && (
+        <>
+          <span className="board-objectbar-divider" aria-hidden="true" />
+          <button type="button" className="board-tool" aria-label={`${kind} entfernen`} title={`${kind} entfernen (Entf)`} onClick={onRemove}>
+            <TrashIcon />
+          </button>
+        </>
+      )}
+    </div>
   )
 }

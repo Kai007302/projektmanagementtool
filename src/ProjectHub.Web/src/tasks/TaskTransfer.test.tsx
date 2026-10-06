@@ -24,6 +24,7 @@ describe('TaskTransfer', () => {
     const onImported = vi.fn()
     render(<TaskTransfer project={project(true)} onImported={onImported} />)
 
+    await userEvent.click(screen.getByRole('button', { name: '+ Aufgaben importieren' }))
     await userEvent.upload(screen.getByLabelText('Aufgaben importieren (Excel oder CSV)'), file())
 
     expect(await screen.findByText('2 Aufgaben erkannt. Nicht übernommen: Kostenstelle.')).toBeInTheDocument()
@@ -52,6 +53,7 @@ describe('TaskTransfer', () => {
     })
     render(<TaskTransfer project={project(true)} onImported={() => {}} />)
 
+    await userEvent.click(screen.getByRole('button', { name: '+ Aufgaben importieren' }))
     await userEvent.upload(screen.getByLabelText('Aufgaben importieren (Excel oder CSV)'), file())
 
     expect(await screen.findByText(/2 Probleme in der Datei/)).toBeInTheDocument()
@@ -64,7 +66,7 @@ describe('TaskTransfer', () => {
     const api = fakeApi({ 'GET /api/v1/projects/p-1/tasks/export?format=xlsx': () => new Response('xlsx') })
     render(<TaskTransfer project={project(false)} onImported={() => {}} />)
 
-    expect(screen.queryByLabelText('Aufgaben importieren (Excel oder CSV)')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Aufgaben importieren' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Excel' }))
 
     expect(api.calls.some((c) => c.key === 'GET /api/v1/projects/p-1/tasks/export?format=xlsx')).toBe(true)

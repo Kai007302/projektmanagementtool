@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import type { ProjectDetails } from '../projects/api'
 import { exportTasks, importErrorText, importTasks, type TaskFileFormat, type TaskImportResult } from './transfer'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; onImported: () => void }
 
@@ -73,54 +74,58 @@ export function TaskTransfer({ project, onImported }: Props) {
         </button>
       </div>
       {project.capabilities.canContribute && (
-        <div className="task-import">
-          <label htmlFor={inputId}>Aufgaben importieren (Excel oder CSV)</label>
-          <input
-            id={inputId}
-            type="file"
-            accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={busy}
-            onChange={(event) => void choose(event.target.files?.[0] ?? null)}
-          />
-          <p className="muted">
-            Erste Zeile mit Spaltennamen, mindestens „Titel“. Weitere Spalten wie im Export: Beschreibung, Status, Priorität,
-            Zuständig (E-Mail), Start, Fällig, Fortschritt (%), Aufwand (h). Es werden immer neue Aufgaben angelegt.
-          </p>
-          {busy && <p role="status">Datei wird geprüft …</p>}
-          {check && (
-            <div className="task-import-check" role="status">
-              {check.errors.length === 0 ? (
-                <p>
-                  {check.rows === 1 ? '1 Aufgabe erkannt.' : `${check.rows} Aufgaben erkannt.`}
-                  {check.ignoredColumns.length > 0 && ` Nicht übernommen: ${check.ignoredColumns.join(', ')}.`}
-                </p>
-              ) : (
-                <>
-                  <p>
-                    <strong>
-                      {check.errors.length === 1 ? '1 Problem' : `${check.errors.length} Probleme`} in der Datei. Es wird nichts
-                      importiert, bis alle behoben sind.
-                    </strong>
-                  </p>
-                  <ul className="task-import-errors">
-                    {check.errors.slice(0, 20).map((e, index) => (
-                      <li key={index}>
-                        Zeile {e.row}, {e.column}: {importErrorText[e.code] ?? e.message}
-                      </li>
-                    ))}
-                  </ul>
-                  {check.errors.length > 20 && <p className="muted">… und {check.errors.length - 20} weitere.</p>}
-                </>
+        <Reveal label="Aufgaben importieren">
+          {() => (
+            <div className="task-import">
+              <label htmlFor={inputId}>Aufgaben importieren (Excel oder CSV)</label>
+              <input
+                id={inputId}
+                type="file"
+                accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                disabled={busy}
+                onChange={(event) => void choose(event.target.files?.[0] ?? null)}
+              />
+              <p className="muted">
+                Erste Zeile mit Spaltennamen, mindestens „Titel“. Weitere Spalten wie im Export: Beschreibung, Status, Priorität,
+                Zuständig (E-Mail), Start, Fällig, Fortschritt (%), Aufwand (h). Es werden immer neue Aufgaben angelegt.
+              </p>
+              {busy && <p role="status">Datei wird geprüft …</p>}
+              {check && (
+                <div className="task-import-check" role="status">
+                  {check.errors.length === 0 ? (
+                    <p>
+                      {check.rows === 1 ? '1 Aufgabe erkannt.' : `${check.rows} Aufgaben erkannt.`}
+                      {check.ignoredColumns.length > 0 && ` Nicht übernommen: ${check.ignoredColumns.join(', ')}.`}
+                    </p>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>
+                          {check.errors.length === 1 ? '1 Problem' : `${check.errors.length} Probleme`} in der Datei. Es wird nichts
+                          importiert, bis alle behoben sind.
+                        </strong>
+                      </p>
+                      <ul className="task-import-errors">
+                        {check.errors.slice(0, 20).map((e, index) => (
+                          <li key={index}>
+                            Zeile {e.row}, {e.column}: {importErrorText[e.code] ?? e.message}
+                          </li>
+                        ))}
+                      </ul>
+                      {check.errors.length > 20 && <p className="muted">… und {check.errors.length - 20} weitere.</p>}
+                    </>
+                  )}
+                </div>
               )}
+              {importable && (
+                <button type="button" disabled={busy} onClick={() => void runImport()}>
+                  {check.rows === 1 ? '1 Aufgabe importieren' : `${check.rows} Aufgaben importieren`}
+                </button>
+              )}
+              {done !== null && <p role="status">{done === 1 ? '1 Aufgabe importiert. 🎉' : `${done} Aufgaben importiert. 🎉`}</p>}
             </div>
           )}
-          {importable && (
-            <button type="button" disabled={busy} onClick={() => void runImport()}>
-              {check.rows === 1 ? '1 Aufgabe importieren' : `${check.rows} Aufgaben importieren`}
-            </button>
-          )}
-          {done !== null && <p role="status">{done === 1 ? '1 Aufgabe importiert. 🎉' : `${done} Aufgaben importiert. 🎉`}</p>}
-        </div>
+        </Reveal>
       )}
       {error && <p role="alert">{error}</p>}
     </div>

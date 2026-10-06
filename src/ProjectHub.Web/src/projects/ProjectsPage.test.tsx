@@ -123,8 +123,8 @@ describe('ProjectsPage', () => {
     render(<ProjectsPage me={ben} />)
 
     const board = await openProject()
-    await userEvent.type(board.getByLabelText('Neue Aufgabe'), 'Texte schreiben')
-    await userEvent.click(board.getByRole('button', { name: 'Anlegen' }))
+    await userEvent.click(board.getByRole('button', { name: '+ Aufgabe' }))
+    await userEvent.type(board.getByLabelText('Neue Aufgabe'), 'Texte schreiben{Enter}')
 
     expect(await board.findByRole('button', { name: /Texte schreiben/ })).toBeInTheDocument()
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/projects/p-1/tasks')?.init?.body))).toEqual({
@@ -141,17 +141,18 @@ describe('ProjectsPage', () => {
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
     await board.findByRole('heading', { name: 'Kommentare' })
 
-    expect(board.queryByLabelText('Neue Aufgabe')).not.toBeInTheDocument()
-    expect(board.queryByRole('button', { name: 'Aufgabe speichern' })).not.toBeInTheDocument()
-    expect(board.queryByRole('button', { name: 'Aufgabe löschen' })).not.toBeInTheDocument()
+    expect(board.queryByRole('button', { name: '+ Aufgabe' })).not.toBeInTheDocument()
+    expect(board.queryByLabelText('Status')).not.toBeInTheDocument()
+    expect(board.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
     expect(board.queryByLabelText('Kommentar')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Projekt löschen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zum Projekt' })).not.toBeInTheDocument()
   })
 
-  it('sends only changed task fields with the version and offers only working members as assignees', async () => {
+  it('saves each changed task field right away with the latest version and offers only working members as assignees', async () => {
+    let version = 1
     const api = fakeApi({
       ...projectRoutes(),
-      'PATCH /api/v1/tasks/t-1': () => json({ ...design, status: 'in_progress', version: 2 }),
+      'PATCH /api/v1/tasks/t-1': () => json({ ...design, status: 'in_progress', version: ++version }),
     })
     render(<ProjectsPage me={ben} />)
 
@@ -161,15 +162,15 @@ describe('ProjectsPage', () => {
     expect(within(assignee).queryByRole('option', { name: 'Eva Viewer' })).not.toBeInTheDocument()
 
     await userEvent.selectOptions(board.getByLabelText('Status'), 'in_progress')
-    await userEvent.selectOptions(assignee, 'u-clara')
-    await userEvent.click(board.getByRole('button', { name: 'Aufgabe speichern' }))
+    await userEvent.selectOptions(board.getByLabelText('Zuständig'), 'u-clara')
 
-    await vi.waitFor(() => expect(api.calls.some((c) => c.key === 'PATCH /api/v1/tasks/t-1')).toBe(true))
-    expect(JSON.parse(String(api.calls.find((c) => c.key === 'PATCH /api/v1/tasks/t-1')?.init?.body))).toEqual({
-      version: 1,
-      status: 'in_progress',
-      assigneeId: 'u-clara',
-    })
+    const patches = () => api.calls.filter((c) => c.key === 'PATCH /api/v1/tasks/t-1').map((c) => JSON.parse(String(c.init?.body)) as unknown)
+    await vi.waitFor(() => expect(patches()).toHaveLength(2))
+    expect(patches()).toEqual([
+      { version: 1, status: 'in_progress' },
+      { version: 2, assigneeId: 'u-clara' },
+    ])
+    expect(board.queryByRole('button', { name: 'Aufgabe speichern' })).not.toBeInTheDocument()
   })
 
   it('reloads the task and explains a conflicting change', async () => {
@@ -187,10 +188,9 @@ describe('ProjectsPage', () => {
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
     await userEvent.selectOptions(await board.findByLabelText('Priorität'), 'high')
-    await userEvent.click(board.getByRole('button', { name: 'Aufgabe speichern' }))
 
     expect(await board.findByText(/inzwischen geändert/)).toBeInTheDocument()
-    expect(await board.findByDisplayValue('Von Clara geändert')).toBeInTheDocument()
+    expect(await board.findByRole('heading', { name: /Von Clara geändert/ })).toBeInTheDocument()
     expect(api.calls.filter((c) => c.key === 'GET /api/v1/tasks/t-1')).toHaveLength(2)
   })
 

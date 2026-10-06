@@ -25,6 +25,7 @@ test('tasks are imported from a CSV file after a check and exported as Excel wor
   await api(request, 'POST', '/projects', { name })
   await openProject(page, name, 'Liste')
 
+  await page.getByRole('button', { name: '+ Aufgaben importieren' }).click()
   await page.getByLabel('Aufgaben importieren (Excel oder CSV)').setInputFiles({
     name: 'aufgaben.csv',
     mimeType: 'text/csv',

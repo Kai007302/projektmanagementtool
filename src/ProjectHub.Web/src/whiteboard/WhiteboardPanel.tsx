@@ -6,6 +6,7 @@ import { createWhiteboard, deleteWhiteboard, fetchWhiteboards, renameWhiteboard,
 import { BoardEditor } from './BoardEditor'
 import { useLatest } from '../api/useLatest'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -72,20 +73,31 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
           </label>
         )}
         {canEdit && (
-          <form className="inline-form" onSubmit={create}>
-            <label>
-              Neues Whiteboard
-              <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} placeholder="Name" />
-            </label>
-            <button type="submit">Anlegen</button>
-          </form>
+          <Reveal label="Whiteboard">
+            {(close) => (
+              <form className="quick-create" onSubmit={create}>
+                <input
+                  aria-label="Neues Whiteboard"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  onBlur={() => {
+                    if (!name.trim()) close()
+                  }}
+                  required
+                  maxLength={200}
+                  placeholder="Name, Enter zum Anlegen"
+                  autoFocus
+                />
+              </form>
+            )}
+          </Reveal>
         )}
       </div>
       {error && <p role="alert">{error}</p>}
       {boards === null ? (
         <p className="muted">Whiteboards werden geladen …</p>
       ) : !selected ? (
-        <EmptyState emoji="🎨">{canEdit ? 'Noch kein Whiteboard. Lege oben das erste an.' : 'Dieses Projekt hat noch kein Whiteboard.'}</EmptyState>
+        <EmptyState emoji="🎨">{canEdit ? 'Noch kein Whiteboard. Lege mit „+ Whiteboard“ das erste an.' : 'Dieses Projekt hat noch kein Whiteboard.'}</EmptyState>
       ) : (
         <BoardEditor
           key={selected.id}

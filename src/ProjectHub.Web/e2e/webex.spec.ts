@@ -34,6 +34,7 @@ test('an editor links a meeting and creates the project space; notifications arr
     const webex = page.getByRole('region', { name: 'Webex' })
 
     // A link that is not on webex.com is refused before it reaches the server.
+    await webex.getByRole('button', { name: '+ Webex-Link' }).click()
     const form = webex.getByRole('form', { name: 'Webex-Link hinzufügen' })
     await form.getByLabel('Titel').fill('Jour fixe')
     await form.getByLabel('Link').fill('https://webex.com.evil.example/meet')
