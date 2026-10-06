@@ -10,7 +10,7 @@
   --border: #e7e0d2;
   --border-strong: #d6cdbb;
   --text: #0f172a;
-  --muted: #5b6b7f;
+  --muted: #526173; /* at least 4.5:1 also on the cream segment background */
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-soft: #eef2ff;
