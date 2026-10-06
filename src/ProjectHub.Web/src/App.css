@@ -2455,8 +2455,26 @@ fieldset.block-fields {
   transform: translateY(-2px);
 }
 
+.project-tile {
+  position: relative;
+}
+
+/* The project's menu sits on its tile, beside the button that opens the project. */
+.project-tile-menu {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+}
+
+.project-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .project-card-icon {
   flex: none;
+  overflow: hidden;
   display: grid;
   place-items: center;
   width: 2.5rem;
@@ -2464,6 +2482,13 @@ fieldset.block-fields {
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--project) 16%, transparent);
   font-size: 1.25rem;
+}
+
+.project-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
 }
 
 .project-card-body {
@@ -3061,6 +3086,25 @@ fieldset.block-fields {
   margin: 1rem 0 1.25rem;
 }
 
+.knowledge-search-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-toggle {
+  flex: none;
+}
+
+.filter-toggle.active {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.filter-chip.removable {
+  padding-right: 0.7rem;
+  cursor: pointer;
+}
+
 .knowledge-search-input {
   width: 100%;
   box-sizing: border-box;
@@ -3213,4 +3257,86 @@ kbd {
   .search-trigger kbd {
     display: none;
   }
+}
+
+/* A small window for rare tasks opened from a menu. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10vh 1rem 1rem;
+  background: rgb(15 23 42 / 0.35);
+}
+
+.dialog {
+  position: relative;
+  width: min(32rem, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+.dialog-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+.dialog .panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.dialog h3 {
+  margin-top: 0;
+  padding-right: 2rem;
+}
+
+.project-appearance-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  --project: var(--accent);
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.5rem, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.emoji-choice {
+  padding: 0.35rem 0;
+  font-size: 1.25rem;
+}
+
+.emoji-choice[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The account menu behind the avatar. */
+.menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto;
+  height: auto;
+  padding: 0.15rem 0.4rem 0.15rem 0.15rem;
+  text-align: left;
 }

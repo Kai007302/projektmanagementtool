@@ -76,6 +76,46 @@ public sealed class CalendarFeedTests(InfrastructureFixture infrastructure) : Ap
         Assert.True(await ScalarAsync("select count(*) from audit_log where actor_id = $1 and action = 'CalendarFeedRevoked'", Eva.Id) >= 1);
     }
 
+    [Fact]
+    public async Task A_project_calendar_holds_all_dates_of_the_project_and_lives_beside_the_own_one()
+    {
+        var project = await CreateTeamProjectAsync();
+        var other = await CreateTeamProjectAsync();
+        var mine = await CreateTaskAsync(Ben, project.Id, NewTask("Meins", assigneeId: David.Id, dueDate: Soon));
+        var others = await CreateTaskAsync(Ben, project.Id, NewTask("Von Clara", assigneeId: Clara.Id, dueDate: Soon));
+        var elsewhere = await CreateTaskAsync(Ben, other.Id, NewTask("Anderes Projekt", assigneeId: David.Id, dueDate: Soon));
+        var milestone = await CreateMilestoneAsync(project.Id, "Abnahme", Soon.AddDays(3));
+
+        var own = await CreateFeedAsync(David);
+        var feed = await CreateFeedAsync(David, $"/api/v1/projects/{project.Id}/calendar-feed");
+        var text = await Factory.CreateClient().GetStringAsync(feed);
+
+        Assert.Contains($"X-WR-CALNAME:ProjectHub – {project.Name}", text, StringComparison.Ordinal);
+        Assert.Contains($"UID:task-{mine.Id}@projecthub\r\n", text, StringComparison.Ordinal);
+        Assert.Contains($"UID:task-{others.Id}@projecthub\r\n", text, StringComparison.Ordinal);
+        Assert.Contains($"UID:milestone-{milestone.Id}@projecthub\r\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain($"task-{elsewhere.Id}", text, StringComparison.Ordinal);
+
+        // Both addresses work side by side; renewing the project address leaves the own one alone.
+        await CreateFeedAsync(David, $"/api/v1/projects/{project.Id}/calendar-feed");
+        Assert.Equal(HttpStatusCode.NotFound, (await Factory.CreateClient().GetAsync(feed)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Factory.CreateClient().GetAsync(own)).StatusCode);
+        Assert.True((await As(David).GetFromJsonAsync<CalendarFeedStatus>($"/api/v1/projects/{project.Id}/calendar-feed"))!.Active);
+        Assert.False((await As(David).GetFromJsonAsync<CalendarFeedStatus>($"/api/v1/projects/{other.Id}/calendar-feed"))!.Active);
+    }
+
+    [Fact]
+    public async Task A_project_calendar_ends_when_the_person_leaves_and_needs_access_to_create()
+    {
+        var project = await CreateTeamProjectAsync();
+        var feed = await CreateFeedAsync(David, $"/api/v1/projects/{project.Id}/calendar-feed");
+        Assert.Equal(HttpStatusCode.OK, (await Factory.CreateClient().GetAsync(feed)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await As(Ben).DeleteAsync($"/api/v1/projects/{project.Id}/members/{David.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Factory.CreateClient().GetAsync(feed)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(David).PostAsync($"/api/v1/projects/{project.Id}/calendar-feed", null)).StatusCode);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("?token=")]
@@ -109,9 +149,9 @@ public sealed class CalendarFeedTests(InfrastructureFixture infrastructure) : Ap
     }
 
     /// <summary>Creates (or replaces) the person's feed and returns its path and query, as a calendar program would fetch it.</summary>
-    private async Task<string> CreateFeedAsync(SeedUser user)
+    private async Task<string> CreateFeedAsync(SeedUser user, string path = "/api/v1/me/calendar-feed")
     {
-        var response = await As(user).PostAsync("/api/v1/me/calendar-feed", null);
+        var response = await As(user).PostAsync(path, null);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var created = (await response.Content.ReadFromJsonAsync<CalendarFeedCreated>())!;
         var url = new Uri(created.Url);

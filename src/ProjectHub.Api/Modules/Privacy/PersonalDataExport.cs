@@ -40,10 +40,14 @@ public sealed record PersonalDataExport(
     IReadOnlyList<ExportWhiteboardEdits> WhiteboardEdits,
     IReadOnlyList<ExportLogEntry> ActivityEntries,
     IReadOnlyList<ExportLogEntry> AuditEntries,
-    ExportCalendarFeed? CalendarFeed);
+    ExportCalendarFeed? CalendarFeed,
+    IReadOnlyList<ExportProjectCalendarFeed> ProjectCalendarFeeds);
 
 /// <summary>Whether the person has a calendar address; the address itself is not stored and cannot be exported.</summary>
 public sealed record ExportCalendarFeed(DateTimeOffset CreatedAt, DateTimeOffset? LastUsedAt);
+
+/// <summary>A calendar address for one project (ADR 0020); like <see cref="ExportCalendarFeed"/> without the address.</summary>
+public sealed record ExportProjectCalendarFeed(Guid ProjectId, DateTimeOffset CreatedAt, DateTimeOffset? LastUsedAt);
 
 public sealed record ExportProfile(
     Guid Id, string DisplayName, string Email, string? Department, string Status, string OrganizationRole, string Organization,
@@ -176,9 +180,15 @@ public sealed class PersonalDataExportService(ProjectHubDbContext db, IAuditLog 
             .ToListAsync(ct);
 
         var calendarFeed = await db.Set<CalendarFeed>().AsNoTracking()
-            .Where(f => f.OrganizationId == org && f.UserId == me)
+            .Where(f => f.OrganizationId == org && f.UserId == me && f.ProjectId == null)
             .Select(f => new ExportCalendarFeed(f.CreatedAt, f.LastUsedAt))
             .SingleOrDefaultAsync(ct);
+
+        var projectCalendarFeeds = await db.Set<CalendarFeed>().AsNoTracking()
+            .Where(f => f.OrganizationId == org && f.UserId == me && f.ProjectId != null)
+            .OrderBy(f => f.CreatedAt)
+            .Select(f => new ExportProjectCalendarFeed(f.ProjectId!.Value, f.CreatedAt, f.LastUsedAt))
+            .ToListAsync(ct);
 
         // Accountability (Art. 5 (2) GDPR): who exported when, without content.
         audit.Record(user, AuditActions.PersonalDataExported, "app_user", me);
@@ -186,7 +196,7 @@ public sealed class PersonalDataExportService(ProjectHubDbContext db, IAuditLog 
 
         return new PersonalDataExport(
             clock.GetUtcNow(), Notice, profile, projects, teams, preferences, notifications, mails, assigned, created,
-            taskComments, knowledgeComments, articles, versions, attachments, whiteboardEdits, activity, auditEntries, calendarFeed);
+            taskComments, knowledgeComments, articles, versions, attachments, whiteboardEdits, activity, auditEntries, calendarFeed, projectCalendarFeeds);
     }
 
     private static IQueryable<ExportTask> ToExport(IQueryable<ProjectTask> tasks) =>

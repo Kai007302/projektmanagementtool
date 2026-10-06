@@ -12,7 +12,16 @@ using ProjectHub.Api.Modules.Users;
 namespace ProjectHub.Api.Modules.Projects;
 
 public sealed record ProjectSummary(
-    Guid Id, string Name, string? Description, string Status, DateOnly? StartDate, DateOnly? EndDate, string? MyRole, long Version);
+    Guid Id,
+    string Name,
+    string? Description,
+    string Status,
+    DateOnly? StartDate,
+    DateOnly? EndDate,
+    string? MyRole,
+    long Version,
+    string? Icon = null,
+    long? LogoVersion = null);
 
 public sealed record ProjectMemberResponse(Guid UserId, string DisplayName, string Email, string Role);
 
@@ -26,7 +35,9 @@ public sealed record ProjectDetails(
     Guid OwnerId,
     long Version,
     ProjectCapabilities Capabilities,
-    IReadOnlyList<ProjectMemberResponse> Members);
+    IReadOnlyList<ProjectMemberResponse> Members,
+    string? Icon = null,
+    long? LogoVersion = null);
 
 public sealed record CreateProjectRequest(string? Name, string? Description, string? Status, DateOnly? StartDate, DateOnly? EndDate);
 
@@ -41,6 +52,7 @@ public sealed class ProjectService(
 {
     public const int MaxNameLength = 200;
     public const int MaxDescriptionLength = 10_000;
+    public const int MaxIconLength = 16;
 
     public async Task<IReadOnlyList<ProjectSummary>> ListAsync(UserContext user, Paging paging, CancellationToken ct)
     {
@@ -56,7 +68,7 @@ public sealed class ProjectService(
             orderby project.Name, project.Id
             select new ProjectSummary(
                 project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate,
-                membership == null ? null : membership.Role, project.Version);
+                membership == null ? null : membership.Role, project.Version, project.Icon, project.LogoVersion);
 
         return await rows.Skip(paging.Skip).Take(paging.Take + 1).ToListAsync(ct);
     }
@@ -79,7 +91,7 @@ public sealed class ProjectService(
 
         return new ProjectDetails(
             project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, project.OwnerId,
-            project.Version, await access.CapabilitiesAsync(user, projectId, ct), members);
+            project.Version, await access.CapabilitiesAsync(user, projectId, ct), members, project.Icon, project.LogoVersion);
     }
 
     public async Task<ServiceResult<Project>> CreateAsync(UserContext user, CreateProjectRequest request, CancellationToken ct)
@@ -147,6 +159,7 @@ public sealed class ProjectService(
         if (!patch.TryApply<string>("name", value => project.Name = value?.Trim() ?? string.Empty, changed, out var error)
             || !patch.TryApply<string>("description", value => project.Description = Normalize(value), changed, out error)
             || !patch.TryApply<string>("status", value => project.Status = value ?? string.Empty, changed, out error)
+            || !patch.TryApply<string>("icon", value => project.Icon = Normalize(value), changed, out error)
             || !patch.TryApply<DateOnly?>("startDate", value => project.StartDate = value, changed, out error)
             || !patch.TryApply<DateOnly?>("endDate", value => project.EndDate = value, changed, out error))
         {
@@ -168,7 +181,8 @@ public sealed class ProjectService(
             }
         }
 
-        return new ProjectSummary(project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, null, project.Version);
+        return new ProjectSummary(
+            project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, null, project.Version, project.Icon, project.LogoVersion);
     }
 
     public async Task<ServiceResult<Done>> DeleteAsync(UserContext user, Guid projectId, CancellationToken ct)
@@ -308,6 +322,12 @@ public sealed class ProjectService(
         if (project.Description?.Length > MaxDescriptionLength)
         {
             return ServiceFailure.Invalid("description", $"At most {MaxDescriptionLength} characters.");
+        }
+
+        // An emoji, perhaps with a skin tone or joined from several (👩‍💻): short, and without letters or digits.
+        if (project.Icon is { } icon && (icon.Length > MaxIconLength || icon.Any(char.IsLetterOrDigit) || icon.Any(char.IsWhiteSpace)))
+        {
+            return ServiceFailure.Invalid("icon", $"One emoji, at most {MaxIconLength} characters.");
         }
 
         if (!ProjectStatus.All.Contains(project.Status))

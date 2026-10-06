@@ -13,6 +13,7 @@ public static class ProjectEndpoints
         services
             .AddScoped<ProjectAccess>()
             .AddScoped<ProjectService>()
+            .AddScoped<ProjectLogoService>()
             .AddScoped<ProjectActivityService>();
 
     public static RouteGroupBuilder MapProjectEndpoints(this RouteGroupBuilder api)
@@ -47,11 +48,34 @@ public static class ProjectEndpoints
         projects.MapDelete("/{id:guid}/members/{userId:guid}", async (Guid id, Guid userId, UserContext user, ProjectService service, CancellationToken ct) =>
             ApiResults.NoContent(await service.RemoveMemberAsync(user, id, userId, ct)));
 
+        projects.MapGet("/{id:guid}/logo", async (Guid id, UserContext user, ProjectLogoService service, HttpContext http, CancellationToken ct) =>
+            ApiResults.From(await service.GetAsync(user, id, ct), logo =>
+            {
+                http.Response.Headers.XContentTypeOptions = "nosniff";
+                return Results.File(logo.Content, logo.ContentType);
+            }));
+
+        // Bearer-token API without cookies, so no antiforgery token is needed.
+        projects.MapPut("/{id:guid}/logo", async (Guid id, IFormFile? file, UserContext user, ProjectLogoService service, CancellationToken ct) =>
+                ApiResults.Ok(await service.UploadAsync(user, id, file, ct)))
+            .DisableAntiforgery()
+            .RequireRateLimiting(HttpHardening.UploadPolicy)
+            .WithMetadata(new LogoSizeLimit());
+
+        projects.MapDelete("/{id:guid}/logo", async (Guid id, UserContext user, ProjectLogoService service, CancellationToken ct) =>
+            ApiResults.Ok(await service.DeleteAsync(user, id, ct)));
+
         projects.MapGet("/{id:guid}/activity", async (Guid id, UserContext user, ProjectActivityService service, int? limit, int? offset, CancellationToken ct) =>
             Paging.TryCreate(limit, offset, out var paging, out var error)
                 ? ApiResults.From(await service.ListAsync(user, id, paging, ct), rows => Results.Ok(paging.ToPage(rows)))
                 : error!);
 
         return api;
+    }
+
+    /// <summary>A little more than the largest logo, for the multipart framing around it.</summary>
+    private sealed class LogoSizeLimit : Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata
+    {
+        public long? MaxRequestBodySize => ProjectLogoService.MaxSizeBytes + 64 * 1024;
     }
 }

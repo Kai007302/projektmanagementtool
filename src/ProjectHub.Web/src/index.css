@@ -3,19 +3,20 @@
  * Components only use these variables, so the look can be tuned here.
  */
 :root {
-  --bg: #f8fafc;
+  /* Cream instead of white behind the content; cards stay white. */
+  --bg: #f7f2e8;
   --surface: #ffffff;
-  --surface-muted: #f1f5f9;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --surface-muted: #f3eee4;
+  --border: #e7e0d2;
+  --border-strong: #d6cdbb;
   --text: #0f172a;
   --muted: #5b6b7f;
   --accent: #4f46e5;
   --accent-hover: #4338ca;
   --accent-soft: #eef2ff;
   --accent-text: #4f46e5;
-  --header-bg: rgb(255 255 255 / 0.9);
-  --segment-bg: #e9eef5;
+  --header-bg: rgb(250 246 238 / 0.9);
+  --segment-bg: #ebe4d6;
   --chip-fg: #475569;
   --danger-border: #fecaca;
   --danger: #b91c1c;

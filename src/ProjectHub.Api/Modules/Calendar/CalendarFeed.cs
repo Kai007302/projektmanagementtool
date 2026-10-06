@@ -15,12 +15,16 @@ using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.Modules.Calendar;
 
-/// <summary>The secret address of a person's subscribed calendar; only the hash of its token is kept.</summary>
+/// <summary>
+/// The secret address of a person's subscribed calendar; only the hash of its token is kept. Without a project it holds
+/// the person's own dates, with one the dates of that project (ADR 0020).
+/// </summary>
 public sealed class CalendarFeed
 {
     public Guid Id { get; init; }
     public Guid OrganizationId { get; init; }
     public Guid UserId { get; init; }
+    public Guid? ProjectId { get; init; }
     public required byte[] TokenHash { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? LastUsedAt { get; set; }
@@ -41,7 +45,7 @@ public sealed record CalendarFeedCreated(string Url, DateTimeOffset CreatedAt);
 /// milestones of the projects they are a member of. Calendar programs fetch it without signing in, so the address
 /// carries a random token; access to every entry is checked again on each fetch, as for the person themselves.
 /// </summary>
-public sealed class CalendarFeedService(ProjectHubDbContext db, IAuditLog audit, NotificationOptions app, TimeProvider clock)
+public sealed class CalendarFeedService(ProjectHubDbContext db, ProjectAccess projectAccess, IAuditLog audit, NotificationOptions app, TimeProvider clock)
 {
     public const string FeedPath = "/api/v1/calendar-feed.ics";
     public const int MaxEntries = 1_000;
@@ -54,36 +58,76 @@ public sealed class CalendarFeedService(ProjectHubDbContext db, IAuditLog audit,
     /// <summary>The last-used time is written at most this often, not on every refresh.</summary>
     private static readonly TimeSpan UsageResolution = TimeSpan.FromMinutes(15);
 
-    public async Task<CalendarFeedStatus> StatusAsync(UserContext user, CancellationToken ct)
+    public Task<CalendarFeedStatus> StatusAsync(UserContext user, CancellationToken ct) => StatusOfAsync(user, null, ct);
+
+    public async Task<ServiceResult<CalendarFeedStatus>> ProjectStatusAsync(UserContext user, Guid projectId, CancellationToken ct)
     {
-        var feed = await Own(user).AsNoTracking().SingleOrDefaultAsync(ct);
+        if (await projectAccess.RequireAsync(user, projectId, ProjectPermission.View, ct) is { } failure)
+        {
+            return failure;
+        }
+
+        return await StatusOfAsync(user, projectId, ct);
+    }
+
+    private async Task<CalendarFeedStatus> StatusOfAsync(UserContext user, Guid? projectId, CancellationToken ct)
+    {
+        var feed = await Own(user, projectId).AsNoTracking().SingleOrDefaultAsync(ct);
         return new CalendarFeedStatus(feed is not null, feed?.CreatedAt, feed?.LastUsedAt);
     }
 
     /// <summary>Creates the address, or replaces it: the previous address stops working at once.</summary>
-    public async Task<CalendarFeedCreated> CreateAsync(UserContext user, CancellationToken ct)
+    public Task<CalendarFeedCreated> CreateAsync(UserContext user, CancellationToken ct) => CreateForAsync(user, null, ct);
+
+    /// <summary>The address of one project's calendar; replacing it leaves the person's other addresses working.</summary>
+    public async Task<ServiceResult<CalendarFeedCreated>> CreateForProjectAsync(UserContext user, Guid projectId, CancellationToken ct)
+    {
+        if (await projectAccess.RequireAsync(user, projectId, ProjectPermission.View, ct) is { } failure)
+        {
+            return failure;
+        }
+
+        return await CreateForAsync(user, projectId, ct);
+    }
+
+    private async Task<CalendarFeedCreated> CreateForAsync(UserContext user, Guid? projectId, CancellationToken ct)
     {
         var token = Base64Url(RandomNumberGenerator.GetBytes(TokenBytes));
         var now = clock.GetUtcNow();
-        var feed = await Own(user).SingleOrDefaultAsync(ct);
+        var feed = await Own(user, projectId).SingleOrDefaultAsync(ct);
         var replaced = feed is not null;
         if (feed is null)
         {
-            feed = new CalendarFeed { Id = Guid.CreateVersion7(), OrganizationId = user.OrganizationId, UserId = user.UserId, TokenHash = Hash(token) };
+            feed = new CalendarFeed
+            {
+                Id = Guid.CreateVersion7(), OrganizationId = user.OrganizationId, UserId = user.UserId, ProjectId = projectId, TokenHash = Hash(token),
+            };
             db.Set<CalendarFeed>().Add(feed);
         }
 
         feed.TokenHash = Hash(token);
         feed.CreatedAt = now;
         feed.LastUsedAt = null;
-        audit.Record(user, AuditActions.CalendarFeedCreated, "calendar_feed", feed.Id, new { Replaced = replaced });
+        audit.Record(user, AuditActions.CalendarFeedCreated, "calendar_feed", feed.Id, new { Replaced = replaced, ProjectId = projectId });
         await db.SaveChangesAsync(ct);
         return new CalendarFeedCreated($"{app.AppUrl.TrimEnd('/')}{FeedPath}?token={token}", now);
     }
 
-    public async Task<ServiceResult<Done>> DeleteAsync(UserContext user, CancellationToken ct)
+    public Task<ServiceResult<Done>> DeleteAsync(UserContext user, CancellationToken ct) => DeleteForAsync(user, null, ct);
+
+    public async Task<ServiceResult<Done>> DeleteForProjectAsync(UserContext user, Guid projectId, CancellationToken ct)
     {
-        var feed = await Own(user).SingleOrDefaultAsync(ct);
+        if (await projectAccess.RequireAsync(user, projectId, ProjectPermission.View, ct) is { } failure)
+        {
+            return failure;
+        }
+
+        return await DeleteForAsync(user, projectId, ct);
+    }
+
+    private async Task<ServiceResult<Done>> DeleteForAsync(UserContext user, Guid? projectId, CancellationToken ct)
+    {
+        var feed = await Own(user, projectId).SingleOrDefaultAsync(ct);
         if (feed is null)
         {
             return ServiceFailure.NotFound("Calendar feed");
@@ -122,8 +166,46 @@ public sealed class CalendarFeedService(ProjectHubDbContext db, IAuditLog audit,
             await db.SaveChangesAsync(ct);
         }
 
-        var entries = await EntriesAsync(found.User, DateOnly.FromDateTime(now.UtcDateTime).AddDays(-PastDays), ct);
-        return CalendarFile.Write(entries, now, "ProjectHub – Meine Termine");
+        var since = DateOnly.FromDateTime(now.UtcDateTime).AddDays(-PastDays);
+        if (found.Feed.ProjectId is not { } projectId)
+        {
+            return CalendarFile.Write(await EntriesAsync(found.User, since, ct), now, "ProjectHub – Meine Termine");
+        }
+
+        // A project calendar holds what the person could see in the project now; leaving the project ends it.
+        if (await projectAccess.RequireAsync(found.User, projectId, ProjectPermission.View, ct) is not null)
+        {
+            return ServiceFailure.NotFound("Calendar feed");
+        }
+
+        var name = await db.Set<Project>().Where(p => p.Id == projectId).Select(p => p.Name).SingleAsync(ct);
+        return CalendarFile.Write(await ProjectEntriesAsync(found.User, projectId, since, ct), now, $"ProjectHub – {name}");
+    }
+
+    /// <summary>All dated tasks and the milestones of one project; the caller has checked that the person may see it.</summary>
+    private async Task<List<CalendarEntry>> ProjectEntriesAsync(UserContext user, Guid projectId, DateOnly since, CancellationToken ct)
+    {
+        var tasks = await db.Set<ProjectTask>().AsNoTracking()
+            .Where(t => t.OrganizationId == user.OrganizationId && t.ProjectId == projectId && t.DeletedAt == null
+                        && (t.StartDate != null || t.DueDate != null)
+                        && (t.DueDate ?? t.StartDate) >= since)
+            .OrderBy(t => t.StartDate ?? t.DueDate).ThenBy(t => t.Id)
+            .Select(t => new { t.Id, t.Title, t.StartDate, t.DueDate, t.Version })
+            .Take(MaxEntries)
+            .ToListAsync(ct);
+        var milestones = await db.Set<GanttMilestone>().AsNoTracking()
+            .Where(m => m.OrganizationId == user.OrganizationId && m.ProjectId == projectId && m.MilestoneDate >= since)
+            .OrderBy(m => m.MilestoneDate).ThenBy(m => m.Id)
+            .Select(m => new { m.Id, m.Name, m.MilestoneDate, m.Version })
+            .Take(MaxEntries)
+            .ToListAsync(ct);
+
+        return tasks
+            .Select(t => new CalendarEntry(
+                $"task-{t.Id}@projecthub", t.Version, t.Title, (t.StartDate ?? t.DueDate)!.Value, (t.DueDate ?? t.StartDate)!.Value, app.AppUrl))
+            .Concat(milestones.Select(m => new CalendarEntry(
+                $"milestone-{m.Id}@projecthub", m.Version, $"◆ {m.Name}", m.MilestoneDate, m.MilestoneDate, app.AppUrl)))
+            .ToList();
     }
 
     private async Task<List<CalendarEntry>> EntriesAsync(UserContext user, DateOnly since, CancellationToken ct)
@@ -164,8 +246,8 @@ public sealed class CalendarFeedService(ProjectHubDbContext db, IAuditLog audit,
             .ToList();
     }
 
-    private IQueryable<CalendarFeed> Own(UserContext user) =>
-        db.Set<CalendarFeed>().Where(f => f.OrganizationId == user.OrganizationId && f.UserId == user.UserId);
+    private IQueryable<CalendarFeed> Own(UserContext user, Guid? projectId) =>
+        db.Set<CalendarFeed>().Where(f => f.OrganizationId == user.OrganizationId && f.UserId == user.UserId && f.ProjectId == projectId);
 
     private static byte[] Hash(string token) => SHA256.HashData(Encoding.ASCII.GetBytes(token));
 

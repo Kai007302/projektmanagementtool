@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean }
 
@@ -6,7 +6,15 @@ export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; 
  * The "…" button for rare actions (rename, move, delete), like in Notion or Linear. The menu closes after a choice,
  * on Escape and on a click elsewhere.
  */
-export function Menu({ label, items, className }: { label: string; items: MenuItem[]; className?: string }) {
+type Props = {
+  label: string
+  items: MenuItem[]
+  className?: string
+  /** What the button shows instead of the three dots, e.g. the person's avatar. */
+  trigger?: ReactNode
+}
+
+export function Menu({ label, items, className, trigger }: Props) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -35,12 +43,23 @@ export function Menu({ label, items, className }: { label: string; items: MenuIt
         }
       }}
     >
-      <button ref={button} type="button" className="menu-button" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <circle cx="3" cy="8" r="1.5" />
-          <circle cx="8" cy="8" r="1.5" />
-          <circle cx="13" cy="8" r="1.5" />
-        </svg>
+      <button
+        ref={button}
+        type="button"
+        className={trigger ? 'menu-button menu-trigger' : 'menu-button'}
+        aria-label={label}
+        title={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        {trigger ?? (
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="8" cy="8" r="1.5" />
+            <circle cx="13" cy="8" r="1.5" />
+          </svg>
+        )}
       </button>
       {open && (
         <div className="menu-list" role="menu" aria-label={label}>

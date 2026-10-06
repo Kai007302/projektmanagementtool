@@ -6,7 +6,9 @@ import { DueDate } from '../tasks/DueDate'
 import { PriorityBadge } from '../tasks/PriorityBadge'
 import { EmptyState } from '../ui/EmptyState'
 import { greeting, projectLook, today } from '../ui/personality'
-import { createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
+import { canEditProject, createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
+import { ProjectIcon } from './ProjectIcon'
+import { ProjectMenu } from './ProjectMenu'
 import { ProjectView } from './ProjectView'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
 
@@ -80,8 +82,9 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
       ) : (
         <ul className="project-grid">
           {projects.map((project) => (
-            <li key={project.id}>
+            <li key={project.id} className="project-tile">
               <ProjectCard project={project} overview={overview.get(project.id)} onOpen={() => setSelected(project.id)} />
+              <ProjectMenu className="project-tile-menu" project={project} canEdit={canEditProject(project.myRole)} onChanged={load} />
             </li>
           ))}
         </ul>
@@ -96,9 +99,7 @@ function ProjectCard({ project, overview, onOpen }: { project: ProjectSummary; o
   const members = overview?.people ?? []
   return (
     <button type="button" className="project-card" style={{ ['--project' as string]: look.color }} onClick={onOpen}>
-      <span className="project-card-icon" aria-hidden="true">
-        {look.emoji}
-      </span>
+      <ProjectIcon project={project} className="project-card-icon" />
       <span className="project-card-body">
         <span className="card-title">{project.name}</span>
         <span className="card-meta">

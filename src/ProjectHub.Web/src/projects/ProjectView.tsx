@@ -13,7 +13,9 @@ import { MembersPanel } from './MembersPanel'
 import { WebexPanel } from '../webex/WebexPanel'
 import { useLatest } from '../api/useLatest'
 import { InlineEdit } from '../ui/InlineEdit'
-import { Menu } from '../ui/Menu'
+import { projectLook } from '../ui/personality'
+import { ProjectIcon } from './ProjectIcon'
+import { ProjectMenu } from './ProjectMenu'
 
 type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
 
@@ -81,7 +83,8 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
         <>
           <header className="project-header">
             <div>
-              <h2 id="project-heading">
+              <h2 id="project-heading" className="project-title" style={{ ['--project' as string]: projectLook(project.id).color }}>
+                <ProjectIcon project={project} className="project-card-icon project-title-icon" />
                 <InlineEdit key={project.name} value={project.name} label="Projektname" editable={project.capabilities.canEdit} onSave={(name) => save({ name })} />
               </h2>
               <p className="muted project-subline">
@@ -104,7 +107,12 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
                 {project.description && <span>{project.description}</span>}
               </p>
             </div>
-            {project.capabilities.canManage && <Menu label="Weitere Aktionen zum Projekt" items={[{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }]} />}
+            <ProjectMenu
+              project={project}
+              canEdit={project.capabilities.canEdit}
+              extraItems={project.capabilities.canManage ? [{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }] : []}
+              onChanged={changed}
+            />
           </header>
           <nav className="tabs" aria-label="Ansicht">
             {(Object.keys(viewText) as View[]).map((value) => (

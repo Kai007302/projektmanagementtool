@@ -4,10 +4,11 @@ import { createCalendarFeed, deleteCalendarFeed, fetchCalendarFeed, webcalUrl, t
 const dateText = (iso: string) => new Date(iso).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
 /**
- * The person's own dates as a calendar subscription (ADR 0018): tasks assigned to them with a date and the
- * milestones of their projects. The address works like a password and is shown only right after it is created.
+ * A calendar subscription (ADR 0018): without a project the person's own dates (tasks assigned to them with a date and
+ * the milestones of their projects), with one all dates of that project (ADR 0020). The address works like a password
+ * and is shown only right after it is created.
  */
-export function CalendarFeedPanel() {
+export function CalendarFeedPanel({ project }: { project?: { id: string; name: string } }) {
   const [status, setStatus] = useState<CalendarFeedStatus | null>(null)
   const [url, setUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -15,14 +16,14 @@ export function CalendarFeedPanel() {
   const inputId = useId()
 
   useEffect(() => {
-    fetchCalendarFeed().then(setStatus, (e: Error) => setError(e.message))
-  }, [])
+    fetchCalendarFeed(project?.id).then(setStatus, (e: Error) => setError(e.message))
+  }, [project?.id])
 
   async function create() {
     if (status?.active && !window.confirm('Neue Adresse erstellen? Die bisherige funktioniert dann nicht mehr.')) return
     setError(null)
     try {
-      const created = await createCalendarFeed()
+      const created = await createCalendarFeed(project?.id)
       setUrl(created.url)
       setCopied(false)
       setStatus({ active: true, createdAt: created.createdAt, lastUsedAt: null })
@@ -35,7 +36,7 @@ export function CalendarFeedPanel() {
     if (!window.confirm('Kalender-Adresse löschen? Abonnierte Kalender werden dann nicht mehr aktualisiert.')) return
     setError(null)
     try {
-      await deleteCalendarFeed()
+      await deleteCalendarFeed(project?.id)
       setUrl(null)
       setStatus({ active: false, createdAt: null, lastUsedAt: null })
     } catch (e) {
@@ -55,10 +56,11 @@ export function CalendarFeedPanel() {
 
   return (
     <section className="panel calendar-feed" aria-labelledby="calendar-feed-heading">
-      <h3 id="calendar-feed-heading">Kalender abonnieren</h3>
+      <h3 id="calendar-feed-heading">{project ? `Kalender von „${project.name}“ abonnieren` : 'Meine Termine abonnieren'}</h3>
       <p className="muted">
-        Deine Aufgaben mit Termin und die Meilensteine deiner Projekte erscheinen in Outlook, Google oder Apple Kalender und
-        aktualisieren sich von selbst.
+        {project
+          ? 'Alle Aufgaben mit Termin und die Meilensteine dieses Projekts erscheinen in Outlook, Google oder Apple Kalender und aktualisieren sich von selbst.'
+          : 'Deine Aufgaben mit Termin und die Meilensteine deiner Projekte erscheinen in Outlook, Google oder Apple Kalender und aktualisieren sich von selbst.'}
       </p>
       {status === null && !error && <p>Wird geladen …</p>}
       {url && (
@@ -75,7 +77,7 @@ export function CalendarFeedPanel() {
           </div>
           <p className="muted">
             In Outlook: Kalender hinzufügen → Aus dem Internet abonnieren → Adresse einfügen. Die Adresse wirkt wie ein Passwort:
-            Wer sie kennt, sieht Titel und Projekt deiner Termine. Sie wird nur jetzt angezeigt.
+            Wer sie kennt, sieht die Titel der Termine. Sie wird nur jetzt angezeigt.
           </p>
         </div>
       )}

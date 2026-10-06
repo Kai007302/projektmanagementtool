@@ -17,6 +17,8 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `012_privacy.sql`: `app_user.anonymized_at` (anonymisierte Personen, ADR 0017) und Indizes über `created_at` für die Löschfristen von Benachrichtigungen, Aktivität und Audit-Log
 - `011_knowledge_search_vector.sql`: `knowledge_article.search_vector`, von PostgreSQL generierter Suchvektor mit GIN-Index; ersetzt den Ausdrucksindex aus 006 (ADR 0013)
 - `013_calendar_feed.sql`: `calendar_feed` (geheime Adresse des Kalender-Abos je Person, ADR 0018)
+- `014_project_calendar_feed.sql`: `calendar_feed.project_id` (Kalender je Projekt, ADR 0020)
+- `015_project_icon_logo.sql`: `project.icon`, `project.logo_version` und `project_logo` (Projektsymbol und Logo, ADR 0020)
 
 ## Regeln
 
@@ -169,7 +171,7 @@ Das Gantt-Diagramm ist eine Ansicht auf Tasks und braucht keine eigene Migration
 
 Migration 013 (ADR 0018):
 
-- `calendar_feed`: höchstens eine Zeile je Person (`user_id` eindeutig) mit `token_hash` (SHA-256 des Tokens in der Adresse, 32 Bytes, eindeutig), `created_at` und `last_used_at` (höchstens alle 15 Minuten aktualisiert). Das Token selbst wird nicht gespeichert. Die Anonymisierung einer Person löscht die Zeile.
+- `calendar_feed`: höchstens eine Zeile je Person und Projekt (`user_id`, `project_id` eindeutig, `project_id` leer für die eigenen Termine; Migration 014, ADR 0020) mit `token_hash` (SHA-256 des Tokens in der Adresse, 32 Bytes, eindeutig), `created_at` und `last_used_at` (höchstens alle 15 Minuten aktualisiert). Das Token selbst wird nicht gespeichert. Die Anonymisierung einer Person löscht ihre Zeilen.
 
 ## Webex
 

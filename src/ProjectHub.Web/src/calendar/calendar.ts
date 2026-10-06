@@ -37,12 +37,15 @@ export type CalendarFeedStatus = { active: boolean; createdAt: string | null; la
 
 export type CalendarFeedCreated = { url: string; createdAt: string }
 
-export const fetchCalendarFeed = () => apiFetch<CalendarFeedStatus>('/api/v1/me/calendar-feed')
+/** The person's own calendar, or with a project id the calendar of that project (ADR 0020). */
+const feedPath = (projectId?: string) => (projectId ? `/api/v1/projects/${projectId}/calendar-feed` : '/api/v1/me/calendar-feed')
+
+export const fetchCalendarFeed = (projectId?: string) => apiFetch<CalendarFeedStatus>(feedPath(projectId))
 
 /** Creates the feed address or replaces it; the old address stops working. The address is only shown now. */
-export const createCalendarFeed = () => apiFetch<CalendarFeedCreated>('/api/v1/me/calendar-feed', { method: 'POST' })
+export const createCalendarFeed = (projectId?: string) => apiFetch<CalendarFeedCreated>(feedPath(projectId), { method: 'POST' })
 
-export const deleteCalendarFeed = () => apiFetch<void>('/api/v1/me/calendar-feed', { method: 'DELETE' })
+export const deleteCalendarFeed = (projectId?: string) => apiFetch<void>(feedPath(projectId), { method: 'DELETE' })
 
 /** The same address with the webcal scheme, which opens the subscription dialog of the calendar program. */
 export const webcalUrl = (url: string) => url.replace(/^https?:/, 'webcal:')

@@ -174,8 +174,8 @@ export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOp
 type SearchProps = { spaces: Space[]; tags: Tag[]; initial: ArticleFilter; onSearch: (filter: ArticleFilter) => void }
 
 /**
- * One search field that searches while typing, with the filters as small chips beside it. No search button and no
- * filter form, like the search in Linear or Notion.
+ * One search field that searches while typing. The filters stay hidden until someone asks for them with the filter
+ * button; every active filter shows as a chip that a click removes, like in Linear or Notion.
  */
 function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
   const [q, setQ] = useState(initial.q ?? '')
@@ -183,6 +183,7 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
   const [status, setStatus] = useState(initial.status ?? '')
   const [spaceId, setSpaceId] = useState(initial.spaceId ?? '')
   const [tag, setTag] = useState(initial.tag ?? '')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const search = useRef(onSearch)
   useEffect(() => {
     search.current = onSearch
@@ -210,6 +211,21 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
     </select>
   )
 
+  const spaceName = (id: string) => spaces.find((space) => space.id === id)?.name ?? 'unbekannt'
+  const active: { label: string; value: string; clear: () => void }[] = [
+    ...(type ? [{ label: 'Art', value: articleTypes[type as keyof typeof articleTypes] ?? type, clear: () => setType('') }] : []),
+    ...(status ? [{ label: 'Status', value: articleStatuses[status as keyof typeof articleStatuses] ?? status, clear: () => setStatus('') }] : []),
+    ...(spaceId ? [{ label: 'Bereich', value: spaceName(spaceId), clear: () => setSpaceId('') }] : []),
+    ...(tag ? [{ label: 'Tag', value: tag, clear: () => setTag('') }] : []),
+  ]
+
+  function clearAll() {
+    setType('')
+    setStatus('')
+    setSpaceId('')
+    setTag('')
+  }
+
   return (
     <form
       className="knowledge-search"
@@ -219,18 +235,39 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
         onSearch({ q: q.trim(), type, status, spaceId, tag })
       }}
     >
-      <input className="knowledge-search-input" type="search" aria-label="Suche" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Artikel suchen, z. B. Deployment, Kickoff …" />
-      <div className="filter-chips">
-        {chip('Art', type, setType, Object.entries(articleTypes))}
-        {chip('Status', status, setStatus, Object.entries(articleStatuses))}
-        {chip('Bereich', spaceId, setSpaceId, spaces.map((space) => [space.id, space.name]))}
-        {chip(
-          'Tag',
-          tag,
-          setTag,
-          tags.map((t) => [t.name, `${t.name} (${t.articleCount})`]),
-        )}
+      <div className="knowledge-search-row">
+        <input className="knowledge-search-input" type="search" aria-label="Suche" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Artikel suchen, z. B. Deployment, Kickoff …" />
+        <button type="button" className={active.length > 0 ? 'filter-toggle active' : 'filter-toggle'} aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>
+          Filter{active.length > 0 && ` (${active.length})`}
+        </button>
       </div>
+      {filtersOpen && (
+        <div className="filter-chips">
+          {chip('Art', type, setType, Object.entries(articleTypes))}
+          {chip('Status', status, setStatus, Object.entries(articleStatuses))}
+          {chip('Bereich', spaceId, setSpaceId, spaces.map((space) => [space.id, space.name]))}
+          {chip(
+            'Tag',
+            tag,
+            setTag,
+            tags.map((t) => [t.name, `${t.name} (${t.articleCount})`]),
+          )}
+        </div>
+      )}
+      {active.length > 0 && (
+        <div className="filter-chips" role="group" aria-label="Aktive Filter">
+          {active.map((filter) => (
+            <button key={filter.label} type="button" className="filter-chip active removable" aria-label={`Filter ${filter.label}: ${filter.value} entfernen`} onClick={filter.clear}>
+              {filter.label}: {filter.value} <span aria-hidden="true">✕</span>
+            </button>
+          ))}
+          {active.length > 1 && (
+            <button type="button" className="link-button" onClick={clearAll}>
+              Alle entfernen
+            </button>
+          )}
+        </div>
+      )}
     </form>
   )
 }

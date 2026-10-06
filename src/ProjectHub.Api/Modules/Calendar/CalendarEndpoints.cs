@@ -77,6 +77,15 @@ public static class CalendarEndpoints
         api.MapDelete("/me/calendar-feed", async (UserContext user, CalendarFeedService service, CancellationToken ct) =>
             ApiResults.NoContent(await service.DeleteAsync(user, ct)));
 
+        api.MapGet("/projects/{id:guid}/calendar-feed", async (Guid id, UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            ApiResults.From(await service.ProjectStatusAsync(user, id, ct), value => Results.Ok(value)));
+
+        api.MapPost("/projects/{id:guid}/calendar-feed", async (Guid id, UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            ApiResults.From(await service.CreateForProjectAsync(user, id, ct), value => Results.Ok(value)));
+
+        api.MapDelete("/projects/{id:guid}/calendar-feed", async (Guid id, UserContext user, CalendarFeedService service, CancellationToken ct) =>
+            ApiResults.NoContent(await service.DeleteForProjectAsync(user, id, ct)));
+
         // Fetched by calendar programs without signing in; the token in the query string is the credential. Query
         // strings are neither logged by the web container nor recorded in traces (ADR 0017, ADR 0018).
         api.MapGet(CalendarFeedService.FeedPath["/api/v1".Length..], async (string? token, CalendarFeedService service, CancellationToken ct) =>

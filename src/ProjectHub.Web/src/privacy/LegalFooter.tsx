@@ -1,45 +1,24 @@
 import { useEffect, useState } from 'react'
-import { CalendarFeedPanel } from '../calendar/CalendarFeedPanel'
-import { downloadMyData, fetchLegal, type LegalInformation } from './api'
+import { fetchLegal, type LegalInformation } from './api'
 
-/** Privacy notice, imprint and the person's own data export, at the bottom of every page. */
-export function LegalFooter({ signedIn }: { signedIn: boolean }) {
+/**
+ * Privacy notice and imprint at the bottom of every page. The person's own data export and calendar are in the menu
+ * behind their avatar, the calendar of a project in that project's menu.
+ */
+export function LegalFooter() {
   const [legal, setLegal] = useState<LegalInformation | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [calendar, setCalendar] = useState(false)
 
   useEffect(() => {
-    // Without the links the app still works; the footer then only offers the export.
+    // Without the links the app still works; the footer then stays empty.
     fetchLegal().then(setLegal, () => {})
   }, [])
 
-  async function download() {
-    setError(null)
-    try {
-      await downloadMyData()
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
+  if (!legal?.privacyNoticeUrl && !legal?.imprintUrl) return null
 
   return (
-    <>
-      <nav className="legal-links" aria-label="Rechtliches">
-        {legal?.privacyNoticeUrl && <a href={legal.privacyNoticeUrl}>Datenschutz</a>}
-        {legal?.imprintUrl && <a href={legal.imprintUrl}>Impressum</a>}
-        {signedIn && (
-          <button type="button" className="link-button" aria-expanded={calendar} onClick={() => setCalendar(!calendar)}>
-            Kalender abonnieren
-          </button>
-        )}
-        {signedIn && (
-          <button type="button" className="link-button" onClick={() => void download()}>
-            Meine Daten herunterladen
-          </button>
-        )}
-        {error && <span role="alert">{error}</span>}
-      </nav>
-      {signedIn && calendar && <CalendarFeedPanel />}
-    </>
+    <nav className="legal-links" aria-label="Rechtliches">
+      {legal.privacyNoticeUrl && <a href={legal.privacyNoticeUrl}>Datenschutz</a>}
+      {legal.imprintUrl && <a href={legal.imprintUrl}>Impressum</a>}
+    </nav>
   )
 }

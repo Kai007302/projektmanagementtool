@@ -12,6 +12,10 @@ export type ProjectSummary = {
   endDate: string | null
   myRole: ProjectRole | null
   version: number
+  /** The emoji chosen for the project; null shows one derived from the id. */
+  icon?: string | null
+  /** Set while the project has a logo; changes with every new logo. */
+  logoVersion?: number | null
 }
 
 export type ProjectMember = { userId: string; displayName: string; email: string; role: ProjectRole }
@@ -57,8 +61,19 @@ export const fetchProject = (id: string) => apiFetch<ProjectDetails>(`/api/v1/pr
 export const createProject = (name: string, description: string) =>
   apiFetch<ProjectSummary>('/api/v1/projects', { method: 'POST', body: jsonBody({ name, description }) })
 
-export const updateProject = (id: string, version: number, changes: Partial<Pick<ProjectSummary, 'name' | 'description' | 'status'>>) =>
+export const updateProject = (id: string, version: number, changes: Partial<Pick<ProjectSummary, 'name' | 'description' | 'status' | 'icon'>>) =>
   apiFetch<ProjectSummary>(`/api/v1/projects/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })
+
+export function uploadProjectLogo(id: string, file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return apiFetch<{ logoVersion: number | null }>(`/api/v1/projects/${id}/logo`, { method: 'PUT', body: form })
+}
+
+export const deleteProjectLogo = (id: string) => apiFetch<{ logoVersion: number | null }>(`/api/v1/projects/${id}/logo`, { method: 'DELETE' })
+
+/** Roles that may change a project's name, symbol and logo. */
+export const canEditProject = (role: ProjectRole | null) => role === 'admin' || role === 'editor'
 
 export const deleteProject = (id: string) => apiFetch<void>(`/api/v1/projects/${id}`, { method: 'DELETE' })
 
