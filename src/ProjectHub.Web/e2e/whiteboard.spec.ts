@@ -90,7 +90,7 @@ test('two people draw together, a viewer follows and the board survives a reload
   await expect(objectList(claraPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
 
   // Ben renames and deletes the board; the others follow.
-  await ben.getByRole('button', { name: 'Name des Whiteboards: Workshop, bearbeiten' }).click()
+  await ben.getByRole('heading', { name: 'Workshop' }).getByRole('button').click()
   await ben.getByLabel('Name des Whiteboards', { exact: true }).fill('Workshop März')
   await ben.getByLabel('Name des Whiteboards', { exact: true }).press('Enter')
   await expect(evaPage.getByRole('heading', { name: 'Workshop März' })).toBeVisible()

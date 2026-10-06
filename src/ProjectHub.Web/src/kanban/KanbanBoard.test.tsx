@@ -214,7 +214,8 @@ describe('KanbanBoard', () => {
     })
     renderBoard()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Spaltenname „Erledigt“: Erledigt, bearbeiten' }))
+    await screen.findByRole('region', { name: 'Erledigt' })
+    await userEvent.click(column('Erledigt').getByRole('button', { name: 'Erledigt' }))
     const name = column('Erledigt').getByLabelText('Spaltenname „Erledigt“')
     await userEvent.clear(name)
     await userEvent.type(name, 'Fertig{Enter}')

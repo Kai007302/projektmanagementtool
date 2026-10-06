@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 
 type Props = {
   value: string
-  /** Accessible name of the field and the button, e.g. "Projektname". */
+  /** Accessible name of the field and description of the button, e.g. "Projektname"; the button is named by the text itself so headings keep their name. */
   label: string
   onSave: (value: string) => Promise<unknown> | void
   editable: boolean
@@ -22,7 +22,7 @@ export function InlineEdit({ value, label, onSave, editable, maxLength = 200, cl
 
   if (draft === null) {
     return (
-      <button type="button" className={['inline-edit', className].filter(Boolean).join(' ')} aria-label={`${label}: ${value}, bearbeiten`} title="Zum Bearbeiten klicken" onClick={() => setDraft(value)}>
+      <button type="button" className={['inline-edit', className].filter(Boolean).join(' ')} aria-description={`${label}, zum Bearbeiten klicken`} title="Zum Bearbeiten klicken" onClick={() => setDraft(value)}>
         {children ?? value}
       </button>
     )

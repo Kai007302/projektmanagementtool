@@ -83,6 +83,8 @@ test('tasks are planned, linked and moved on the Gantt chart while a viewer watc
 
   // Dragging the end handle of "Analyse" one day to the right breaks the link again.
   const analysis = bar(ben, 'Analyse')
+  // The date form below the chart may have scrolled the first row under the sticky top bar; bring it to the middle.
+  await analysis.evaluate((element) => element.scrollIntoView({ block: 'center' }))
   const handle = analysis.locator('[data-handle="end"]')
   const box = (await handle.boundingBox())!
   await ben.mouse.move(box.x + box.width / 2, box.y + box.height / 2)

@@ -210,7 +210,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   function stopEditing(id: string, backToCanvas: boolean) {
     undoRef.current?.stopCapturing()
     setEditingId((current) => (current === id ? null : current))
-    if (backToCanvas) svgRef.current?.focus()
+    if (backToCanvas) svgRef.current?.focus({ preventScroll: true })
   }
 
   function add(type: ObjectType, taskId?: string) {
@@ -308,7 +308,8 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   function onObjectDown(event: PointerEvent, object: BoardObject) {
     if (event.button !== 0) return
     select(object.id)
-    svgRef.current?.focus()
+    // Without preventScroll the canvas scrolls into view under the pointer and a double click hits the background.
+    svgRef.current?.focus({ preventScroll: true })
     if (canEdit) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
     else event.stopPropagation()
   }

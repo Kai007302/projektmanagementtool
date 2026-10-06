@@ -13,8 +13,8 @@ test('an article is written, reviewed and published, and only then visible to th
   // The draft opens in the editor right away; title, type and space are set there.
   const editor = clara.getByRole('form', { name: 'Artikel bearbeiten' })
   await editor.getByLabel('Titel').fill(title)
-  await editor.getByLabel('Art').selectOption('how_to')
-  await editor.getByLabel('Bereich').selectOption({ label: 'Projektmethodik' })
+  await editor.getByLabel('Art', { exact: true }).selectOption('how_to')
+  await editor.getByLabel('Bereich', { exact: true }).selectOption({ label: 'Projektmethodik' })
   await editor.getByLabel('Zusammenfassung').fill('Die ersten Tage im Projektteam.')
   await editor.getByLabel('Neuer Block').selectOption('heading')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()
