@@ -166,6 +166,27 @@ describe('KanbanBoard', () => {
     expect(screen.queryByRole('button', { name: /Aufgabe$/ })).not.toBeInTheDocument()
   })
 
+  it('opens a card for reading only, without fields to change it', async () => {
+    fakeApi({
+      'GET /api/v1/projects/p-1/board': () => json(board()),
+      'GET /api/v1/tasks/t-1': () =>
+        json({ id: 't-1', projectId: 'p-1', title: 'Design', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 3 }),
+      'GET /api/v1/tasks/t-1/comments?limit=100': () => json({ items: [], nextOffset: null }),
+      'GET /api/v1/tasks/t-1/attachments': () => json([]),
+      'GET /api/v1/tasks/t-1/whiteboards': () => json([]),
+    })
+    renderBoard()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Design' }))
+
+    expect(await screen.findByText('Status')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Titel bearbeiten' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Unteraufgabe' })).not.toBeInTheDocument()
+    expect(screen.getByText(/nur zum Ansehen/)).toBeInTheDocument()
+  })
+
   it('lets editors add a column', async () => {
     const api = fakeApi({
       'GET /api/v1/projects/p-1/board': () => json(board()),

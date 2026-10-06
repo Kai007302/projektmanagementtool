@@ -38,6 +38,8 @@ type Props = {
   onChanged: () => void
   onDeleted: () => void
   onClose: () => void
+  /** Only shows the task; the Kanban board opens cards like this, changes happen in the list. */
+  readOnly?: boolean
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
@@ -51,7 +53,7 @@ const staleText = 'Jemand anderes hat die Aufgabe inzwischen geändert. Der aktu
  * A task in a panel on the right, like in Asana: the board stays visible, every field saves as soon as it changes,
  * rare actions sit in the "…" menu. Escape or the close button closes it.
  */
-export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose }: Props) {
+export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = useRef<Task | null>(null)
@@ -106,7 +108,8 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
     }
   }
 
-  const { canContribute, canEdit } = project.capabilities
+  const canContribute = project.capabilities.canContribute && !readOnly
+  const canEdit = project.capabilities.canEdit && !readOnly
 
   return (
     <aside
@@ -134,6 +137,7 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
             <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
           </h4>
           <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
+          {readOnly && project.capabilities.canContribute && <p className="muted">Auf dem Board nur zum Ansehen. Bearbeiten in der Ansicht „Liste“.</p>}
           <TaskCalendar task={task} />
           {canContribute && (
             <QuickCreate

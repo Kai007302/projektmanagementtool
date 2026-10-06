@@ -134,6 +134,12 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Kalenderdateien für Aufgaben und Meilensteine bekommt, wer das Projekt sehen darf (View). Sonst „nicht gefunden“ (404).
 - Sie enthalten nur Titel, Datum und einen Link in die App.
 - Das Kalender-Abo (ADR 0018) verwaltet jede Person nur für sich selbst (`/me/calendar-feed`). Abgerufen wird es ohne Anmeldung mit dem Token aus der Adresse; es enthält nur, was die Person zu diesem Zeitpunkt sehen darf: ihr zugewiesene Aufgaben in sichtbaren Projekten und Meilensteine der Projekte, in denen sie Mitglied ist. Inaktive oder anonymisierte Personen: 404.
+- Den Kalender eines Projekts (ADR 0020, `/projects/{id}/calendar-feed`) kann abonnieren, wer das Projekt sehen darf (View); jede Person hat dafür ihre eigene Adresse. Er enthält alle datierten Aufgaben und Meilensteine des Projekts. Beim Abruf wird das Leserecht der Person neu geprüft; wer es verloren hat, bekommt 404.
+
+## Projektsymbol und Logo
+
+- Symbol und Logo sieht, wer das Projekt sehen darf (View). Ändern, hochladen und entfernen braucht Edit (ADR 0020).
+- Logos nur als PNG, JPEG oder WebP bis 256 KB, erkannt am Dateiinhalt; SVG wird abgelehnt.
 
 ## Identität
 

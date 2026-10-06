@@ -105,7 +105,6 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
           project={project}
           me={me}
           revision={revision}
-          onChanged={onChanged}
           onRename={(newName) => run(async () => void (await renameWhiteboard(selected, newName)))}
           onDelete={() => {
             if (window.confirm(`Whiteboard „${selected.name}“ wirklich löschen?`)) void run(() => deleteWhiteboard(selected.id))

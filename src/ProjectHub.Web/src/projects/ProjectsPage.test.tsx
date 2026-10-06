@@ -145,7 +145,41 @@ describe('ProjectsPage', () => {
     expect(board.queryByLabelText('Status')).not.toBeInTheDocument()
     expect(board.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
     expect(board.queryByLabelText('Kommentar')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zum Projekt' })).not.toBeInTheDocument()
+    // Viewers get the calendar and the download, but nothing that changes the project.
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zum Projekt' }))
+    expect(screen.getByRole('menuitem', { name: 'Kalender abonnieren' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Projekt löschen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Symbol und Logo ändern' })).not.toBeInTheDocument()
+  })
+
+  it('offers calendar, download, symbol and logo in the menu of each project tile', async () => {
+    let version = 1
+    const api = fakeApi({
+      ...projectRoutes(),
+      'PATCH /api/v1/projects/p-1': () => json({ ...summary, icon: '🛰️', version: ++version }),
+      'PUT /api/v1/projects/p-1/logo': () => json({ logoVersion: 42 }),
+      'GET /api/v1/projects/p-1/calendar-feed': () => json({ active: false, createdAt: null, lastUsedAt: null }),
+    })
+    render(<ProjectsPage me={ben} />)
+
+    const tile = await screen.findByRole('button', { name: 'Weitere Aktionen zum Projekt' })
+    await userEvent.click(tile)
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Kalender abonnieren' }))
+    expect(await screen.findByRole('heading', { name: 'Kalender von „Intranet“ abonnieren' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }))
+
+    await userEvent.click(tile)
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Symbol und Logo ändern' }))
+    const dialog = within(screen.getByRole('dialog', { name: /Symbol und Logo/ }))
+    await userEvent.click(dialog.getByRole('button', { name: '🧪' }))
+    expect(api.calls.find((c) => c.key === 'PATCH /api/v1/projects/p-1')?.init?.body).toBe(JSON.stringify({ version: 1, icon: '🧪' }))
+
+    // Only images are taken as a logo.
+    const input = dialog.getByLabelText('Logo-Datei')
+    await userEvent.upload(input, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }), { applyAccept: false })
+    expect(dialog.getByRole('alert')).toHaveTextContent('PNG, JPEG oder WebP')
+    await userEvent.upload(input, new File([new Uint8Array([0x89, 0x50])], 'logo.png', { type: 'image/png' }))
+    expect(api.calls.some((c) => c.key === 'PUT /api/v1/projects/p-1/logo' && c.init?.body instanceof FormData)).toBe(true)
   })
 
   it('saves each changed task field right away with the latest version and offers only working members as assignees', async () => {

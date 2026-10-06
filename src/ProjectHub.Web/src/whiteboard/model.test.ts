@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
-import { addNextTo, addObject, addObjects, isColor, localOrigin, stickyGrid, describe as describeObject, moveBy, objectsOf, readObjects, removeObject, updateObject } from './model'
+import {
+  addConnector,
+  addNextTo,
+  addObject,
+  addObjects,
+  isColor,
+  localOrigin,
+  stickyGrid,
+  describe as describeObject,
+  describeArrow,
+  moveBy,
+  objectsOf,
+  readObjects,
+  removeObject,
+  updateObject,
+} from './model'
 import { templates } from './templates'
 
 describe('whiteboard model', () => {
@@ -117,6 +132,61 @@ describe('sticky notes', () => {
     expect(isColor('purple')).toBe(true)
     expect(isColor('toString')).toBe(false)
     expect(isColor(3)).toBe(false)
+  })
+})
+
+describe('whiteboard connectors and locks', () => {
+  function two() {
+    const doc = new Y.Doc()
+    addObject(doc, 'sticky', { x: 100, y: 100 })
+    addObject(doc, 'rect', { x: 600, y: 100 })
+    const [a, b] = readObjects(doc)
+    return { doc, a, b }
+  }
+
+  it('hangs an arrow on two objects and keeps its ends on their outlines', () => {
+    const { doc, a, b } = two()
+    addConnector(doc, a, b)
+
+    const arrow = readObjects(doc).find((o) => o.type === 'arrow')!
+    expect(arrow).toMatchObject({ from: a.id, to: b.id })
+    expect(arrow.x).toBeGreaterThan(a.x + a.w - 1)
+    expect(arrow.x2).toBeLessThan(b.x + 1)
+
+    // The note moves, the arrow follows without anyone changing the arrow.
+    updateObject(doc, a.id, { x: a.x, y: a.y + 300 })
+    const moved = readObjects(doc).find((o) => o.type === 'arrow')!
+    expect(moved.y).toBeGreaterThan(arrow.y + 100)
+    expect(describeArrow(moved, readObjects(doc), () => null)).toBe('Pfeil: Neue Notiz → Rechteck (Blau)')
+  })
+
+  it('draws an arrow to a free point and moves it with the object it hangs on', () => {
+    const { doc, a } = two()
+    const id = addConnector(doc, a, { x: 400, y: 400 })
+
+    const arrow = readObjects(doc).find((o) => o.id === id)!
+    expect(arrow).toMatchObject({ from: a.id, to: null, x2: 400, y2: 400 })
+    // Dragging the arrow itself moves only the loose end; the other one stays on its object.
+    updateObject(doc, id, moveBy(arrow, 50, 50))
+    expect(readObjects(doc).find((o) => o.id === id)).toMatchObject({ x2: 450, y2: 450, x: arrow.x, y: arrow.y })
+  })
+
+  it('removes the arrows of a removed object and forgets an end that is gone', () => {
+    const { doc, a, b } = two()
+    addConnector(doc, a, b)
+    removeObject(doc, b.id)
+
+    expect(readObjects(doc).map((o) => o.type)).toEqual(['sticky'])
+  })
+
+  it('stores the lock in the document and drops the field when it is unlocked', () => {
+    const { doc, a } = two()
+    updateObject(doc, a.id, { locked: true })
+    expect(readObjects(doc).find((o) => o.id === a.id)?.locked).toBe(true)
+
+    updateObject(doc, a.id, { locked: false })
+    expect(readObjects(doc).find((o) => o.id === a.id)?.locked).toBe(false)
+    expect(objectsOf(doc).get(a.id)?.has('locked')).toBe(false)
   })
 })
 

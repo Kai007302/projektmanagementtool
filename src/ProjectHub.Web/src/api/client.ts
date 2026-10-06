@@ -48,6 +48,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 /** Sends a request with the same authentication and hands back the open response, e.g. to read a server-sent event stream. */
 export const apiStream = (path: string, init: RequestInit = {}): Promise<Response> => send(path, init)
 
+/** Loads a file through the API (with the same authentication), e.g. an image that an <img> cannot fetch itself. */
+export const apiBlob = async (path: string): Promise<Blob> => (await send(path, {})).blob()
+
 /** Downloads a file through the API (with the same authentication) and hands it to the browser. */
 export async function apiDownload(path: string, fileName: string): Promise<void> {
   const blob = await (await send(path, {})).blob()

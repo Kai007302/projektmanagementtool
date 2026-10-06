@@ -5,7 +5,7 @@ import { fetchApiStatus, type ApiStatus } from './api/health'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
-import { initials } from './identity/initials'
+import { AccountMenu } from './identity/AccountMenu'
 import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import type { Notification } from './notifications/api'
@@ -142,7 +142,6 @@ function App() {
                   <circle cx="9" cy="9" r="5.5" />
                   <path d="M13.2 13.2 L17 17" />
                 </svg>
-                <span>Suchen</span>
                 <kbd aria-hidden="true">Strg K</kbd>
               </button>
             )}
@@ -151,13 +150,7 @@ function App() {
             {session && (
               <div className="account-row">
                 <NotificationBell key={session.me.id} onOpen={openNotification} />
-                <span className="avatar" aria-hidden="true">
-                  {initials(session.me.displayName)}
-                </span>
-                <p className="account-name">
-                  <strong>{session.me.displayName}</strong>
-                  <span>{roleText[session.me.organizationRole]}</span>
-                </p>
+                <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} />
               </div>
             )}
             {signedInWithEntra() && (
@@ -205,7 +198,7 @@ function App() {
         <span className={`status status-${status}`} role="status">
           {statusText[status]}
         </span>
-        <LegalFooter signedIn={session !== null} />
+        <LegalFooter />
       </footer>
     </div>
   )

@@ -85,6 +85,59 @@ public sealed class ProjectEndpointTests(InfrastructureFixture infrastructure) :
         Assert.Equal(project.Version + 1, updated.Version);
     }
 
+    [Fact]
+    public async Task Editor_sets_an_emoji_and_rejects_text_as_symbol()
+    {
+        var project = await CreateTeamProjectAsync();
+
+        var set = await As(Clara).PatchAsJsonAsync($"/api/v1/projects/{project.Id}", new { version = project.Version, icon = "🛰️" });
+        Assert.Equal(HttpStatusCode.OK, set.StatusCode);
+        var updated = (await set.Content.ReadFromJsonAsync<ProjectSummary>())!;
+        Assert.Equal("🛰️", updated.Icon);
+        var list = await As(Eva).GetFromJsonAsync<PagedResponse<ProjectSummary>>("/api/v1/projects?limit=100");
+        Assert.Equal("🛰️", list!.Items.Single(p => p.Id == project.Id).Icon);
+
+        var text = await As(Clara).PatchAsJsonAsync($"/api/v1/projects/{project.Id}", new { version = updated.Version, icon = "Rakete" });
+        Assert.Equal(HttpStatusCode.BadRequest, text.StatusCode);
+    }
+
+    [Fact]
+    public async Task Editor_uploads_a_logo_that_members_can_load_and_scripts_are_refused()
+    {
+        var project = await CreateTeamProjectAsync();
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52];
+
+        var upload = await UploadLogoAsync(Clara, project.Id, png, "logo.png", "image/png");
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        var version = (await upload.Content.ReadFromJsonAsync<ProjectLogoUpdated>())!.LogoVersion;
+        Assert.NotNull(version);
+
+        var details = await As(Eva).GetFromJsonAsync<ProjectDetails>($"/api/v1/projects/{project.Id}");
+        Assert.Equal(version, details!.LogoVersion);
+        Assert.Equal(project.Version, details.Version);
+        var logo = await As(Eva).GetAsync($"/api/v1/projects/{project.Id}/logo");
+        Assert.Equal(HttpStatusCode.OK, logo.StatusCode);
+        Assert.Equal("image/png", logo.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(png, await logo.Content.ReadAsByteArrayAsync());
+
+        // An SVG that claims to be a PNG is refused; members cannot change the logo at all.
+        var svg = "<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"u8.ToArray();
+        Assert.Equal(HttpStatusCode.BadRequest, (await UploadLogoAsync(Clara, project.Id, svg, "logo.png", "image/png")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await UploadLogoAsync(David, project.Id, png, "logo.png", "image/png")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(Fritz).GetAsync($"/api/v1/projects/{project.Id}/logo")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await As(Clara).DeleteAsync($"/api/v1/projects/{project.Id}/logo")).StatusCode);
+        Assert.Null((await As(Eva).GetFromJsonAsync<ProjectDetails>($"/api/v1/projects/{project.Id}"))!.LogoVersion);
+        Assert.Equal(HttpStatusCode.NotFound, (await As(Eva).GetAsync($"/api/v1/projects/{project.Id}/logo")).StatusCode);
+    }
+
+    private Task<HttpResponseMessage> UploadLogoAsync(SeedUser user, Guid projectId, byte[] content, string fileName, string contentType)
+    {
+        var file = new ByteArrayContent(content);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        return As(user).PutAsync($"/api/v1/projects/{projectId}/logo", new MultipartFormDataContent { { file, "file", fileName } });
+    }
+
     [Theory]
     [InlineData("dev-david")]
     [InlineData("dev-eva")]

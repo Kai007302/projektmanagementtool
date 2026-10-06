@@ -75,7 +75,7 @@ async function openArticle() {
 describe('KnowledgePage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('lists articles and searches while typing, with filters as chips', async () => {
+  it('lists articles and searches while typing, with filters behind a button and removable chips', async () => {
     const api = fakeApi({ ...routes(), 'GET /api/v1/knowledge/articles?limit=100&q=Freigabe&type=process&tag=Betrieb': () => json(empty) })
     render(<KnowledgePage me={ben} />)
 
@@ -83,12 +83,19 @@ describe('KnowledgePage', () => {
 
     const search = screen.getByRole('search')
     await userEvent.type(within(search).getByLabelText('Suche'), 'Freigabe')
+    expect(within(search).queryByLabelText('Art')).not.toBeInTheDocument()
+    await userEvent.click(within(search).getByRole('button', { name: 'Filter' }))
     await userEvent.selectOptions(within(search).getByLabelText('Art'), 'process')
     await userEvent.selectOptions(within(search).getByLabelText('Tag'), 'Betrieb')
     expect(within(search).queryByRole('button', { name: 'Suchen' })).not.toBeInTheDocument()
 
     expect(await screen.findByText('Keine Artikel gefunden.')).toBeInTheDocument()
     expect(api.calls.map((c) => c.key)).toContain('GET /api/v1/knowledge/articles?limit=100&q=Freigabe&type=process&tag=Betrieb')
+
+    // One click on a chip removes that filter again.
+    await userEvent.click(within(search).getByRole('button', { name: 'Filter Tag: Betrieb entfernen' }))
+    expect(within(search).queryByRole('button', { name: /^Filter Tag/ })).not.toBeInTheDocument()
+    expect(within(search).getByRole('button', { name: 'Filter (1)' })).toBeInTheDocument()
   })
 
   it('renders blocks as text and resolves references the reader can see', async () => {

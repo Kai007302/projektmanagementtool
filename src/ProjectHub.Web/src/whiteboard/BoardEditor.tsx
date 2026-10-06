@@ -3,9 +3,9 @@ import * as Y from 'yjs'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { fetchTasks, taskStatuses, type Task } from '../tasks/api'
-import { TaskDetails } from '../tasks/TaskDetails'
 import { fetchWhiteboardTasks, type Whiteboard, type WhiteboardTask } from './api'
 import {
+  addConnector,
   addObject,
   addNextTo,
   addObjects,
@@ -13,6 +13,7 @@ import {
   colors,
   isColor,
   describe,
+  describeArrow,
   localOrigin,
   moveBy,
   objectsOf,
@@ -28,7 +29,25 @@ import {
   type NewObject,
   type ObjectType,
 } from './model'
-import { ArrowIcon, DiamondIcon, EllipseIcon, FitIcon, ListIcon, MinusIcon, OpenIcon, PencilIcon, PlusIcon, RectIcon, RedoIcon, TaskIcon, TemplatesIcon, TextIcon, TrashIcon, UndoIcon } from './icons'
+import {
+  ArrowIcon,
+  ConnectIcon,
+  DiamondIcon,
+  EllipseIcon,
+  FitIcon,
+  LockIcon,
+  MinusIcon,
+  PencilIcon,
+  PlusIcon,
+  RectIcon,
+  RedoIcon,
+  TaskIcon,
+  TemplatesIcon,
+  TextIcon,
+  TrashIcon,
+  UndoIcon,
+  UnlockIcon,
+} from './icons'
 import { diamondPoints, fills, strokes, textColor } from './palette'
 import { StickyStack, stickyDragType } from './StickyStack'
 import { connectWhiteboard, type Peer, type SyncStatus, type WhiteboardSync } from './sync'
@@ -42,7 +61,6 @@ type Props = {
   project: ProjectDetails
   me: Me
   revision: number
-  onChanged: () => void
   onRename: (name: string) => Promise<void>
   onDelete: () => void
 }
@@ -52,6 +70,11 @@ type View = { x: number; y: number; zoom: number }
 type Drag =
   | { kind: 'pan'; startX: number; startY: number; view: View }
   | { kind: 'move' | 'resize' | 'start' | 'end'; startX: number; startY: number; object: BoardObject }
+  /** Dragging a connector out of an object, like in draw.io: `at` is the current point on the board. */
+  | { kind: 'connect'; startX: number; startY: number; object: BoardObject; at: { x: number; y: number }; overId: string | null }
+
+/** Where the menu for an object opened, in pixels inside the canvas. */
+type ObjectMenu = { id: string; x: number; y: number }
 
 const peerColors = ['#d7263d', '#1b998b', '#c05805', '#6a4c93', '#2e86ab', '#8a6d00']
 
@@ -88,7 +111,7 @@ const maxZoom = 3
 const clampZoom = (zoom: number) => Math.min(maxZoom, Math.max(minZoom, zoom))
 
 /** One whiteboard: canvas, toolbar, object list and properties, live with everyone else on it. */
-export function BoardEditor({ board, project, me, revision, onChanged, onRename, onDelete }: Props) {
+export function BoardEditor({ board, project, me, revision, onRename, onDelete }: Props) {
   const [generation, setGeneration] = useState(0)
   const [objects, setObjects] = useState<BoardObject[]>([])
   const [status, setStatus] = useState<SyncStatus>('connecting')
@@ -103,8 +126,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
   const [showTemplates, setShowTemplates] = useState(false)
   const [stickyColor, setStickyColor] = useState<Color>(rememberedStickyColor)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [showList, setShowList] = useState(false)
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  const [menu, setMenu] = useState<ObjectMenu | null>(null)
   const docRef = useRef<Y.Doc | null>(null)
   const undoRef = useRef<Y.UndoManager | null>(null)
   const syncRef = useRef<WhiteboardSync | null>(null)
@@ -196,6 +218,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
 
   function select(id: string | null) {
     setSelectedId(id)
+    setMenu((current) => (current && current.id === id ? current : null))
     setEditingId((current) => (current === id ? current : null))
     syncRef.current?.sendPresence(null, null, id)
   }
@@ -292,6 +315,28 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     updateObject(doc(), id, changes)
   }
 
+  /** The topmost object under a point on the board; arrows and the object itself are skipped. */
+  function objectAt(point: { x: number; y: number }, exceptId?: string): BoardObject | null {
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const o = objects[i]
+      if (o.type === 'arrow' || o.id === exceptId) continue
+      if (point.x >= o.x && point.x <= o.x + o.w && point.y >= o.y && point.y <= o.y + o.h) return o
+    }
+    return null
+  }
+
+  /** Opens the menu of an object at a point in the page (right click, or the keyboard menu key). */
+  function openMenu(id: string, clientX: number, clientY: number) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    select(id)
+    setMenu({ id, x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) })
+  }
+
+  function toggleLock(object: BoardObject) {
+    change(object.id, { locked: !object.locked })
+    undoRef.current?.stopCapturing()
+  }
+
   function remove(id: string) {
     removeObject(doc(), id)
     undoRef.current?.stopCapturing()
@@ -310,18 +355,28 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     select(object.id)
     // Without preventScroll the canvas scrolls into view under the pointer and a double click hits the background.
     svgRef.current?.focus({ preventScroll: true })
-    if (canEdit) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
+    if (canEdit && !object.locked) startDrag(event, { kind: 'move', startX: event.clientX, startY: event.clientY, object })
     else event.stopPropagation()
   }
 
   function onHandleDown(event: PointerEvent, object: BoardObject, kind: 'resize' | 'start' | 'end') {
-    if (event.button !== 0 || !canEdit) return
+    if (event.button !== 0 || !canEdit || object.locked) return
+    // An arrow end that hangs on an object is taken off it as soon as it is dragged by hand.
+    if (kind === 'start' && object.from) change(object.id, { from: null })
+    if (kind === 'end' && object.to) change(object.id, { to: null })
     startDrag(event, { kind, startX: event.clientX, startY: event.clientY, object })
+  }
+
+  /** Starts a new arrow at one of the four dots around the selected object. */
+  function onConnectDown(event: PointerEvent, object: BoardObject, at: { x: number; y: number }) {
+    if (event.button !== 0 || !canEdit) return
+    startDrag(event, { kind: 'connect', startX: event.clientX, startY: event.clientY, object, at, overId: null })
   }
 
   function onBackgroundDown(event: PointerEvent) {
     if (event.button !== 0) return
     select(null)
+    setMenu(null)
     svgRef.current?.setPointerCapture?.(event.pointerId)
     setDrag({ kind: 'pan', startX: event.clientX, startY: event.clientY, view })
   }
@@ -344,13 +399,23 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
     const wx = dx / view.zoom
     const wy = dy / view.zoom
     const o = drag.object
-    if (drag.kind === 'move') change(o.id, moveBy(o, wx, wy))
+    if (drag.kind === 'connect') {
+      const at = toWorld(event.clientX, event.clientY)
+      setDrag({ ...drag, at, overId: objectAt(at, o.id)?.id ?? null })
+    } else if (drag.kind === 'move') change(o.id, moveBy(o, wx, wy))
     else if (drag.kind === 'resize') change(o.id, { w: o.w + wx, h: o.h + wy })
     else if (drag.kind === 'start') change(o.id, { x: o.x + wx, y: o.y + wy })
     else change(o.id, { x2: o.x2 + wx, y2: o.y2 + wy })
   }
 
   function onPointerUp() {
+    if (drag?.kind === 'connect') {
+      const target = drag.overId ? objects.find((o) => o.id === drag.overId) : null
+      // A connector dropped on the object it started at would be a line of length zero.
+      const id = addConnector(doc(), drag.object, target ?? drag.at)
+      undoRef.current?.stopCapturing()
+      select(id)
+    }
     if (drag && drag.kind !== 'pan') undoRef.current?.stopCapturing()
     setDrag(null)
   }
@@ -373,7 +438,15 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       return
     }
     if (event.key === 'Escape') {
-      select(null)
+      if (menu) setMenu(null)
+      else select(null)
+      return
+    }
+    // Shift+F10 and the menu key open the object's menu, as they do everywhere else.
+    if (selected && (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))) {
+      event.preventDefault()
+      const rect = svgRef.current?.getBoundingClientRect()
+      openMenu(selected.id, (rect?.left ?? 0) + view.x + (selected.x + selected.w / 2) * view.zoom, (rect?.top ?? 0) + view.y + selected.y * view.zoom)
       return
     }
     if (canEdit && !mod && !event.altKey && event.key.toLowerCase() === 'n') {
@@ -381,7 +454,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       addSticky()
       return
     }
-    if (!selected || !canEdit) return
+    if (!selected || !canEdit || selected.locked) return
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       remove(selected.id)
@@ -414,6 +487,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
       return { zoom, x: cx - ((cx - current.x) * zoom) / current.zoom, y: cy - ((cy - current.y) * zoom) / current.zoom }
     })
 
+  const menuObject = menu ? (objects.find((o) => o.id === menu.id) ?? null) : null
   const peerList = [...peers.values()]
   const present = [...new Map([[me.id, me.displayName] as const, ...peerList.map((p) => [p.userId, p.name] as const)]).values()]
 
@@ -443,7 +517,7 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             className={drag?.kind === 'pan' ? 'board-canvas panning' : 'board-canvas'}
             role="application"
             aria-roledescription="Whiteboard"
-            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Doppelklick oder Enter bearbeitet den Text. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Die Objektliste oben rechts wählt Objekte per Tastatur.`}
+            aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Rechtsklick öffnet die Optionen, Doppelklick oder Enter bearbeitet den Text. Von den Punkten am gewählten Objekt zieht man einen Pfeil zu einem anderen Objekt. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Gesperrte Objekte bleiben, wo sie sind. Die Objektliste rechts wählt Objekte per Tastatur.`}
             tabIndex={0}
             onPointerDown={onBackgroundDown}
             onPointerMove={onPointerMove}
@@ -451,6 +525,13 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             onPointerCancel={onPointerUp}
             onPointerLeave={onPointerLeave}
             onKeyDown={onKeyDown}
+            onContextMenu={(event) => {
+              // Right click belongs to the object, not to the browser: it opens the object's options.
+              const target = objectAt(toWorld(event.clientX, event.clientY))
+              event.preventDefault()
+              if (target) openMenu(target.id, event.clientX, event.clientY)
+              else setMenu(null)
+            }}
             // Pointer capture makes the canvas the target of the double click; the press before it selected the object.
             onDoubleClick={() => {
               if (selected && canEdit && hasText(selected)) startEditing(selected.id)
@@ -483,14 +564,26 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
                   peerSelected={peerList.find((p) => p.selectedObjectId === object.id)}
                   editable={canEdit}
                   editing={object.id === editingId && canEdit}
+                  connectTarget={drag?.kind === 'connect' && drag.overId === object.id}
                   markerId={`arrow-head-${board.id}`}
                   onDown={(event) => onObjectDown(event, object)}
                   onHandleDown={(event, kind) => onHandleDown(event, object, kind)}
+                  onConnectDown={(event, at) => onConnectDown(event, object, at)}
                   onAddNext={(direction) => addStickyNextTo(object, direction)}
                   onText={(text) => change(object.id, { text })}
                   onStopEditing={(backToCanvas) => stopEditing(object.id, backToCanvas)}
                 />
               ))}
+              {drag?.kind === 'connect' && (
+                <line
+                  className="board-connect-preview"
+                  x1={drag.object.x + drag.object.w / 2}
+                  y1={drag.object.y + drag.object.h / 2}
+                  x2={drag.at.x}
+                  y2={drag.at.y}
+                  markerEnd={`url(#arrow-head-${board.id})`}
+                />
+              )}
               {peerList.map((peer) =>
                 peer.x === null || peer.y === null ? null : (
                   <g key={peer.connectionId} className="board-cursor" transform={`translate(${peer.x} ${peer.y}) scale(${1 / view.zoom})`} aria-hidden="true">
@@ -540,29 +633,34 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
               </button>
             </div>
           )}
-          {selected && !(drag && drag.kind !== 'pan') && (
-            <ObjectBar
-              key={selected.id}
-              object={selected}
-              view={view}
+          {menuObject && !drag && (
+            <ObjectMenuCard
+              key={menuObject.id}
+              object={menuObject}
+              at={menu!}
               editable={canEdit}
-              hasTask={Boolean(selected.taskId && tasks.get(selected.taskId))}
               onColor={(color) => {
-                change(selected.id, { color })
+                change(menuObject.id, { color })
                 undoRef.current?.stopCapturing()
               }}
-              onEditText={() => startEditing(selected.id)}
-              onOpenTask={() => setOpenTaskId(selected.taskId)}
-              onRemove={() => remove(selected.id)}
+              onEditText={() => {
+                setMenu(null)
+                startEditing(menuObject.id)
+              }}
+              onLock={() => {
+                toggleLock(menuObject)
+                setMenu(null)
+              }}
+              onRemove={() => {
+                setMenu(null)
+                remove(menuObject.id)
+              }}
+              onClose={() => {
+                setMenu(null)
+                svgRef.current?.focus({ preventScroll: true })
+              }}
             />
           )}
-          <div className="board-corner board-corner-top">
-            <button type="button" className="board-tool board-list-toggle" aria-expanded={showList} title="Objektliste" onClick={() => setShowList(!showList)}>
-              <ListIcon />
-              <span>Objekte ({objects.length})</span>
-            </button>
-          </div>
-          {showList && <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} />}
           <div className="board-corner board-corner-right">
             <button type="button" className="board-tool" aria-label="Verkleinern" title="Verkleinern" onClick={() => zoomBy(1 / 1.25)}>
               <MinusIcon />
@@ -578,21 +676,26 @@ export function BoardEditor({ board, project, me, revision, onChanged, onRename,
             </button>
           </div>
         </div>
+        <aside className="board-side">
+          <ObjectList objects={objects} tasks={tasks} selectedId={selectedId} onSelect={select} />
+          {selected && (
+            <ObjectPanel
+              key={selected.id}
+              object={selected}
+              objects={objects}
+              task={selected.taskId ? tasks.get(selected.taskId) : undefined}
+              editable={canEdit}
+              onColor={(color) => {
+                change(selected.id, { color })
+                undoRef.current?.stopCapturing()
+              }}
+              onEditText={() => startEditing(selected.id)}
+              onLock={() => toggleLock(selected)}
+              onRemove={() => remove(selected.id)}
+            />
+          )}
+        </aside>
       </div>
-      {openTaskId && (
-        <TaskDetails
-          key={openTaskId}
-          taskId={openTaskId}
-          project={project}
-          me={me}
-          onChanged={onChanged}
-          onDeleted={() => {
-            setOpenTaskId(null)
-            onChanged()
-          }}
-          onClose={() => setOpenTaskId(null)}
-        />
-      )}
     </div>
   )
 }
@@ -675,9 +778,11 @@ type ShapeProps = {
   peerSelected: Peer | undefined
   editable: boolean
   editing: boolean
+  connectTarget: boolean
   markerId: string
   onDown: (event: PointerEvent) => void
   onHandleDown: (event: PointerEvent, kind: 'resize' | 'start' | 'end') => void
+  onConnectDown: (event: PointerEvent, at: { x: number; y: number }) => void
   onAddNext: (direction: 'right' | 'below') => void
   onText: (text: string) => void
   onStopEditing: (backToCanvas: boolean) => void
@@ -694,23 +799,25 @@ const textClass: Record<Exclude<ObjectType, 'arrow' | 'task'>, string> = {
   text: 'board-text large',
 }
 
-function ObjectShape({ object, task, selected, peerSelected, editable, editing, markerId, onDown, onHandleDown, onAddNext, onText, onStopEditing }: ShapeProps) {
+function ObjectShape({ object, task, selected, peerSelected, editable, editing, connectTarget, markerId, onDown, onHandleDown, onConnectDown, onAddNext, onText, onStopEditing }: ShapeProps) {
   const { x, y, w, h } = object
   const fill = fills[object.color]
   const stroke = strokes[object.color]
-  const outline = selected ? 'var(--accent)' : peerSelected ? peerColor(peerSelected.userId) : null
+  const outline = connectTarget ? 'var(--accent)' : selected ? 'var(--accent)' : peerSelected ? peerColor(peerSelected.userId) : null
+  const changeable = editable && !object.locked
 
   if (object.type === 'arrow') {
     return (
       <g className="board-object" data-object-id={object.id} onPointerDown={onDown}>
         <line x1={x} y1={y} x2={object.x2} y2={object.y2} stroke="transparent" strokeWidth={14} />
         <line x1={x} y1={y} x2={object.x2} y2={object.y2} stroke={outline ?? stroke} strokeWidth={selected ? 3 : 2} markerEnd={`url(#${markerId})`} />
-        {selected && editable && (
+        {selected && changeable && (
           <>
             <circle className="board-handle" cx={x} cy={y} r={6} onPointerDown={(event) => onHandleDown(event, 'start')} />
             <circle className="board-handle" cx={object.x2} cy={object.y2} r={6} onPointerDown={(event) => onHandleDown(event, 'end')} />
           </>
         )}
+        {object.locked && <LockMark x={(x + object.x2) / 2} y={(y + object.y2) / 2} />}
       </g>
     )
   }
@@ -736,7 +843,7 @@ function ObjectShape({ object, task, selected, peerSelected, editable, editing, 
     )
 
   return (
-    <g className="board-object" data-object-id={object.id} onPointerDown={onDown}>
+    <g className={object.locked ? 'board-object locked' : 'board-object'} data-object-id={object.id} data-locked={object.locked || undefined} onPointerDown={onDown}>
       {shape}
       <foreignObject x={x} y={y} width={w} height={h} pointerEvents={editing ? undefined : 'none'}>
         {object.type === 'task' ? (
@@ -792,13 +899,43 @@ function ObjectShape({ object, task, selected, peerSelected, editable, editing, 
           vectorEffect="non-scaling-stroke"
         />
       )}
-      {selected && editable && <circle className="board-handle resize" cx={x + w + 5} cy={y + h + 5} r={5} onPointerDown={(event) => onHandleDown(event, 'resize')} />}
-      {selected && editable && object.type === 'sticky' && (
+      {selected && changeable && <circle className="board-handle resize" cx={x + w + 5} cy={y + h + 5} r={5} onPointerDown={(event) => onHandleDown(event, 'resize')} />}
+      {selected && changeable && (
         <>
-          <QuickAdd cx={x + w + 26} cy={y + h / 2} label="Notiz rechts daneben" onAdd={() => onAddNext('right')} />
-          <QuickAdd cx={x + w / 2} cy={y + h + 26} label="Notiz darunter" onAdd={() => onAddNext('below')} />
+          <ConnectDot cx={x + w / 2} cy={y - 12} label="Pfeil nach oben ziehen" onDown={(event) => onConnectDown(event, { x: x + w / 2, y: y - 12 })} />
+          <ConnectDot cx={x + w + 12} cy={y + h / 2} label="Pfeil nach rechts ziehen" onDown={(event) => onConnectDown(event, { x: x + w + 12, y: y + h / 2 })} />
+          <ConnectDot cx={x + w / 2} cy={y + h + 12} label="Pfeil nach unten ziehen" onDown={(event) => onConnectDown(event, { x: x + w / 2, y: y + h + 12 })} />
+          <ConnectDot cx={x - 12} cy={y + h / 2} label="Pfeil nach links ziehen" onDown={(event) => onConnectDown(event, { x: x - 12, y: y + h / 2 })} />
         </>
       )}
+      {selected && changeable && object.type === 'sticky' && (
+        <>
+          <QuickAdd cx={x + w + 30} cy={y + h - 10} label="Notiz rechts daneben" onAdd={() => onAddNext('right')} />
+          <QuickAdd cx={x + w - 10} cy={y + h + 30} label="Notiz darunter" onAdd={() => onAddNext('below')} />
+        </>
+      )}
+      {object.locked && <LockMark x={x + w - 10} y={y + 10} />}
+    </g>
+  )
+}
+
+/** A small lock on an object that cannot be moved. */
+function LockMark({ x, y }: { x: number; y: number }) {
+  return (
+    <g className="board-lock-mark" transform={`translate(${x - 7} ${y - 7})`} aria-hidden="true">
+      <rect x="0" y="5" width="14" height="9" rx="2" />
+      <path d="M3 5 V3.2 a4 4 0 0 1 8 0 V5" fill="none" />
+    </g>
+  )
+}
+
+/** draw.io's connector dots: dragging one out of the object draws an arrow to wherever it is dropped. */
+function ConnectDot({ cx, cy, label, onDown }: { cx: number; cy: number; label: string; onDown: (event: PointerEvent) => void }) {
+  return (
+    <g className="board-connect-dot" onPointerDown={onDown}>
+      <title>{label}</title>
+      <circle cx={cx} cy={cy} r={9} fill="transparent" />
+      <circle cx={cx} cy={cy} r={4.5} />
     </g>
   )
 }
@@ -829,6 +966,7 @@ function QuickAdd({ cx, cy, label, onAdd }: { cx: number; cy: number; label: str
 
 /** Every object as a button, so the board works with the keyboard and a screen reader too. */
 function ObjectList({ objects, tasks, selectedId, onSelect }: ListProps) {
+  const title = (taskId: string) => tasks.get(taskId)?.title
   return (
     <section className="board-list" aria-labelledby="board-objects-heading">
       <h4 id="board-objects-heading">Objekte ({objects.length})</h4>
@@ -844,7 +982,13 @@ function ObjectList({ objects, tasks, selectedId, onSelect }: ListProps) {
                 aria-pressed={object.id === selectedId}
                 onClick={() => onSelect(object.id)}
               >
-                {describe(object, object.taskId ? tasks.get(object.taskId)?.title : null)}
+                {object.locked && (
+                  <span className="board-list-lock" title="Gesperrt">
+                    <span className="visually-hidden">Gesperrt: </span>
+                    <span aria-hidden="true">🔒</span>
+                  </span>
+                )}
+                {object.type === 'arrow' ? describeArrow(object, objects, title) : describe(object, object.taskId ? title(object.taskId) : null)}
               </button>
             </li>
           ))}
@@ -854,93 +998,184 @@ function ObjectList({ objects, tasks, selectedId, onSelect }: ListProps) {
   )
 }
 
-type BarProps = {
+type ColorsProps = { color: Color; onPick: (color: Color) => void; inMenu?: boolean }
+
+/** The sixteen board colors as swatches, used in the object menu and in the right column. */
+function ColorChoice({ color, onPick, inMenu = false }: ColorsProps) {
+  return (
+    <div className="sticky-swatches" role="group" aria-label="Farbe">
+      {(Object.entries(colors) as [Color, string][]).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          role={inMenu ? 'menuitemradio' : undefined}
+          className="sticky-swatch"
+          aria-label={label}
+          aria-checked={inMenu ? value === color : undefined}
+          aria-pressed={inMenu ? undefined : value === color}
+          title={label}
+          style={{ background: fills[value], borderColor: strokes[value] }}
+          onClick={() => onPick(value)}
+        />
+      ))}
+    </div>
+  )
+}
+
+type MenuProps = {
   object: BoardObject
-  view: View
+  at: { x: number; y: number }
   editable: boolean
-  hasTask: boolean
   onColor: (color: Color) => void
   onEditText: () => void
-  onOpenTask: () => void
+  onLock: () => void
   onRemove: () => void
+  onClose: () => void
 }
 
 /**
- * Miro's context bar: a small floating bar right above the selected object with what fits it (color, text, open the
- * task, delete). Below the object when there is no room above.
+ * The options of an object, opened with a right click like in draw.io: color, text, lock and remove.
+ * A left click only selects and moves, so nothing pops up while someone is arranging the board.
  */
-function ObjectBar({ object, view, editable, hasTask, onColor, onEditText, onOpenTask, onRemove }: BarProps) {
+function ObjectMenuCard({ object, at, editable, onColor, onEditText, onLock, onRemove, onClose }: MenuProps) {
   const [colorsOpen, setColorsOpen] = useState(false)
-  const top = object.type === 'arrow' ? Math.min(object.y, object.y2) : object.y
-  const bottom = object.type === 'arrow' ? Math.max(object.y, object.y2) : object.y + object.h
-  const centerX = object.type === 'arrow' ? (object.x + object.x2) / 2 : object.x + object.w / 2
-  const left = view.x + centerX * view.zoom
-  const above = view.y + top * view.zoom
-  const below = above < 64
-  const y = below ? view.y + bottom * view.zoom + 14 : above - 14
+  const first = useRef<HTMLButtonElement>(null)
   const kind = objectTypes[object.type]
 
-  if (!editable && !(object.type === 'task' && hasTask)) return null
+  useEffect(() => first.current?.focus(), [])
+
+  if (!editable) return null
 
   return (
     <div
-      className={below ? 'board-objectbar below' : 'board-objectbar'}
-      role="toolbar"
+      className="board-objectmenu"
+      role="menu"
       aria-label={`${kind} bearbeiten`}
-      style={{ left, top: y }}
+      style={{ left: at.x, top: at.y }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onContextMenu={(event) => event.preventDefault()}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && colorsOpen) {
+        if (event.key === 'Escape') {
           event.stopPropagation()
-          setColorsOpen(false)
+          if (colorsOpen) setColorsOpen(false)
+          else onClose()
         }
       }}
     >
-      {editable && object.type !== 'task' && (
-        <span className="board-tool-group">
-          <button type="button" className="board-tool" aria-label={`Farbe: ${colors[object.color]}`} title="Farbe" aria-expanded={colorsOpen} onClick={() => setColorsOpen(!colorsOpen)}>
-            <span className="board-color-dot" style={{ background: fills[object.color], borderColor: strokes[object.color] }} />
+      {hasText(object) && (
+        <button ref={first} type="button" role="menuitem" className="board-menu-item" onClick={onEditText}>
+          <PencilIcon /> Text bearbeiten
+        </button>
+      )}
+      {object.type !== 'task' && (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            className="board-menu-item"
+            aria-expanded={colorsOpen}
+            ref={hasText(object) ? undefined : first}
+            onClick={() => setColorsOpen(!colorsOpen)}
+          >
+            <span className="board-color-dot" style={{ background: fills[object.color], borderColor: strokes[object.color] }} /> Farbe: {colors[object.color]}
           </button>
           {colorsOpen && (
-            <div className="board-popover board-objectbar-colors">
-              <div className="sticky-swatches" role="group" aria-label="Farbe">
-                {(Object.entries(colors) as [Color, string][]).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="sticky-swatch"
-                    aria-label={label}
-                    aria-pressed={value === object.color}
-                    title={label}
-                    style={{ background: fills[value], borderColor: strokes[value] }}
-                    onClick={() => {
-                      onColor(value)
-                      setColorsOpen(false)
-                    }}
-                  />
-                ))}
-              </div>
+            <div className="board-menu-colors">
+              <ColorChoice
+                inMenu
+                color={object.color}
+                onPick={(value) => {
+                  onColor(value)
+                  setColorsOpen(false)
+                }}
+              />
             </div>
           )}
-        </span>
-      )}
-      {editable && hasText(object) && (
-        <button type="button" className="board-tool" aria-label="Text bearbeiten" title="Text bearbeiten (Doppelklick)" onClick={onEditText}>
-          <PencilIcon />
-        </button>
-      )}
-      {object.type === 'task' && hasTask && (
-        <button type="button" className="board-tool" aria-label="Aufgabe öffnen" title="Aufgabe öffnen" onClick={onOpenTask}>
-          <OpenIcon />
-        </button>
-      )}
-      {editable && (
-        <>
-          <span className="board-objectbar-divider" aria-hidden="true" />
-          <button type="button" className="board-tool" aria-label={`${kind} entfernen`} title={`${kind} entfernen (Entf)`} onClick={onRemove}>
-            <TrashIcon />
-          </button>
         </>
       )}
+      <button type="button" role="menuitem" className="board-menu-item" ref={hasText(object) || object.type !== 'task' ? undefined : first} onClick={onLock}>
+        {object.locked ? <UnlockIcon /> : <LockIcon />} {object.locked ? 'Entsperren' : 'Sperren'}
+      </button>
+      <button type="button" role="menuitem" className="board-menu-item danger" disabled={object.locked} onClick={onRemove}>
+        <TrashIcon /> {kind} entfernen
+      </button>
     </div>
+  )
+}
+
+type PanelProps = {
+  object: BoardObject
+  objects: BoardObject[]
+  task: WhiteboardTask | undefined
+  editable: boolean
+  onColor: (color: Color) => void
+  onEditText: () => void
+  onLock: () => void
+  onRemove: () => void
+}
+
+/** The selected object in the right column: what it is, what it is connected to, and what can be done with it. */
+function ObjectPanel({ object, objects, task, editable, onColor, onEditText, onLock, onRemove }: PanelProps) {
+  const kind = objectTypes[object.type]
+  const connected = objects.filter((o) => o.type === 'arrow' && (o.from === object.id || o.to === object.id))
+  const name = (id: string | null) => {
+    const end = id ? objects.find((o) => o.id === id) : undefined
+    if (!end) return 'frei'
+    const text = end.type === 'task' ? (end.taskId ? (task?.id === end.taskId ? task.title : objectTypes.task) : objectTypes.task) : end.text.trim()
+    return text || objectTypes[end.type]
+  }
+
+  return (
+    <section className="board-selected" aria-labelledby="board-selected-heading">
+      <h4 id="board-selected-heading">{kind}</h4>
+      {object.type === 'task' ? (
+        task ? (
+          <dl className="board-selected-task">
+            <dt>Aufgabe</dt>
+            <dd>{task.title}</dd>
+            <dt>Status</dt>
+            <dd>{taskStatuses[task.status]}</dd>
+            <dt>Zuständig</dt>
+            <dd>{task.assigneeName ?? 'Niemand'}</dd>
+          </dl>
+        ) : (
+          <p className="muted">Aufgabe nicht verfügbar.</p>
+        )
+      ) : (
+        <p className="board-selected-text">{object.text.trim() || <span className="muted">Kein Text</span>}</p>
+      )}
+      {connected.length > 0 && (
+        <p className="muted">
+          Verbunden: {connected.map((arrow) => (arrow.from === object.id ? `→ ${name(arrow.to)}` : `← ${name(arrow.from)}`)).join(', ')}
+        </p>
+      )}
+      {object.locked && <p className="muted">Gesperrt. Dieses Objekt lässt sich nicht verschieben.</p>}
+      {editable && (
+        <div className="board-selected-actions">
+          {hasText(object) && (
+            <button type="button" className="board-tool" aria-label="Text bearbeiten" title="Text bearbeiten (Doppelklick)" disabled={object.locked} onClick={onEditText}>
+              <PencilIcon />
+            </button>
+          )}
+          <button
+            type="button"
+            className="board-tool"
+            aria-label={object.locked ? `${kind} entsperren` : `${kind} sperren`}
+            title={object.locked ? 'Entsperren' : 'Sperren'}
+            aria-pressed={object.locked}
+            onClick={onLock}
+          >
+            {object.locked ? <UnlockIcon /> : <LockIcon />}
+          </button>
+          <button type="button" className="board-tool" aria-label={`${kind} entfernen`} title={`${kind} entfernen (Entf)`} disabled={object.locked} onClick={onRemove}>
+            <TrashIcon />
+          </button>
+        </div>
+      )}
+      {editable && object.type !== 'task' && !object.locked && <ColorChoice color={object.color} onPick={onColor} />}
+      <p className="muted board-hint">
+        <ConnectIcon /> Von den Punkten am Objekt lässt sich ein Pfeil zu einem anderen Objekt ziehen. Rechtsklick öffnet die Optionen.
+      </p>
+    </section>
   )
 }

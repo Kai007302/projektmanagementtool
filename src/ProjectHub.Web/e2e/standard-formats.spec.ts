@@ -68,8 +68,9 @@ test('a person subscribes to their dates and the address works without signing i
   await api(request, 'POST', `/projects/${project.id}/tasks`, { title: 'Abo-Termin', assigneeId: david, dueDate: due })
 
   await signInAs(page, 'dev-david', 'Projekte')
-  await page.getByRole('button', { name: 'Kalender abonnieren' }).click()
-  const panel = page.getByRole('region', { name: 'Kalender abonnieren' })
+  await page.getByRole('button', { name: /^Konto von / }).click()
+  await page.getByRole('menuitem', { name: 'Meine Termine abonnieren' }).click()
+  const panel = page.getByRole('dialog', { name: 'Meine Termine abonnieren' })
   const create = panel.getByRole('button', { name: 'Kalender-Adresse erstellen' })
   const replace = panel.getByRole('button', { name: 'Neue Adresse erstellen' })
   await expect(create.or(replace)).toBeVisible()
