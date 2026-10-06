@@ -288,6 +288,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
           taskId={selected}
           project={project}
           me={me}
+          readOnly
           onChanged={() => {
             load()
             onChanged()

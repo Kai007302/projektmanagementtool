@@ -23,9 +23,6 @@ async function openWhiteboards(browser: Browser, user: string, project: string):
 
 const objectList = (page: Page) => page.getByRole('region', { name: /^Objekte/ })
 
-/** The object list is folded away like in Miro; it opens from the top right corner of the board. */
-const showObjects = (page: Page) => page.getByRole('button', { name: /^Objekte \(/ }).click()
-
 test('two people draw together, a viewer follows and the board survives a reload', async ({ browser, request }) => {
   const name = uniqueTitle('E2E Whiteboard')
   const task = uniqueTitle('Navigation skizzieren')
@@ -40,14 +37,11 @@ test('two people draw together, a viewer follows and the board survives a reload
   await ben.getByLabel('Neues Whiteboard').press('Enter')
   await expect(ben.getByRole('heading', { name: 'Workshop' })).toBeVisible()
   await expect(ben.getByText(/^Verbunden/)).toBeVisible()
-  await showObjects(ben)
 
   const claraPage = await openWhiteboards(browser, 'dev-clara', name)
   const evaPage = await openWhiteboards(browser, 'dev-eva', name)
   await expect(claraPage.getByText(/^Verbunden · Gerade dabei: .*Ben Projektleiter/)).toBeVisible()
   await expect(evaPage.getByText(/Nur ansehen/)).toBeVisible()
-  await showObjects(claraPage)
-  await showObjects(evaPage)
   await expect(evaPage.getByRole('button', { name: 'Notiz hinzufügen' })).toHaveCount(0)
 
   // Ben writes a note; Clara and Eva see it without reloading.
@@ -72,6 +66,20 @@ test('two people draw together, a viewer follows and the board survives a reload
   await expect(objectList(claraPage).getByRole('button', { name: 'Rechteck: Was lief gut?' })).toBeVisible()
   await expect(objectList(evaPage).getByRole('button', { name: 'Notiz: Daily auf 15 Minuten begrenzen' })).toBeVisible()
 
+  // Ben connects two notes with an arrow; the connection arrives for the others as a connection, not as a loose line.
+  await ben.getByRole('application').locator('[data-object-id]', { hasText: 'Daily auf 15 Minuten begrenzen' }).click()
+  const dot = ben.getByRole('application').locator('.board-connect-dot').first()
+  await dot.hover()
+  await ben.mouse.down()
+  await ben.getByRole('application').locator('[data-object-id]', { hasText: 'Zu viele Meetings' }).hover()
+  await ben.mouse.up()
+  await expect(objectList(claraPage).getByRole('button', { name: /^Pfeil: .* → Zu viele Meetings/ })).toBeVisible()
+
+  // The options of a note come up on a right click; Ben locks it, so nobody moves it by accident.
+  await ben.getByRole('application').locator('[data-object-id]', { hasText: 'Zu viele Meetings' }).click({ button: 'right' })
+  await ben.getByRole('menuitem', { name: 'Sperren' }).click()
+  await expect(objectList(claraPage).getByRole('button', { name: /^Gesperrt: Notiz: Zu viele Meetings/ })).toBeVisible()
+
   // A note dragged from the sticky stack lands on the board for everyone.
   await ben.getByRole('button', { name: 'Notiz hinzufügen' }).dragTo(ben.getByRole('application'))
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz (Gelb)' })).toBeVisible()
@@ -86,7 +94,6 @@ test('two people draw together, a viewer follows and the board survives a reload
   await claraPage.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Projekte', exact: true }).click()
   await claraPage.getByRole('button', { name }).click()
   await claraPage.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Whiteboard' }).click()
-  await showObjects(claraPage)
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben, bitte' })).toBeVisible()
   await expect(objectList(claraPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
 

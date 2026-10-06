@@ -116,3 +116,25 @@ export const ListIcon = () => (
     <circle cx="4" cy="14.5" r="0.6" fill="currentColor" />
   </Icon>
 )
+
+export const LockIcon = () => (
+  <Icon>
+    <rect x="4.5" y="9" width="11" height="7.5" rx="1.5" />
+    <path d="M7 9 V6.5 a3 3 0 0 1 6 0 V9" />
+  </Icon>
+)
+
+export const UnlockIcon = () => (
+  <Icon>
+    <rect x="4.5" y="9" width="11" height="7.5" rx="1.5" />
+    <path d="M7 9 V6.5 a3 3 0 0 1 5.8 -1" />
+  </Icon>
+)
+
+export const ConnectIcon = () => (
+  <Icon>
+    <circle cx="4.5" cy="15.5" r="2" />
+    <circle cx="15.5" cy="4.5" r="2" />
+    <path d="M6.2 13.8 L13.8 6.2" />
+  </Icon>
+)

@@ -3,7 +3,8 @@ import * as Y from 'yjs'
 /**
  * The whiteboard document (ADR 0009): a root map `objects` with one Y.Map per object. Fields are plain
  * values, so concurrent changes to different fields or objects merge; the same field is last-writer-wins.
- * Task cards hold only `taskId`; their data is loaded live from the API.
+ * Task cards hold only `taskId`; their data is loaded live from the API. Arrows can hang on objects with
+ * `from` and `to` (object ids), like connectors in draw.io; `locked` keeps an object in place.
  */
 export const objectsKey = 'objects'
 
@@ -40,6 +41,11 @@ export type BoardObject = {
   color: Color
   text: string
   taskId: string | null
+  /** Arrows only: the objects the arrow starts and ends at; the end then follows the object. */
+  from: string | null
+  to: string | null
+  /** Locked objects cannot be moved, resized, changed or removed until someone unlocks them. */
+  locked: boolean
 }
 
 export const objectTypes: Record<ObjectType, string> = {
@@ -118,10 +124,80 @@ export function readObjects(doc: Y.Doc): BoardObject[] {
       color: isColor(color) ? color : base.color,
       text: stringOr(value.get('text'), ''),
       taskId: typeof value.get('taskId') === 'string' ? (value.get('taskId') as string) : null,
+      from: type === 'arrow' ? stringOr(value.get('from'), '') || null : null,
+      to: type === 'arrow' ? stringOr(value.get('to'), '') || null : null,
+      locked: value.get('locked') === true,
     })
   })
+  const resolved = resolveConnectors(result)
   // Stable order for rendering and the object list: top to bottom, left to right.
-  return result.sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id))
+  return resolved.sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id))
+}
+
+type Point = { x: number; y: number }
+
+const centerOf = (object: BoardObject): Point => ({ x: object.x + object.w / 2, y: object.y + object.h / 2 })
+
+/** Space between an object's outline and an arrow end, so the arrow head stays visible. */
+const connectorGap = 3
+
+/** Where the line from the object's center toward the point leaves the object's outline. */
+export function outlinePoint(object: BoardObject, toward: Point): Point {
+  const center = centerOf(object)
+  const dx = toward.x - center.x
+  const dy = toward.y - center.y
+  if (dx === 0 && dy === 0) return center
+  const rx = object.w / 2 + connectorGap
+  const ry = object.h / 2 + connectorGap
+  const t =
+    object.type === 'ellipse'
+      ? 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2)
+      : object.type === 'diamond'
+        ? 1 / (Math.abs(dx) / rx + Math.abs(dy) / ry)
+        : Math.min(dx === 0 ? Infinity : rx / Math.abs(dx), dy === 0 ? Infinity : ry / Math.abs(dy))
+  return { x: center.x + dx * t, y: center.y + dy * t }
+}
+
+/**
+ * Puts the ends of attached arrows on the outlines of their objects, on the straight line between them. An end whose
+ * object is gone (deleted by someone else at the same time) stays where it was last stored.
+ */
+function resolveConnectors(objects: BoardObject[]): BoardObject[] {
+  const byId = new Map(objects.filter((o) => o.type !== 'arrow').map((o) => [o.id, o]))
+  return objects.map((object) => {
+    if (object.type !== 'arrow') return object
+    const source = object.from ? byId.get(object.from) : undefined
+    const target = object.to ? byId.get(object.to) : undefined
+    if (!source && !target) return { ...object, from: null, to: null }
+    const startAim = target ? centerOf(target) : { x: object.x2, y: object.y2 }
+    const endAim = source ? centerOf(source) : { x: object.x, y: object.y }
+    const start = source ? outlinePoint(source, startAim) : { x: object.x, y: object.y }
+    const end = target ? outlinePoint(target, endAim) : { x: object.x2, y: object.y2 }
+    return { ...object, x: start.x, y: start.y, x2: end.x, y2: end.y, from: source ? source.id : null, to: target ? target.id : null }
+  })
+}
+
+/** A new arrow from one object to another object or to a free point, like dragging a connector in draw.io. */
+export function addConnector(doc: Y.Doc, from: BoardObject, to: BoardObject | Point): string {
+  const id = newObjectId()
+  const target = 'id' in to ? to : null
+  const aim = target ? centerOf(target) : (to as Point)
+  const start = outlinePoint(from, aim)
+  const end = target ? outlinePoint(target, centerOf(from)) : aim
+  doc.transact(() => {
+    const item = new Y.Map<unknown>()
+    item.set('type', 'arrow')
+    // The stored points are a fallback for clients that do not know `from` and `to`, or when an object is gone.
+    item.set('x', Math.round(start.x))
+    item.set('y', Math.round(start.y))
+    item.set('x2', Math.round(end.x))
+    item.set('y2', Math.round(end.y))
+    item.set('color', defaults.arrow.color)
+    item.set('from', from.id)
+    if (target) item.set('to', target.id)
+    objectsOf(doc).set(id, item)
+  }, localOrigin)
+  return id
 }
 
 export const newObjectId = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).replaceAll('-', '')
@@ -227,7 +303,7 @@ export function stickyGrid(lines: string[], color: Color): NewObject[] {
   return texts.map((text, i) => ({ type: 'sticky', x: (i % columns) * (w + gap), y: Math.floor(i / columns) * (h + gap), w, h, color, text }))
 }
 
-export type Changes = Partial<Pick<BoardObject, 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2' | 'color' | 'text'>>
+export type Changes = Partial<Pick<BoardObject, 'x' | 'y' | 'w' | 'h' | 'x2' | 'y2' | 'color' | 'text' | 'from' | 'to' | 'locked'>>
 
 /** Changes only the given fields, so others editing other fields of the same object are not overwritten. */
 export function updateObject(doc: Y.Doc, id: string, changes: Changes) {
@@ -236,7 +312,10 @@ export function updateObject(doc: Y.Doc, id: string, changes: Changes) {
   doc.transact(() => {
     for (const [key, value] of Object.entries(changes)) {
       if (value === undefined) continue
-      if (typeof value === 'number') {
+      if (value === null || value === false) {
+        // Detached ends and unlocked objects carry no field at all.
+        if (item.has(key)) item.delete(key)
+      } else if (typeof value === 'number') {
         const rounded = Math.round(value)
         item.set(key, key === 'w' || key === 'h' ? Math.max(minSize, rounded) : rounded)
       } else if (item.get(key) !== value) {
@@ -246,15 +325,24 @@ export function updateObject(doc: Y.Doc, id: string, changes: Changes) {
   }, localOrigin)
 }
 
-/** Moves an object by a delta; arrows move both ends. */
+/** Moves an object by a delta; arrows move both ends, except ends that hang on an object. */
 export function moveBy(object: BoardObject, dx: number, dy: number): Changes {
-  return object.type === 'arrow'
-    ? { x: object.x + dx, y: object.y + dy, x2: object.x2 + dx, y2: object.y2 + dy }
-    : { x: object.x + dx, y: object.y + dy }
+  if (object.type !== 'arrow') return { x: object.x + dx, y: object.y + dy }
+  return {
+    ...(!object.from && { x: object.x + dx, y: object.y + dy }),
+    ...(!object.to && { x2: object.x2 + dx, y2: object.y2 + dy }),
+  }
 }
 
+/** Removes the object and the arrows hanging on it, in one change. */
 export function removeObject(doc: Y.Doc, id: string) {
-  doc.transact(() => objectsOf(doc).delete(id), localOrigin)
+  const objects = objectsOf(doc)
+  doc.transact(() => {
+    objects.delete(id)
+    objects.forEach((value, key) => {
+      if (value instanceof Y.Map && value.get('type') === 'arrow' && (value.get('from') === id || value.get('to') === id)) objects.delete(key)
+    })
+  }, localOrigin)
 }
 
 /** A short description for the object list and screen readers. */
@@ -263,4 +351,16 @@ export function describe(object: BoardObject, taskTitle?: string | null): string
   if (object.type === 'task') return `${kind}: ${taskTitle ?? 'nicht verfügbar'}`
   if (object.type === 'arrow') return `${kind} von (${Math.round(object.x)}, ${Math.round(object.y)}) nach (${Math.round(object.x2)}, ${Math.round(object.y2)})`
   return object.text.trim() ? `${kind}: ${object.text.trim()}` : `${kind} (${colors[object.color]})`
+}
+
+/** Arrows between objects are described by the objects they connect, e.g. "Pfeil: Idee → Umsetzung". */
+export function describeArrow(object: BoardObject, objects: BoardObject[], taskTitle: (taskId: string) => string | null | undefined): string {
+  if (object.type !== 'arrow' || (!object.from && !object.to)) return describe(object)
+  const name = (id: string | null) => {
+    const end = id ? objects.find((o) => o.id === id) : undefined
+    if (!end) return 'frei'
+    const text = end.type === 'task' ? taskTitle(end.taskId ?? '') : end.text.trim()
+    return text || `${objectTypes[end.type]} (${colors[end.color]})`
+  }
+  return `${objectTypes.arrow}: ${name(object.from)} → ${name(object.to)}`
 }

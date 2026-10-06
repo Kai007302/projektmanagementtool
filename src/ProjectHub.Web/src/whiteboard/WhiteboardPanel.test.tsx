@@ -6,7 +6,7 @@ import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { fakeApi, json } from '../test/fakeApi'
 import type { Whiteboard } from './api'
-import { addObject, readObjects } from './model'
+import { addObject, readObjects, updateObject } from './model'
 import type { SyncHandlers } from './sync'
 import { WhiteboardPanel } from './WhiteboardPanel'
 
@@ -45,7 +45,16 @@ const board = (id: string, name: string): Whiteboard => ({ id, projectId: 'p-1',
 
 const current = () => sessions[sessions.length - 1]
 
-const openList = () => userEvent.click(screen.getByRole('button', { name: /^Objekte/ }))
+/** The object list is a column on the right of the board and always visible. */
+const openList = async () => {
+  await waitFor(() => expect(screen.getByRole('region', { name: /^Objekte/ })).toBeInTheDocument())
+}
+
+/** The options of an object come up on a right click, not on a left click. */
+async function rightClick(element: Element) {
+  fireEvent.pointerDown(element, { button: 2 })
+  fireEvent.contextMenu(element, { clientX: 40, clientY: 40 })
+}
 
 async function connect(canEdit: boolean) {
   await screen.findByRole('application')
@@ -139,16 +148,12 @@ describe('WhiteboardPanel', () => {
     expect(readObjects(current().doc)[0]).toMatchObject({ x: before.x, y: before.y, w: before.w + 10, h: before.h + 10 })
   })
 
-  it('offers color, text, delete and the task in a bar above the selected object instead of a side panel', async () => {
+  it('opens the options of an object on a right click and shows the object in the right column', async () => {
     fakeApi({
       'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }),
-      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1': () => json([{ id: 't-1', title: 'Startseite', status: 'todo', assigneeName: null, dueDate: null }]),
-      'GET /api/v1/tasks/t-1': () => json({ id: 't-1', projectId: 'p-1', title: 'Startseite', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 1 }),
-      'GET /api/v1/tasks/t-1/comments?limit=100': () => json({ items: [], nextOffset: null }),
-      'GET /api/v1/tasks/t-1/attachments': () => json([]),
-      'GET /api/v1/tasks/t-1/whiteboards': () => json([]),
+      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1': () => json([{ id: 't-1', title: 'Startseite', status: 'todo', assigneeName: 'Clara', dueDate: null }]),
     })
-    render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    const { container } = render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
     act(() => {
       addObject(current().doc, 'sticky', { x: 0, y: 0 })
@@ -156,24 +161,74 @@ describe('WhiteboardPanel', () => {
     })
     await openList()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Notiz: Neue Notiz' }))
-    const bar = within(screen.getByRole('toolbar', { name: 'Notiz bearbeiten' }))
-    await userEvent.click(bar.getByRole('button', { name: /^Farbe:/ }))
-    await userEvent.click(bar.getByRole('button', { name: 'Blau' }))
+    // A left click only selects; the options stay away until the right click.
+    const note = container.querySelector('[data-object-id] rect')!
+    fireEvent.pointerDown(note, { button: 0 })
+    fireEvent.pointerUp(note)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Notiz' })).toBeInTheDocument()
+
+    await rightClick(screen.getByRole('application'))
+    const menu = within(screen.getByRole('menu', { name: 'Notiz bearbeiten' }))
+    await userEvent.click(menu.getByRole('menuitem', { name: /^Farbe:/ }))
+    await userEvent.click(menu.getByRole('menuitemradio', { name: 'Blau' }))
     expect(readObjects(current().doc).find((o) => o.type === 'sticky')?.color).toBe('blue')
 
-    await userEvent.click(bar.getByRole('button', { name: 'Text bearbeiten' }))
+    await rightClick(screen.getByRole('application'))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Text bearbeiten' }))
     expect(screen.getByLabelText('Text')).toHaveFocus()
     await userEvent.keyboard('{Escape}')
 
-    await userEvent.click(within(screen.getByRole('toolbar', { name: 'Notiz bearbeiten' })).getByRole('button', { name: 'Notiz entfernen' }))
+    await rightClick(screen.getByRole('application'))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Notiz entfernen' }))
     expect(readObjects(current().doc).map((o) => o.type)).toEqual(['task'])
 
+    // A task card shows its live data in the right column instead of opening a panel of its own.
     await userEvent.click(await screen.findByRole('button', { name: 'Aufgabe: Startseite' }))
-    await userEvent.click(within(screen.getByRole('toolbar', { name: 'Aufgabe bearbeiten' })).getByRole('button', { name: 'Aufgabe öffnen' }))
-    expect(await screen.findByRole('heading', { name: /Startseite/ })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Aufgabe schließen' }))
-    expect(screen.queryByRole('heading', { name: /Startseite/ })).not.toBeInTheDocument()
+    const panel = within(screen.getByRole('region', { name: 'Aufgabe' }))
+    expect(panel.getByText('Startseite')).toBeInTheDocument()
+    expect(panel.getByText('Clara')).toBeInTheDocument()
+  })
+
+  it('connects two objects with an arrow that follows them, and keeps locked objects in place', async () => {
+    fakeApi({ 'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }) })
+    const { container } = render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
+    await connect(true)
+    act(() => {
+      addObject(current().doc, 'sticky', { x: 100, y: 100 })
+      addObject(current().doc, 'rect', { x: 500, y: 100 })
+    })
+    await openList()
+    const [from, to] = readObjects(current().doc)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz: Neue Notiz' }))
+    const dot = container.querySelector('.board-connect-dot')!
+    fireEvent.pointerDown(dot, { button: 0, clientX: 0, clientY: 0 })
+    fireEvent.pointerMove(screen.getByRole('application'), { clientX: to.x + to.w / 2, clientY: to.y + to.h / 2 })
+    fireEvent.pointerUp(screen.getByRole('application'))
+
+    const arrow = readObjects(current().doc).find((o) => o.type === 'arrow')!
+    expect(arrow).toMatchObject({ from: from.id, to: to.id })
+    expect(screen.getByRole('button', { name: 'Pfeil: Neue Notiz → Rechteck (Blau)' })).toBeInTheDocument()
+
+    // Moving the note takes the end of the arrow with it.
+    act(() => void updateObject(current().doc, from.id, { x: from.x, y: from.y + 200 }))
+    const moved = readObjects(current().doc).find((o) => o.type === 'arrow')!
+    expect(moved.y).toBeGreaterThan(arrow.y)
+
+    // A locked object cannot be moved or removed any more.
+    await userEvent.click(screen.getByRole('button', { name: 'Rechteck (Blau)' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Rechteck sperren' }))
+    expect(readObjects(current().doc).find((o) => o.id === to.id)?.locked).toBe(true)
+    screen.getByRole('application').focus()
+    await userEvent.keyboard('{ArrowRight}{Delete}')
+    expect(readObjects(current().doc).find((o) => o.id === to.id)).toMatchObject({ x: to.x, y: to.y })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rechteck entsperren' }))
+    screen.getByRole('application').focus()
+    await userEvent.keyboard('{Delete}')
+    // Deleting the object takes the arrow hanging on it with it.
+    expect(readObjects(current().doc).map((o) => o.type)).toEqual(['sticky'])
   })
 
   it('inserts a template as one undo step and offers it on an empty board', async () => {
