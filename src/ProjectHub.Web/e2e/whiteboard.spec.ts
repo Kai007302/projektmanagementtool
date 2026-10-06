@@ -76,8 +76,9 @@ test('two people draw together, a viewer follows and the board survives a reload
   await ben.getByRole('button', { name: 'Notiz hinzufügen' }).dragTo(ben.getByRole('application'))
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz (Gelb)' })).toBeVisible()
 
-  // The viewer cannot change the note.
-  await evaPage.getByRole('application').locator('[data-object-id]', { hasText: 'Suche nach oben, bitte' }).dblclick()
+  // The viewer cannot change the note. The task card sits on its middle, so the double click aims at its lower edge.
+  await evaPage.getByRole('application').scrollIntoViewIfNeeded()
+  await evaPage.getByRole('application').locator('[data-object-id]', { hasText: 'Suche nach oben, bitte' }).dblclick({ position: { x: 90, y: 114 } })
   await expect(evaPage.getByLabel('Text', { exact: true })).toHaveCount(0)
 
   // After a reload everything is still there.
