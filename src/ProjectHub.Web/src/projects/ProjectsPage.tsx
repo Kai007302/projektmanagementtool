@@ -107,7 +107,7 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
           Du bist noch in keinem Projekt.
         </EmptyState>
       ) : (
-        <ul className="project-grid">
+        <ul className="project-grid" aria-labelledby="projects-heading">
           {projects.map((project) => (
             <li key={project.id} className="project-tile">
               <ProjectCard project={project} overview={overview.get(project.id)} onOpen={() => setSelected(project.id)} />

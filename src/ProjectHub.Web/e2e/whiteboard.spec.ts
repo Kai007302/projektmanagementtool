@@ -92,7 +92,8 @@ test('two people draw together, a viewer follows and the board survives a reload
   // After a reload everything is still there.
   await claraPage.reload()
   await claraPage.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Projekte', exact: true }).click()
-  await claraPage.getByRole('button', { name }).click()
+  // After the reload the start page also offers the project under „Weiter, wo du warst“; open it from the list.
+  await claraPage.getByRole('list', { name: 'Projekte' }).getByRole('button', { name }).click()
   await claraPage.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Whiteboard' }).click()
   await expect(objectList(claraPage).getByRole('button', { name: 'Notiz: Suche nach oben, bitte' })).toBeVisible()
   await expect(objectList(claraPage).getByRole('button', { name: `Aufgabe: ${task}` })).toBeVisible()
