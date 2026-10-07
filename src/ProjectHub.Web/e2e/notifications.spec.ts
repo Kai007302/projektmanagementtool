@@ -39,8 +39,9 @@ test('an assignment shows up live in the bell, opens the task and respects the m
     await bell.click()
     await panel.getByRole('button', { name: new RegExp(`^Ben Projektleiter hat dir „${task}“`) }).click()
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-    await expect(page.getByRole('heading', { name: task, exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: task, exact: true })).toBeVisible()
     await expect(bell).toHaveAccessibleName('Benachrichtigungen, keine ungelesen')
+    await page.keyboard.press('Escape')
 
     // With mails switched off, the next assignment only arrives in the app.
     await bell.click()

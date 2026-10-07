@@ -166,11 +166,13 @@ describe('KanbanBoard', () => {
     expect(screen.queryByRole('button', { name: /Aufgabe$/ })).not.toBeInTheDocument()
   })
 
-  it('opens a card for reading only, without fields to change it', async () => {
-    fakeApi({
+  it('opens a whole card in a window where its dates can be set', async () => {
+    let version = 3
+    const design = { id: 't-1', projectId: 'p-1', title: 'Design', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 3 }
+    const api = fakeApi({
       'GET /api/v1/projects/p-1/board': () => json(board()),
-      'GET /api/v1/tasks/t-1': () =>
-        json({ id: 't-1', projectId: 'p-1', title: 'Design', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 3 }),
+      'GET /api/v1/tasks/t-1': () => json(design),
+      'PATCH /api/v1/tasks/t-1': () => json({ ...design, startDate: '2026-11-02', version: ++version }),
       'GET /api/v1/tasks/t-1/comments?limit=100': () => json({ items: [], nextOffset: null }),
       'GET /api/v1/tasks/t-1/attachments': () => json([]),
       'GET /api/v1/tasks/t-1/whiteboards': () => json([]),
@@ -179,12 +181,15 @@ describe('KanbanBoard', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Design' }))
 
-    expect(await screen.findByText('Status')).toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: 'Status' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Titel bearbeiten' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '+ Unteraufgabe' })).not.toBeInTheDocument()
-    expect(screen.getByText(/nur zum Ansehen/)).toBeInTheDocument()
+    const card = within(await screen.findByRole('dialog', { name: 'Design' }))
+    expect(await card.findByRole('combobox', { name: 'Status' })).toBeInTheDocument()
+    expect(card.getByLabelText('Fällig am')).toBeInTheDocument()
+    await userEvent.type(card.getByLabelText('Start'), '2.11.2026')
+    await userEvent.tab()
+
+    await vi.waitFor(() => expect(api.calls.some((c) => c.key === 'PATCH /api/v1/tasks/t-1')).toBe(true))
+    expect(JSON.parse(String(api.calls.find((c) => c.key === 'PATCH /api/v1/tasks/t-1')?.init?.body))).toEqual({ version: 3, startDate: '2026-11-02' })
+    expect(card.getByLabelText('Start')).toHaveValue('02.11.2026')
   })
 
   it('lets editors add a column', async () => {

@@ -8,7 +8,7 @@
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 45; /* above the task drawer, so the bell and menus open over it; dialogs stay on top */
+  z-index: 20;
   background: var(--header-bg);
   backdrop-filter: saturate(180%) blur(8px);
   border-bottom: 1px solid var(--border);
@@ -605,6 +605,7 @@ button.danger:hover:not(:disabled) {
 }
 
 .kanban-card-title {
+  cursor: pointer;
   border: none;
   background: none;
   box-shadow: none;
@@ -2995,23 +2996,25 @@ fieldset.block-fields {
   background: var(--surface);
 }
 
-.task-drawer {
-  position: fixed;
-  top: var(--header-height, 0);
-  right: 0;
-  bottom: 0;
-  z-index: 40;
-  width: min(30rem, 100vw);
+.task-window {
+  position: relative;
+  width: min(46rem, 100%);
+  max-height: 85vh;
   box-sizing: border-box;
-  padding: 1rem 1.25rem 2rem;
+  padding: 1rem 1.5rem 1.5rem;
   overflow-y: auto;
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-lg);
 }
 
-.task-drawer:focus {
+.task-window:focus {
   outline: none;
+}
+
+.task-backdrop {
+  padding-top: 6vh;
 }
 
 .task-drawer-header {
@@ -3376,15 +3379,6 @@ kbd {
   text-align: left;
 }
 
-/* Read-only task on the board: one clear way to edit it */
-.read-only-hint {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin: 0.75rem 0;
-}
-
 /* Short success notes (ui/toast.tsx) */
 .toasts {
   position: fixed;
@@ -3707,4 +3701,25 @@ kbd {
 
 .template-option small {
   font-weight: 400;
+}
+
+/* The whole card opens the task: the title button stretches over it; the "…" menu stays on top. */
+.kanban-card-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.kanban-card-title:focus-visible {
+  box-shadow: none;
+}
+
+.kanban-card:has(.kanban-card-title:focus-visible) {
+  box-shadow: var(--focus);
+}
+
+.kanban-card-menu {
+  position: relative;
+  z-index: 1;
 }

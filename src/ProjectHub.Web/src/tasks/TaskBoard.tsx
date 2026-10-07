@@ -9,11 +9,11 @@ import { useLatest } from '../api/useLatest'
 import { QuickCreate } from '../ui/QuickCreate'
 import { Skeleton } from '../ui/Skeleton'
 
-type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
+type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
-export function TaskBoard({ project, me, revision, onChanged, initialTaskId = null }: Props) {
+export function TaskBoard({ project, me, revision, onChanged }: Props) {
   const [tasks, setTasks] = useState<Task[] | null>(null)
-  const [selected, setSelected] = useState<string | null>(initialTaskId)
+  const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const latest = useLatest()
