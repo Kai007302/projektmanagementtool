@@ -50,7 +50,6 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
   const [view, setView] = useState<View>(initialView)
-  const [listTask, setListTask] = useState<string | null>(null)
   const [membersOpen, setMembersOpen] = useState(false)
   const webexShown = useWebexShown(projectId, revision)
   const views = (Object.keys(viewText) as View[]).filter((value) => value !== 'webex' || webexShown)
@@ -160,10 +159,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
                 type="button"
                 className={value === view ? 'tab active' : 'tab'}
                 aria-current={value === view ? 'page' : undefined}
-                onClick={() => {
-                  setListTask(null)
-                  setView(value)
-                }}
+                onClick={() => setView(value)}
               >
                 {viewText[value]}
               </button>
@@ -177,13 +173,9 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
                 revision={revision}
                 onChanged={changed}
                 initialTaskId={initialTaskId}
-                onEditInList={(taskId) => {
-                  setListTask(taskId)
-                  setView('list')
-                }}
               />
             )}
-            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={listTask} />}
+            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
             {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
             {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} initialBoardId={initialBoardId} />}
             {view === 'knowledge' && <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />}

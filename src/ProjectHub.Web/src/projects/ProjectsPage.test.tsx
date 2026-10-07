@@ -140,12 +140,13 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
-    await board.findByRole('heading', { name: 'Kommentare' })
+    const task = within(await screen.findByRole('dialog'))
+    await task.findByRole('heading', { name: 'Kommentare' })
 
     expect(board.queryByRole('button', { name: '+ Aufgabe' })).not.toBeInTheDocument()
-    expect(board.queryByLabelText('Status')).not.toBeInTheDocument()
-    expect(board.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
-    expect(board.queryByLabelText('Kommentar')).not.toBeInTheDocument()
+    expect(task.queryByLabelText('Status')).not.toBeInTheDocument()
+    expect(task.queryByRole('button', { name: 'Weitere Aktionen zur Aufgabe' })).not.toBeInTheDocument()
+    expect(task.queryByLabelText('Kommentar')).not.toBeInTheDocument()
     // Viewers get the calendar and the download, but nothing that changes the project.
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zum Projekt' }))
     expect(screen.getByRole('menuitem', { name: 'Kalender abonnieren' })).toBeInTheDocument()
@@ -193,11 +194,12 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
-    const assignee = await board.findByLabelText('Zuständig')
+    const task = within(await screen.findByRole('dialog'))
+    const assignee = await task.findByLabelText('Zuständig')
     expect(within(assignee).queryByRole('option', { name: 'Eva Viewer' })).not.toBeInTheDocument()
 
-    await userEvent.selectOptions(board.getByLabelText('Status'), 'in_progress')
-    await userEvent.selectOptions(board.getByLabelText('Zuständig'), 'u-clara')
+    await userEvent.selectOptions(task.getByLabelText('Status'), 'in_progress')
+    await userEvent.selectOptions(task.getByLabelText('Zuständig'), 'u-clara')
 
     const patches = () => api.calls.filter((c) => c.key === 'PATCH /api/v1/tasks/t-1').map((c) => JSON.parse(String(c.init?.body)) as unknown)
     await vi.waitFor(() => expect(patches()).toHaveLength(2))
@@ -205,7 +207,7 @@ describe('ProjectsPage', () => {
       { version: 1, status: 'in_progress' },
       { version: 2, assigneeId: 'u-clara' },
     ])
-    expect(board.queryByRole('button', { name: 'Aufgabe speichern' })).not.toBeInTheDocument()
+    expect(task.queryByRole('button', { name: 'Aufgabe speichern' })).not.toBeInTheDocument()
   })
 
   it('reloads the task and explains a conflicting change', async () => {
@@ -222,10 +224,11 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
-    await userEvent.selectOptions(await board.findByLabelText('Priorität'), 'high')
+    const task = within(await screen.findByRole('dialog'))
+    await userEvent.selectOptions(await task.findByLabelText('Priorität'), 'high')
 
-    expect(await board.findByText(/inzwischen geändert/)).toBeInTheDocument()
-    expect(await board.findByRole('heading', { name: /Von Clara geändert/ })).toBeInTheDocument()
+    expect(await task.findByText(/inzwischen geändert/)).toBeInTheDocument()
+    expect(await task.findByRole('heading', { name: /Von Clara geändert/ })).toBeInTheDocument()
     expect(api.calls.filter((c) => c.key === 'GET /api/v1/tasks/t-1')).toHaveLength(2)
   })
 
@@ -239,8 +242,9 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
-    await userEvent.type(await board.findByLabelText('Kommentar'), '@Clara Editor bitte prüfen')
-    await userEvent.click(board.getByRole('button', { name: 'Kommentieren' }))
+    const task = within(await screen.findByRole('dialog'))
+    await userEvent.type(await task.findByLabelText('Kommentar'), '@Clara Editor bitte prüfen')
+    await userEvent.click(task.getByRole('button', { name: 'Kommentieren' }))
 
     await vi.waitFor(() => expect(api.calls.some((c) => c.key === 'POST /api/v1/tasks/t-1/comments')).toBe(true))
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/tasks/t-1/comments')?.init?.body))).toEqual({
@@ -259,8 +263,9 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
-    await userEvent.upload(await board.findByLabelText('Datei'), new File(['hallo'], 'notiz.txt', { type: 'text/plain' }))
-    await userEvent.click(board.getByRole('button', { name: 'Hochladen' }))
+    const task = within(await screen.findByRole('dialog'))
+    await userEvent.upload(await task.findByLabelText('Datei'), new File(['hallo'], 'notiz.txt', { type: 'text/plain' }))
+    await userEvent.click(task.getByRole('button', { name: 'Hochladen' }))
 
     await vi.waitFor(() => expect(api.calls.some((c) => c.key === 'POST /api/v1/tasks/t-1/attachments')).toBe(true))
     const call = api.calls.find((c) => c.key === 'POST /api/v1/tasks/t-1/attachments')!

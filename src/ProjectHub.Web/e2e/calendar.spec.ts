@@ -40,6 +40,8 @@ test('a viewer downloads a task and a milestone as calendar entries and opens Ou
   expect(href.searchParams.get('subject')).toBe('Abnahme, Teil 1')
   expect([href.searchParams.get('startdt'), href.searchParams.get('enddt')]).toEqual(['2026-11-02', '2026-11-05'])
   await expect(outlook).toHaveAttribute('target', '_blank')
+  // The task opens in its own window over the page; Escape closes it again.
+  await page.keyboard.press('Escape')
 
   const milestoneDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Meilenstein „Go-live“ als Kalenderdatei herunterladen' }).click()

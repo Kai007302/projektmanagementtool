@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchAiStatus, type AiStatus } from './ai/api'
 import { AssistantPage } from './ai/AssistantPage'
 import { fetchApiStatus, type ApiStatus } from './api/health'
@@ -45,16 +45,6 @@ function App() {
   // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
   const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const header = useRef<HTMLElement>(null)
-
-  // Side panels (the task drawer) start below the sticky top bar, so the bell and the menus stay reachable.
-  useEffect(() => {
-    const element = header.current
-    if (!element || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => document.documentElement.style.setProperty('--header-height', `${element.offsetHeight}px`))
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
 
   // Ctrl+K (Cmd+K on a Mac) opens the search from anywhere, like in Linear or Notion.
   useEffect(() => {
@@ -120,7 +110,7 @@ function App() {
 
   return (
     <div className="app">
-      <header ref={header} className="app-header">
+      <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">

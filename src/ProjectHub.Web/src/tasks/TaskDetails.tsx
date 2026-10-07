@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails, ProjectMember } from '../projects/api'
@@ -42,10 +43,6 @@ type Props = {
   onChanged: () => void
   onDeleted: () => void
   onClose: () => void
-  /** Only shows the task; the Kanban board opens cards like this, changes happen in the list. */
-  readOnly?: boolean
-  /** Read-only view on the board: jumps to the same task in the list, where it can be edited. */
-  onEditInList?: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
@@ -56,10 +53,10 @@ const assignable = (member: ProjectMember) => ['admin', 'editor', 'member'].incl
 const staleText = 'Jemand anderes hat die Aufgabe inzwischen geändert. Der aktuelle Stand wurde geladen.'
 
 /**
- * A task in a panel on the right, like in Asana: the board stays visible, every field saves as soon as it changes,
- * rare actions sit in the "…" menu. Escape or the close button closes it.
+ * A task in its own window over the page, like a Trello card: every field saves as soon as it changes, rare actions
+ * sit in the "…" menu. Escape, the close button or a click beside the window closes it; focus goes back.
  */
-export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false, onEditInList }: Props) {
+export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = useRef<Task | null>(null)
@@ -76,7 +73,11 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
   }, [taskId, show])
 
   useEffect(load, [load])
-  useEffect(() => panel.current?.focus(), [])
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null
+    panel.current?.focus()
+    return () => before?.focus?.()
+  }, [])
 
   /** Saves changes one after another, so a quick second change uses the version the first one returned. */
   function save(changes: TaskChanges) {
@@ -114,62 +115,64 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
     }
   }
 
-  const canContribute = project.capabilities.canContribute && !readOnly
-  const canEdit = project.capabilities.canEdit && !readOnly
+  const { canContribute, canEdit } = project.capabilities
 
-  return (
-    <aside
-      ref={panel}
-      className="task-drawer"
-      aria-labelledby="task-heading"
-      tabIndex={-1}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !event.defaultPrevented) onClose()
+  return createPortal(
+    <div
+      className="dialog-backdrop task-backdrop"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
       }}
     >
-      <header className="task-drawer-header">
-        <span className="muted task-drawer-kicker">Aufgabe</span>
-        {task && canEdit && <Menu label="Weitere Aktionen zur Aufgabe" items={[{ label: 'Aufgabe löschen', danger: true, onSelect: () => void remove() }]} />}
-        <button type="button" className="icon-button" aria-label="Aufgabe schließen" title="Schließen (Esc)" onClick={onClose}>
-          <CloseIcon />
-        </button>
-      </header>
-      {error && <p role="alert">{error}</p>}
-      {!task ? (
-        !error && <Skeleton count={6} label="Aufgabe wird geladen" />
-      ) : (
-        <article className="task-details">
-          <h4 id="task-heading" className="task-drawer-title">
-            <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
-          </h4>
-          <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
-          {readOnly && project.capabilities.canContribute && (
-            <p className="read-only-hint">
-              <span className="muted">Auf dem Board nur zum Ansehen.</span>
-              {onEditInList && (
-                <button type="button" className="primary-button" onClick={onEditInList}>
-                  In der Liste bearbeiten
-                </button>
-              )}
-            </p>
-          )}
-          <TaskCalendar task={task} />
-          {canContribute && (
-            <QuickCreate
-              label="Unteraufgabe"
-              fieldLabel="Neue Unteraufgabe"
-              onCreate={async (title) => {
-                await createTask(project.id, title, task.id)
-                onChanged()
-              }}
-            />
-          )}
-          <CommentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
-          <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
-          <TaskWhiteboards taskId={task.id} />
-        </article>
-      )}
-    </aside>
+      <section
+        ref={panel}
+        className="task-window"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-heading"
+        tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !event.defaultPrevented) {
+            event.stopPropagation()
+            onClose()
+          }
+        }}
+      >
+        <header className="task-drawer-header">
+          <span className="muted task-drawer-kicker">Aufgabe</span>
+          {task && canEdit && <Menu label="Weitere Aktionen zur Aufgabe" items={[{ label: 'Aufgabe löschen', danger: true, onSelect: () => void remove() }]} />}
+          <button type="button" className="icon-button" aria-label="Aufgabe schließen" title="Schließen (Esc)" onClick={onClose}>
+            <CloseIcon />
+          </button>
+        </header>
+        {error && <p role="alert">{error}</p>}
+        {!task ? (
+          !error && <Skeleton count={6} label="Aufgabe wird geladen" />
+        ) : (
+          <article className="task-details">
+            <h4 id="task-heading" className="task-drawer-title">
+              <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
+            </h4>
+            <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
+            <TaskCalendar task={task} />
+            {canContribute && (
+              <QuickCreate
+                label="Unteraufgabe"
+                fieldLabel="Neue Unteraufgabe"
+                onCreate={async (title) => {
+                  await createTask(project.id, title, task.id)
+                  onChanged()
+                }}
+              />
+            )}
+            <CommentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
+            <AttachmentsPanel taskId={task.id} project={project} me={me} onChanged={onChanged} />
+            <TaskWhiteboards taskId={task.id} />
+          </article>
+        )}
+      </section>
+    </div>,
+    document.body,
   )
 }
 
@@ -204,6 +207,7 @@ type FieldsProps = { task: Task; members: ProjectMember[]; editable: boolean; on
 
 /** The task's properties as a compact list; each one saves on its own, there is no save button. */
 function TaskFields({ task, members, editable, onSave }: FieldsProps) {
+  const [startDate, setStartDate] = useState(task.startDate ?? '')
   const [dueDate, setDueDate] = useState(task.dueDate ?? '')
   const [progress, setProgress] = useState(String(task.progress))
 
@@ -216,6 +220,12 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         <dd>{taskPriorities[task.priority]}</dd>
         <dt>Zuständig</dt>
         <dd>{task.assigneeName ?? 'Niemand'}</dd>
+        {task.startDate && (
+          <>
+            <dt>Start</dt>
+            <dd>{formatDate(task.startDate)}</dd>
+          </>
+        )}
         {task.dueDate && (
           <>
             <dt>Fällig am</dt>
@@ -258,6 +268,8 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
           </option>
         ))}
       </select>
+      <label htmlFor="task-start">Start</label>
+      <DateField id="task-start" value={startDate} onChange={setStartDate} onBlur={() => void onSave({ startDate: startDate || null })} />
       <label htmlFor="task-due">Fällig am</label>
       <DateField id="task-due" value={dueDate} onChange={setDueDate} onBlur={() => void onSave({ dueDate: dueDate || null })} />
       <label htmlFor="task-progress">Fortschritt (%)</label>
