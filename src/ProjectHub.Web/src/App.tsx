@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchAiStatus, type AiStatus } from './ai/api'
 import { AssistantPage } from './ai/AssistantPage'
 import { fetchApiStatus, type ApiStatus } from './api/health'
@@ -14,8 +14,9 @@ import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import { CommandPalette } from './ui/CommandPalette'
-import { ThemeToggle } from './ui/ThemeToggle'
+import { Toaster } from './ui/Toaster'
 import './App.css'
+import { SearchIcon } from './ui/icons'
 
 const statusText: Record<ApiStatus, string> = {
   checking: 'Verbindung wird geprüft …',
@@ -44,6 +45,16 @@ function App() {
   // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
   const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const header = useRef<HTMLElement>(null)
+
+  // Side panels (the task drawer) start below the sticky top bar, so the bell and the menus stay reachable.
+  useEffect(() => {
+    const element = header.current
+    if (!element || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => document.documentElement.style.setProperty('--header-height', `${element.offsetHeight}px`))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   // Ctrl+K (Cmd+K on a Mac) opens the search from anywhere, like in Linear or Notion.
   useEffect(() => {
@@ -109,7 +120,7 @@ function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
+      <header ref={header} className="app-header">
         <div className="app-header-inner">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">
@@ -135,26 +146,24 @@ function App() {
               ))}
             </nav>
           )}
-          <div className="account">
-            {session && (
+          {session && (
+            <div className="header-search">
               <button type="button" className="search-trigger" aria-label="Suchen (Strg+K)" onClick={() => setPaletteOpen(true)}>
-                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <circle cx="9" cy="9" r="5.5" />
-                  <path d="M13.2 13.2 L17 17" />
-                </svg>
+                <SearchIcon />
                 <kbd aria-hidden="true">Strg K</kbd>
               </button>
-            )}
-            <ThemeToggle />
+            </div>
+          )}
+          <div className="account">
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
               <div className="account-row">
                 <NotificationBell key={session.me.id} onOpen={openNotification} />
-                <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} />
+                <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} onSignOut={signedInWithEntra() ? () => void signOut() : undefined} />
               </div>
             )}
-            {signedInWithEntra() && (
-              <button type="button" className="sign-out" onClick={() => void signOut()}>
+            {!session && signedInWithEntra() && (
+              <button type="button" onClick={() => void signOut()}>
                 Abmelden
               </button>
             )}
@@ -200,6 +209,7 @@ function App() {
         </span>
         <LegalFooter />
       </footer>
+      <Toaster />
     </div>
   )
 }

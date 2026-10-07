@@ -65,7 +65,8 @@ describe('WebexPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Projektraum in Webex anlegen' }))
     expect(calls.some((c) => c.key === 'POST /api/v1/projects/p-1/webex/space')).toBe(true)
     expect(onChanged).toHaveBeenCalledTimes(2)
-    expect(form).toBeInTheDocument()
+    // The window with the form closes after the link was added.
+    expect(form).not.toBeInTheDocument()
   })
 
   it('stays hidden when Webex is not set up and nothing is linked', async () => {

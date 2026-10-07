@@ -7,27 +7,53 @@ import { ProjectKnowledge } from '../knowledge/ProjectKnowledge'
 import { useProjectEvents } from '../realtime/projectEvents'
 import { TaskBoard } from '../tasks/TaskBoard'
 import { WhiteboardPanel } from '../whiteboard/WhiteboardPanel'
-import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectStatus } from './api'
+import { deleteProject, fetchProject, projectStatuses, updateProject, type ProjectDetails, type ProjectMember, type ProjectStatus } from './api'
 import { ActivityFeed } from './ActivityFeed'
 import { MembersPanel } from './MembersPanel'
 import { WebexPanel } from '../webex/WebexPanel'
+import { fetchProjectWebex } from '../webex/api'
+import { Dialog } from '../ui/Dialog'
+import { initials } from '../identity/initials'
 import { useLatest } from '../api/useLatest'
 import { InlineEdit } from '../ui/InlineEdit'
 import { projectLook } from '../ui/personality'
 import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
+import { Skeleton } from '../ui/Skeleton'
+import { rememberVisit } from '../ui/recent'
 
-type Props = { projectId: string; me: Me; onBack: () => void; onOpenArticle?: (id: string) => void; initialTaskId?: string | null }
+export type View = 'board' | 'list' | 'gantt' | 'whiteboard' | 'knowledge' | 'activity' | 'webex'
 
-type View = 'board' | 'list' | 'gantt' | 'whiteboard'
+type Props = {
+  projectId: string
+  me: Me
+  onBack: () => void
+  onOpenArticle?: (id: string) => void
+  initialTaskId?: string | null
+  initialView?: View
+  /** Whiteboard to show first in the whiteboard view, e.g. from "Weiter, wo du warst". */
+  initialBoardId?: string | null
+}
 
-const viewText: Record<View, string> = { board: 'Board', list: 'Liste', gantt: 'Gantt', whiteboard: 'Whiteboard' }
+const viewText: Record<View, string> = {
+  board: 'Board',
+  list: 'Liste',
+  gantt: 'Gantt',
+  whiteboard: 'Whiteboard',
+  knowledge: 'Wissen',
+  activity: 'Aktivität',
+  webex: 'Webex',
+}
 
-export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskId = null }: Props) {
+export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskId = null, initialView = 'board', initialBoardId = null }: Props) {
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
-  const [view, setView] = useState<View>('board')
+  const [view, setView] = useState<View>(initialView)
+  const [listTask, setListTask] = useState<string | null>(null)
+  const [membersOpen, setMembersOpen] = useState(false)
+  const webexShown = useWebexShown(projectId, revision)
+  const views = (Object.keys(viewText) as View[]).filter((value) => value !== 'webex' || webexShown)
 
   const latest = useLatest()
   const load = useCallback(() => {
@@ -35,6 +61,11 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   }, [latest, projectId])
 
   useEffect(load, [load])
+
+  const name = project?.name
+  useEffect(() => {
+    if (name) rememberVisit(me.id, { kind: 'project', id: projectId, title: name })
+  }, [me.id, projectId, name])
 
   /** Something in the project changed: reload details and the activity feed. */
   const changed = useCallback(() => {
@@ -78,7 +109,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
       </button>
       {error && <p role="alert">{error}</p>}
       {!project ? (
-        <p>Projekt wird geladen …</p>
+        <Skeleton kind="board" label="Projekt wird geladen" />
       ) : (
         <>
           <header className="project-header">
@@ -107,40 +138,93 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
                 {project.description && <span>{project.description}</span>}
               </p>
             </div>
-            <ProjectMenu
-              project={project}
-              canEdit={project.capabilities.canEdit}
-              extraItems={project.capabilities.canManage ? [{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }] : []}
-              onChanged={changed}
-            />
+            <div className="project-header-actions">
+              <MembersButton members={project.members} onOpen={() => setMembersOpen(true)} />
+              <ProjectMenu
+                project={project}
+                canEdit={project.capabilities.canEdit}
+                extraItems={project.capabilities.canManage ? [{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }] : []}
+                onChanged={changed}
+              />
+            </div>
           </header>
+          {membersOpen && (
+            <Dialog label="Mitglieder" onClose={() => setMembersOpen(false)}>
+              <MembersPanel project={project} onChanged={changed} />
+            </Dialog>
+          )}
           <nav className="tabs" aria-label="Ansicht">
-            {(Object.keys(viewText) as View[]).map((value) => (
+            {views.map((value) => (
               <button
                 key={value}
                 type="button"
                 className={value === view ? 'tab active' : 'tab'}
                 aria-current={value === view ? 'page' : undefined}
-                onClick={() => setView(value)}
+                onClick={() => {
+                  setListTask(null)
+                  setView(value)
+                }}
               >
                 {viewText[value]}
               </button>
             ))}
           </nav>
-          <div className={view === 'list' ? 'project-layout' : 'project-layout wide'}>
-            {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={initialTaskId} />}
-            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
+          <div className="project-content">
+            {view === 'board' && (
+              <KanbanBoard
+                project={project}
+                me={me}
+                revision={revision}
+                onChanged={changed}
+                initialTaskId={initialTaskId}
+                onEditInList={(taskId) => {
+                  setListTask(taskId)
+                  setView('list')
+                }}
+              />
+            )}
+            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={listTask} />}
             {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
-            {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} />}
-            <aside className="project-side">
-              <MembersPanel project={project} onChanged={changed} />
-              <WebexPanel project={project} revision={revision} onChanged={changed} />
-              <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />
-              <ActivityFeed projectId={project.id} revision={revision} />
-            </aside>
+            {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} initialBoardId={initialBoardId} />}
+            {view === 'knowledge' && <ProjectKnowledge projectId={project.id} revision={revision} onOpenArticle={onOpenArticle} />}
+            {view === 'activity' && <ActivityFeed projectId={project.id} revision={revision} />}
+            {view === 'webex' && <WebexPanel project={project} revision={revision} onChanged={changed} />}
           </div>
         </>
       )}
     </section>
   )
+}
+
+/** The team as a row of avatars in the project header; opens the member list (add, change roles, remove). */
+function MembersButton({ members, onOpen }: { members: ProjectMember[]; onOpen: () => void }) {
+  return (
+    <button type="button" className="members-button" aria-haspopup="dialog" title="Mitglieder verwalten" onClick={onOpen}>
+      <span className="avatar-stack" aria-hidden="true">
+        {members.slice(0, 4).map((member) => (
+          <span key={member.userId} className="avatar small">
+            {initials(member.displayName)}
+          </span>
+        ))}
+        {members.length > 4 && <span className="avatar small more">+{members.length - 4}</span>}
+      </span>
+      <span>{members.length === 1 ? '1 Mitglied' : `${members.length} Mitglieder`}</span>
+    </button>
+  )
+}
+
+/** Whether the project has a Webex tab: Webex is set up, or links exist from before. */
+function useWebexShown(projectId: string, revision: number) {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    let current = true
+    fetchProjectWebex(projectId).then(
+      (webex) => current && setShown(webex.available || webex.links.length > 0),
+      () => {},
+    )
+    return () => {
+      current = false
+    }
+  }, [projectId, revision])
+  return shown
 }

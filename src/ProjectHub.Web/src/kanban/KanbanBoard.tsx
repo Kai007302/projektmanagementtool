@@ -24,8 +24,17 @@ import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
 import { Reveal } from '../ui/Reveal'
+import { Skeleton } from '../ui/Skeleton'
 
-type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
+type Props = {
+  project: ProjectDetails
+  me: Me
+  revision: number
+  onChanged: () => void
+  initialTaskId?: string | null
+  /** Opens a task for editing in the list view (cards on the board are read-only). */
+  onEditInList?: (taskId: string) => void
+}
 
 type DropTarget = { columnId: string; index: number }
 
@@ -44,7 +53,7 @@ function withCardMoved(board: Board, card: KanbanCard, target: DropTarget): Boar
   return { ...board, columns }
 }
 
-export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = null }: Props) {
+export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = null, onEditInList }: Props) {
   const [board, setBoard] = useState<Board | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState<KanbanCard | null>(null)
@@ -124,7 +133,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
     if (dropTarget?.columnId !== column.id) setDropTarget({ columnId: column.id, index: column.cards.length })
   }
 
-  if (!board) return error ? <p role="alert">{error}</p> : <p>Board wird geladen …</p>
+  if (!board) return error ? <p role="alert">{error}</p> : <Skeleton kind="board" label="Board wird geladen" />
 
   return (
     <section className="panel kanban" aria-labelledby="board-heading">
@@ -289,6 +298,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
           project={project}
           me={me}
           readOnly
+          onEditInList={onEditInList && (() => onEditInList(selected))}
           onChanged={() => {
             load()
             onChanged()

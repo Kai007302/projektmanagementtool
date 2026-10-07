@@ -30,6 +30,10 @@ import {
 import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
+import { Skeleton } from '../ui/Skeleton'
+import { DateField } from '../ui/DateField'
+import { formatDate } from '../ui/dates'
+import { CloseIcon } from '../ui/icons'
 
 type Props = {
   taskId: string
@@ -40,6 +44,8 @@ type Props = {
   onClose: () => void
   /** Only shows the task; the Kanban board opens cards like this, changes happen in the list. */
   readOnly?: boolean
+  /** Read-only view on the board: jumps to the same task in the list, where it can be edited. */
+  onEditInList?: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
@@ -53,7 +59,7 @@ const staleText = 'Jemand anderes hat die Aufgabe inzwischen geändert. Der aktu
  * A task in a panel on the right, like in Asana: the board stays visible, every field saves as soon as it changes,
  * rare actions sit in the "…" menu. Escape or the close button closes it.
  */
-export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false }: Props) {
+export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false, onEditInList }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = useRef<Task | null>(null)
@@ -125,19 +131,28 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
         <span className="muted task-drawer-kicker">Aufgabe</span>
         {task && canEdit && <Menu label="Weitere Aktionen zur Aufgabe" items={[{ label: 'Aufgabe löschen', danger: true, onSelect: () => void remove() }]} />}
         <button type="button" className="icon-button" aria-label="Aufgabe schließen" title="Schließen (Esc)" onClick={onClose}>
-          ✕
+          <CloseIcon />
         </button>
       </header>
       {error && <p role="alert">{error}</p>}
       {!task ? (
-        !error && <p>Aufgabe wird geladen …</p>
+        !error && <Skeleton count={6} label="Aufgabe wird geladen" />
       ) : (
         <article className="task-details">
           <h4 id="task-heading" className="task-drawer-title">
             <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
           </h4>
           <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
-          {readOnly && project.capabilities.canContribute && <p className="muted">Auf dem Board nur zum Ansehen. Bearbeiten in der Ansicht „Liste“.</p>}
+          {readOnly && project.capabilities.canContribute && (
+            <p className="read-only-hint">
+              <span className="muted">Auf dem Board nur zum Ansehen.</span>
+              {onEditInList && (
+                <button type="button" className="primary-button" onClick={onEditInList}>
+                  In der Liste bearbeiten
+                </button>
+              )}
+            </p>
+          )}
           <TaskCalendar task={task} />
           {canContribute && (
             <QuickCreate
@@ -204,7 +219,7 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         {task.dueDate && (
           <>
             <dt>Fällig am</dt>
-            <dd>{task.dueDate}</dd>
+            <dd>{formatDate(task.dueDate)}</dd>
           </>
         )}
       </dl>
@@ -244,7 +259,7 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         ))}
       </select>
       <label htmlFor="task-due">Fällig am</label>
-      <input id="task-due" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} onBlur={() => void onSave({ dueDate: dueDate || null })} />
+      <DateField id="task-due" value={dueDate} onChange={setDueDate} onBlur={() => void onSave({ dueDate: dueDate || null })} />
       <label htmlFor="task-progress">Fortschritt (%)</label>
       <input
         id="task-progress"
@@ -404,7 +419,7 @@ function AttachmentsPanel({ taskId, project, me, onChanged }: PanelProps) {
                   aria-label={`${attachment.fileName} löschen`}
                   onClick={() => run(() => deleteAttachment(attachment.id))}
                 >
-                  ✕
+                  <CloseIcon />
                 </button>
               )}
             </span>

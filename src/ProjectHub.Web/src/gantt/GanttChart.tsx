@@ -41,6 +41,8 @@ import {
 } from './timeline'
 import { useLatest } from '../api/useLatest'
 import { EmptyState } from '../ui/EmptyState'
+import { Skeleton } from '../ui/Skeleton'
+import { DateField } from '../ui/DateField'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -189,7 +191,7 @@ export function GanttChart({ project, me, revision, onChanged }: Props) {
     }
   }
 
-  if (!gantt) return error ? <p role="alert">{error}</p> : <p>Gantt wird geladen …</p>
+  if (!gantt) return error ? <p role="alert">{error}</p> : <Skeleton kind="list" count={5} label="Gantt wird geladen" />
 
   const rowIndex = new Map(rows.map((row, index) => [row.task.id, index]))
   const titles = new Map(gantt.tasks.map((task) => [task.id, task.title]))
@@ -520,11 +522,11 @@ function TaskSchedule({ project, me, task, gantt, canContribute, onReschedule, o
         <form className="inline-form" onSubmit={save} aria-label="Termin">
           <label>
             Start
-            <input type="date" value={start} onChange={(event) => setStart(event.target.value)} />
+            <DateField value={start} onChange={setStart} />
           </label>
           <label>
             Ende
-            <input type="date" value={end} onChange={(event) => setEnd(event.target.value)} />
+            <DateField value={end} onChange={setEnd} />
           </label>
           <button type="submit">Termin speichern</button>
           {message && <p role="alert">{message}</p>}
@@ -620,7 +622,7 @@ function Milestones({ milestones, canEdit, onCreate, onUpdate, onDelete }: Miles
           </label>
           <label>
             Datum
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+            <DateField value={date} onChange={setDate} required />
           </label>
           <button type="submit">Meilenstein anlegen</button>
         </form>
@@ -658,7 +660,7 @@ function MilestoneItem({ milestone, canEdit, onUpdate, onDelete }: MilestoneItem
           </label>
           <label>
             Datum
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
+            <DateField value={date} onChange={setDate} required />
           </label>
           <button type="submit">Speichern</button>
           <button type="button" onClick={() => setEditing(false)}>

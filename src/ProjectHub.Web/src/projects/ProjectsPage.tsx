@@ -5,12 +5,17 @@ import type { Task } from '../tasks/api'
 import { DueDate } from '../tasks/DueDate'
 import { PriorityBadge } from '../tasks/PriorityBadge'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 import { greeting, projectLook, today } from '../ui/personality'
 import { canEditProject, createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
 import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
+import { ContinueSection } from './ContinueSection'
+import { applyTemplate, projectTemplates, type ProjectTemplate } from './templates'
 import { ProjectView } from './ProjectView'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
+import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = {
   me: Me
@@ -23,6 +28,7 @@ type Props = {
 export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(initialProjectId)
+  const [openBoard, setOpenBoard] = useState<string | null>(null)
   const [openTask, setOpenTask] = useState<{ projectId: string; taskId: string } | null>(
     initialProjectId && initialTaskId ? { projectId: initialProjectId, taskId: initialTaskId } : null,
   )
@@ -45,10 +51,13 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
         projectId={selected}
         me={me}
         initialTaskId={openTask?.projectId === selected ? openTask.taskId : null}
+        initialView={openBoard ? 'whiteboard' : 'board'}
+        initialBoardId={openBoard}
         onOpenArticle={onOpenArticle}
         onBack={() => {
           setSelected(null)
           setOpenTask(null)
+          setOpenBoard(null)
           load()
         }}
       />
@@ -65,22 +74,40 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
           setSelected(task.projectId)
         }}
       />
-      <h2 id="projects-heading">Projekte</h2>
+      {projects && (
+        <ContinueSection
+          me={me}
+          projects={projects}
+          tasksOf={(projectId) => overview.get(projectId)?.tasks}
+          onOpenArticle={onOpenArticle}
+          onOpenProject={(projectId, boardId) => {
+            setOpenBoard(boardId ?? null)
+            setSelected(projectId)
+          }}
+        />
+      )}
+      <header className="page-header">
+        <h2 id="projects-heading">Projekte</h2>
+        <Reveal label="Projekt" title="Neues Projekt" primary>
+          {() => (
+            <CreateProjectForm
+              onCreated={(project) => {
+                load()
+                setSelected(project.id)
+              }}
+            />
+          )}
+        </Reveal>
+      </header>
       {error && <p role="alert">{error}</p>}
-      <CreateProjectForm
-        onCreated={(project) => {
-          load()
-          setSelected(project.id)
-        }}
-      />
       {projects === null ? (
-        <p>Projekte werden geladen …</p>
+        <Skeleton kind="tiles" label="Projekte werden geladen" />
       ) : projects.length === 0 ? (
-        <EmptyState emoji="🚀" hint="Leg oben dein erstes Projekt an.">
+        <EmptyState emoji="🚀" hint="Leg mit „+ Projekt“ dein erstes Projekt an.">
           Du bist noch in keinem Projekt.
         </EmptyState>
       ) : (
-        <ul className="project-grid">
+        <ul className="project-grid" aria-labelledby="projects-heading">
           {projects.map((project) => (
             <li key={project.id} className="project-tile">
               <ProjectCard project={project} overview={overview.get(project.id)} onOpen={() => setSelected(project.id)} />
@@ -193,27 +220,54 @@ function Greeting({ me, overview, onOpen }: { me: Me; overview: Map<string, Proj
 
 function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary) => void }) {
   const [name, setName] = useState('')
+  const [template, setTemplate] = useState<ProjectTemplate['id']>('empty')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setBusy(true)
+    let project: ProjectSummary
     try {
-      const project = await createProject(name, '')
-      setName('')
-      onCreated(project)
+      project = await createProject(name, '')
     } catch (e) {
       setError((e as Error).message)
+      setBusy(false)
+      return
     }
+    try {
+      await applyTemplate(project.id, projectTemplates.find((t) => t.id === template)!)
+      toast(`Projekt „${project.name}“ angelegt. 🎉`)
+    } catch {
+      toast(`Projekt „${project.name}“ angelegt. Die Vorlage wurde nicht vollständig übernommen.`)
+    }
+    setName('')
+    setBusy(false)
+    onCreated(project)
   }
 
   return (
-    <form className="inline-form" onSubmit={submit}>
+    <form className="stacked-form" onSubmit={submit}>
       <label>
-        Neues Projekt
-        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+        Name des Projekts
+        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
       </label>
-      <button type="submit">Projekt anlegen</button>
+      <fieldset className="template-picker">
+        <legend>Vorlage</legend>
+        {projectTemplates.map((option) => (
+          <label key={option.id} className="template-option">
+            <input type="radio" name="template" value={option.id} checked={template === option.id} onChange={() => setTemplate(option.id)} />
+            <span>
+              <strong>{option.name}</strong>
+              <small className="muted">{option.description}</small>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <button type="submit" disabled={busy}>
+        {busy ? 'Wird angelegt …' : 'Projekt anlegen'}
+      </button>
       {error && <p role="alert">{error}</p>}
     </form>
   )

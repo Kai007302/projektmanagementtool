@@ -31,15 +31,16 @@ test('an editor links a meeting and creates the project space; notifications arr
     await page.keyboard.press('Escape')
 
     await page.getByRole('button', { name }).click()
+    await page.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Webex' }).click()
     const webex = page.getByRole('region', { name: 'Webex' })
 
     // A link that is not on webex.com is refused before it reaches the server.
     await webex.getByRole('button', { name: '+ Webex-Link' }).click()
-    const form = webex.getByRole('form', { name: 'Webex-Link hinzufügen' })
+    const form = page.getByRole('dialog', { name: 'Webex-Link hinzufügen' }).getByRole('form', { name: 'Webex-Link hinzufügen' })
     await form.getByLabel('Titel').fill('Jour fixe')
     await form.getByLabel('Link').fill('https://webex.com.evil.example/meet')
     await form.getByRole('button', { name: 'Hinzufügen' }).click()
-    await expect(webex.getByRole('alert')).toContainText('webex.com')
+    await expect(form.getByRole('alert')).toContainText('webex.com')
     await form.getByLabel('Link').fill('https://contoso.webex.com/meet/ben')
     await form.getByRole('button', { name: 'Hinzufügen' }).click()
     await expect(webex.getByRole('link', { name: 'Meeting „Jour fixe“ in Webex öffnen (neues Fenster)' })).toHaveAttribute('href', 'https://contoso.webex.com/meet/ben')

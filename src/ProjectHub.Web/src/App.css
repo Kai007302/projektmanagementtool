@@ -8,7 +8,7 @@
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 45; /* above the task drawer, so the bell and menus open over it; dialogs stay on top */
   background: var(--header-bg);
   backdrop-filter: saturate(180%) blur(8px);
   border-bottom: 1px solid var(--border);
@@ -109,12 +109,6 @@
 .account-name span {
   color: var(--muted);
   font-size: 0.75rem;
-}
-
-.sign-out {
-  padding: 0.3125rem 0.625rem;
-  font-size: 0.8125rem;
-  color: var(--muted);
 }
 
 .dev-switcher {
@@ -510,14 +504,6 @@ button.danger {
 
 button.danger:hover:not(:disabled) {
   background: var(--danger-soft);
-}
-
-.project-layout.wide {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.project-layout.wide .project-side {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
 }
 
 .kanban-columns {
@@ -2459,8 +2445,8 @@ fieldset.block-fields {
   position: relative;
 }
 
-/* The project's menu sits on its tile, beside the button that opens the project. */
-.project-tile-menu {
+/* The project's menu sits on its tile, beside the button that opens the project (below the progress ring). */
+.menu.project-tile-menu {
   position: absolute;
   right: 0.5rem;
   bottom: 0.5rem;
@@ -2726,6 +2712,7 @@ fieldset.block-fields {
 }
 :root[data-theme='dark'] .priority-urgent {
   --priority-fg: #fca5a5;
+}
 
 /* Legal links and own data export (ADR 0017) */
 .app-footer {
@@ -2748,15 +2735,6 @@ fieldset.block-fields {
 .legal-links .link-button {
   color: var(--muted);
   font-size: inherit;
-}
-
-.anonymize-person {
-  margin: 1rem 0;
-}
-
-.anonymize-person summary {
-  cursor: pointer;
-  font-weight: 600;
 }
 
 .anonymize-person form,
@@ -2784,6 +2762,7 @@ fieldset.block-fields {
 .task-transfer .row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-start;
   align-items: center;
   gap: 0.75rem;
 }
@@ -2922,6 +2901,8 @@ fieldset.block-fields {
 
 .add-button {
   justify-self: start;
+  /* The text lines up with the content above; the hover background reaches into the margin. */
+  margin-left: -0.75rem;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
@@ -2961,8 +2942,12 @@ fieldset.block-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0;
+}
+
+.project-header + .tabs {
+  margin-top: 1.25rem;
 }
 
 .status-chip {
@@ -3012,7 +2997,7 @@ fieldset.block-fields {
 
 .task-drawer {
   position: fixed;
-  top: 0;
+  top: var(--header-height, 0);
   right: 0;
   bottom: 0;
   z-index: 40;
@@ -3080,6 +3065,16 @@ fieldset.block-fields {
   gap: 1rem;
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-actions .add-button {
+  margin-left: 0;
+}
+
 .knowledge-search {
   display: grid;
   gap: 0.6rem;
@@ -3143,14 +3138,44 @@ fieldset.block-fields {
 }
 
 /* Ctrl+K search, like in Linear. */
+.header-search {
+  flex: 1 1 14rem;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* Looks like a search field: magnifier on the left, the shortcut quietly in the middle. */
 .search-trigger {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr) 1rem;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.5rem 0.3rem 0.6rem;
+  width: 100%;
+  max-width: 28rem;
+  min-height: var(--control-height);
+  padding: 0 0.75rem;
+  border-color: var(--border);
+  background: var(--surface);
+  box-shadow: none;
   color: var(--muted);
   font-size: 0.8125rem;
   font-weight: 500;
+}
+
+.search-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.search-trigger kbd {
+  justify-self: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
 }
 
 kbd {
@@ -3306,6 +3331,16 @@ kbd {
   padding-right: 2rem;
 }
 
+.dialog-title {
+  margin: 0 0 1rem;
+  padding-right: 2.5rem;
+  font-size: 1.0625rem;
+}
+
+.dialog .reveal form {
+  margin: 0;
+}
+
 .project-appearance-preview {
   display: flex;
   align-items: center;
@@ -3339,4 +3374,337 @@ kbd {
   height: auto;
   padding: 0.15rem 0.4rem 0.15rem 0.15rem;
   text-align: left;
+}
+
+/* Read-only task on the board: one clear way to edit it */
+.read-only-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.75rem 0;
+}
+
+/* Short success notes (ui/toast.tsx) */
+.toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.875rem;
+  pointer-events: auto;
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-check {
+  display: inline-grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-weight: 700;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+/* Loading placeholders (ui/Skeleton.tsx) */
+.skeleton {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0.75rem 0;
+}
+
+.skeleton-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.skeleton-board {
+  display: flex;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.skeleton-column {
+  flex: 0 0 17rem;
+  display: grid;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.skeleton-bar,
+.skeleton-block {
+  display: block;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--border) 50%, var(--surface-muted) 75%) 0 0 / 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-bar {
+  height: 0.875rem;
+}
+
+.skeleton-bar:nth-child(3n) {
+  width: 70%;
+}
+
+.skeleton-bar.short {
+  width: 40%;
+}
+
+.skeleton-block {
+  height: 5.5rem;
+}
+
+.skeleton-list .skeleton-block {
+  height: 2.5rem;
+}
+
+.skeleton-block.card {
+  height: 4.5rem;
+  background-color: var(--surface);
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar,
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+/* Start page: "Weiter, wo du warst" */
+.continue {
+  margin-bottom: 1.5rem;
+}
+
+.continue h3 {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.continue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+}
+
+.continue-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  color: inherit;
+  text-align: left;
+}
+
+.continue-item:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent-text);
+}
+
+.continue-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.continue-text {
+  display: grid;
+  min-width: 0;
+}
+
+.continue-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.continue-kind {
+  font-size: 0.75rem;
+}
+
+.continue-milestone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+.meter {
+  flex: 1 1 8rem;
+  max-width: 16rem;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+/* Project header: team and "…" on the right */
+.project-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.members-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.375rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.members-button .avatar-stack {
+  margin: 0;
+}
+
+.project-content > .panel + .panel {
+  margin-top: 1.25rem;
+}
+
+/* Date field that understands "morgen", "Fr" and "+3" (ui/DateField.tsx) */
+.date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 10rem;
+}
+
+.date-field input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  padding-right: 2.25rem;
+}
+
+.date-field input[type='text']:user-invalid {
+  border-color: var(--danger);
+}
+
+.date-field-picker {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.date-field-native {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* New project: template choice */
+.template-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.template-picker legend {
+  margin-bottom: 0.25rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.stacked-form .template-option {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.template-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.template-option input {
+  margin-top: 0.2rem;
+}
+
+.template-option span {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.template-option small {
+  font-weight: 400;
 }

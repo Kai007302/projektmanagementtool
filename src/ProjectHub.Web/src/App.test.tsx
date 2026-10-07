@@ -65,7 +65,7 @@ describe('App', () => {
     await openTeams()
 
     await screen.findByRole('button', { name: /Plattform/ })
-    expect(screen.queryByRole('button', { name: 'Team anlegen' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Team' })).not.toBeInTheDocument()
   })
 
   it('creates a team and reloads the list', async () => {
@@ -83,7 +83,8 @@ describe('App', () => {
     render(<App />)
     await openTeams()
 
-    await userEvent.type(await screen.findByLabelText('Teamname'), 'Vertrieb')
+    await userEvent.click(await screen.findByRole('button', { name: '+ Team' }))
+    await userEvent.type(screen.getByLabelText('Teamname'), 'Vertrieb')
     await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
 
     expect(await screen.findByRole('button', { name: /Vertrieb/ })).toBeInTheDocument()
@@ -98,7 +99,8 @@ describe('App', () => {
     render(<App />)
     await openTeams()
 
-    await userEvent.type(await screen.findByLabelText('Teamname'), 'Plattform')
+    await userEvent.click(await screen.findByRole('button', { name: '+ Team' }))
+    await userEvent.type(screen.getByLabelText('Teamname'), 'Plattform')
     await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('A team with this name already exists.')

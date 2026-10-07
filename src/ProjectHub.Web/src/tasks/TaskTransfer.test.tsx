@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectDetails } from '../projects/api'
 import { fakeApi, json } from '../test/fakeApi'
+import { Toaster } from '../ui/Toaster'
 import { TaskTransfer } from './TaskTransfer'
 
 function project(canContribute: boolean) {
@@ -22,7 +23,12 @@ describe('TaskTransfer', () => {
       'POST /api/v1/projects/p-1/tasks/import?dryRun=false': () => json({ rows: 2, created: 2, ignoredColumns: [], errors: [] }),
     })
     const onImported = vi.fn()
-    render(<TaskTransfer project={project(true)} onImported={onImported} />)
+    render(
+      <>
+        <TaskTransfer project={project(true)} onImported={onImported} />
+        <Toaster />
+      </>,
+    )
 
     await userEvent.click(screen.getByRole('button', { name: '+ Aufgaben importieren' }))
     await userEvent.upload(screen.getByLabelText('Aufgaben importieren (Excel oder CSV)'), file())
@@ -58,7 +64,7 @@ describe('TaskTransfer', () => {
 
     expect(await screen.findByText(/2 Probleme in der Datei/)).toBeInTheDocument()
     expect(screen.getByText('Zeile 3, Status: Status unbekannt (Offen, In Arbeit, Erledigt)')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /importieren$/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /importieren$/ })).not.toBeInTheDocument()
   })
 
   it('offers the export to everyone and the import only with write access', async () => {

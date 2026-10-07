@@ -1,0 +1,24 @@
+import { useEffect, useState } from 'react'
+import { dismiss, subscribe, type Toast } from './toast'
+import { CheckIcon, CloseIcon } from './icons'
+
+/** Shows the notes from `toast`; rendered once in the app shell (and in tests that check a note). */
+export function Toaster() {
+  const [toasts, setToasts] = useState<Toast[]>([])
+  useEffect(() => subscribe(setToasts), [])
+  return (
+    <div className="toasts" role="status" aria-live="polite">
+      {toasts.map((t) => (
+        <p key={t.id} className="toast">
+          <span className="toast-check">
+            <CheckIcon size={14} />
+          </span>
+          {t.text}
+          <button type="button" className="icon-button" aria-label="Meldung schließen" onClick={() => dismiss(t.id)}>
+            <CloseIcon />
+          </button>
+        </p>
+      ))}
+    </div>
+  )
+}

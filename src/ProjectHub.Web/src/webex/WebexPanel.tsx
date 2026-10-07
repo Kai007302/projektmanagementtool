@@ -12,6 +12,8 @@ import {
 } from './api'
 import { useLatest } from '../api/useLatest'
 import { Reveal } from '../ui/Reveal'
+import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { project: ProjectDetails; revision: number; onChanged: () => void }
 
@@ -23,6 +25,7 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
   const [kind, setKind] = useState<WebexLinkKind>('meeting')
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
   const { canEdit } = project.capabilities
 
   const latest = useLatest()
@@ -46,17 +49,27 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
     }
   }
 
-  function add(event: FormEvent) {
+  async function add(event: FormEvent, close: () => void) {
     event.preventDefault()
+    setFormError(null)
     if (!isWebexUrl(url)) {
-      setError('Bitte einen https-Link auf webex.com eingeben.')
+      setFormError('Bitte einen https-Link auf webex.com eingeben.')
       return
     }
-    void run(async () => {
+    setBusy(true)
+    try {
       await addWebexLink(project.id, kind, title, url)
       setTitle('')
       setUrl('')
-    })
+      close()
+      toast('Webex-Link gespeichert.')
+      onChanged()
+      load()
+    } catch (e) {
+      setFormError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (webex && !webex.available && webex.links.length === 0) return null
@@ -68,7 +81,7 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
       <h3 id="webex-heading">Webex</h3>
       {error && <p role="alert">{error}</p>}
       {webex === null ? (
-        <p>Wird geladen …</p>
+        <Skeleton count={2} label="Webex-Links werden geladen" />
       ) : webex.links.length === 0 ? (
         <p className="muted">Noch keine Meetings oder Spaces verknüpft.</p>
       ) : (
@@ -107,8 +120,8 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
       )}
       {canEdit && webex && (
         <Reveal label="Webex-Link">
-          {() => (
-            <form className="webex-form" aria-label="Webex-Link hinzufügen" onSubmit={add}>
+          {(close) => (
+            <form className="webex-form" aria-label="Webex-Link hinzufügen" onSubmit={(event) => void add(event, close)}>
               <label>
                 Art
                 <select value={kind} onChange={(event) => setKind(event.target.value as WebexLinkKind)} autoFocus>
@@ -130,6 +143,7 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
               <button type="submit" disabled={busy}>
                 Hinzufügen
               </button>
+              {formError && <p role="alert">{formError}</p>}
             </form>
           )}
         </Reveal>
