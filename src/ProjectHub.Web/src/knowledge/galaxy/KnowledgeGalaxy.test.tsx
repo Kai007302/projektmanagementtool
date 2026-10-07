@@ -72,7 +72,7 @@ describe('KnowledgeGalaxy', () => {
     expect(next.getByText('Ist Voraussetzung für')).toBeInTheDocument()
   })
 
-  it('opens an article beside the galaxy, follows its relations and leads to the full page', async () => {
+  it('opens an article right in the galaxy, follows its relations and leads to the full page', async () => {
     const open = vi.fn()
     fakeApi({
       'GET /api/v1/knowledge/graph': () => json(graph),
@@ -84,14 +84,16 @@ describe('KnowledgeGalaxy', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Artikel fokussieren'), 'a-1')
     await userEvent.click(within(screen.getByRole('region', { name: 'Deployment-Prozess' })).getByRole('button', { name: 'Artikel öffnen' }))
 
-    const reader = within(screen.getByRole('region', { name: 'Deployment-Prozess' }))
+    const reader = within(screen.getAllByRole('region', { name: 'Deployment-Prozess' }).find((r) => r.closest('.galaxy-popup'))!)
     expect(await reader.findByText('Erst bauen, dann ausrollen.')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Legende' })).not.toBeInTheDocument()
+    // The pop-up lies over the galaxy, beside it stay the details and the legend.
+    expect(screen.getByRole('button', { name: 'Ganze Seite öffnen' }).closest('.galaxy-popup')).not.toBeNull()
+    expect(screen.getByRole('region', { name: 'Legende' })).toBeInTheDocument()
 
     // A relation shows the other article in the same panel.
     await userEvent.click(reader.getByRole('button', { name: 'Release-Checkliste' }))
-    const next = within(screen.getByRole('region', { name: 'Release-Checkliste' }))
-    expect(await next.findByText('Changelog prüfen.')).toBeInTheDocument()
+    expect(await screen.findByText('Changelog prüfen.')).toBeInTheDocument()
+    const next = within(screen.getAllByRole('region', { name: 'Release-Checkliste' }).find((r) => r.closest('.galaxy-popup'))!)
     expect(screen.getByLabelText('Artikel fokussieren')).toHaveValue('a-3')
 
     await userEvent.click(next.getByRole('button', { name: 'Ganze Seite öffnen' }))
@@ -99,7 +101,7 @@ describe('KnowledgeGalaxy', () => {
 
     // Closing keeps the selection.
     await userEvent.click(next.getByRole('button', { name: 'Artikel schließen' }))
-    expect(screen.getByRole('region', { name: 'Legende' })).toBeInTheDocument()
+    expect(screen.queryByText('Changelog prüfen.')).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Release-Checkliste' })).toBeInTheDocument()
   })
 

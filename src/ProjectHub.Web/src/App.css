@@ -838,7 +838,7 @@ fieldset.block-fields {
     grid-template-columns: 1fr;
   }
 
-  .galaxy-layout .galaxy-reader {
+  .project-side .galaxy-reader {
     position: static;
     max-height: none;
   }
@@ -896,26 +896,63 @@ fieldset.block-fields {
   margin-bottom: 1rem;
 }
 
-/* In full screen the article lies over the galaxy on the right. */
-.galaxy-overlay-reader {
+/* The article pops up right in the galaxy; the planet moves into the free part beside it. */
+.galaxy-popup {
   position: absolute;
-  top: 3.75rem;
-  right: 1rem;
-  bottom: 2.5rem;
-  width: min(28rem, calc(100% - 2rem));
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
   pointer-events: none;
 }
 
-.galaxy-overlay-reader .galaxy-reader {
+.galaxy-popup .galaxy-reader {
   position: static;
+  box-sizing: border-box;
+  width: 100%;
   max-height: 100%;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 18px 48px rgb(18 5 42 / 0.55);
   pointer-events: auto;
+  animation: galaxy-popup-in 220ms ease-out;
 }
 
-.galaxy-overlay-reader .galaxy-reader h3 {
+.galaxy-popup.left .galaxy-reader {
+  animation-name: galaxy-popup-in-left;
+}
+
+.galaxy-popup.below .galaxy-reader {
+  animation-name: galaxy-popup-in-below;
+}
+
+.galaxy-popup .galaxy-reader h3 {
   margin: 0.25rem 0 0.5rem;
   font-size: 1.25rem;
+}
+
+@keyframes galaxy-popup-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+}
+
+@keyframes galaxy-popup-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem) scale(0.98);
+  }
+}
+
+@keyframes galaxy-popup-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galaxy-popup .galaxy-reader {
+    animation: none;
+  }
 }
 
 .galaxy-canvas {

@@ -14,7 +14,7 @@ type Props = {
 }
 
 /**
- * The article beside the galaxy: opened by double-clicking a planet or by zooming into it. Read-only; the full page
+ * The article as a pop-up in the galaxy (beside the list in the list view): opened by clicking a planet or by zooming into it. Read-only; the full page
  * with editing is one click away. Keyed by article, so each article starts fresh.
  */
 export function GalaxyReader({ graph, node, onSelect, onClose, onOpenArticle }: Props) {
@@ -33,9 +33,10 @@ export function GalaxyReader({ graph, node, onSelect, onClose, onOpenArticle }: 
     }
   }, [node.id])
 
-  // On phones the side panel sits below the galaxy; bring it into view.
+  // On phones the side panel of the list view sits below the list; bring it into view. The pop-up in the galaxy is visible anyway.
   useEffect(() => {
-    if (window.matchMedia?.('(max-width: 48rem)').matches) section.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    const element = section.current
+    if (element && !element.closest('.galaxy-popup') && window.matchMedia?.('(max-width: 48rem)').matches) element.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }, [])
 
   const neighbors = neighborsOf(graph, node.id)
