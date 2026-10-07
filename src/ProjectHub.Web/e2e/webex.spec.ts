@@ -31,6 +31,7 @@ test('an editor links a meeting and creates the project space; notifications arr
     await page.keyboard.press('Escape')
 
     await page.getByRole('button', { name }).click()
+    await page.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Webex' }).click()
     const webex = page.getByRole('region', { name: 'Webex' })
 
     // A link that is not on webex.com is refused before it reaches the server.

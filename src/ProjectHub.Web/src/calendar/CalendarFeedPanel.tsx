@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { createCalendarFeed, deleteCalendarFeed, fetchCalendarFeed, webcalUrl, type CalendarFeedStatus } from './calendar'
+import { Skeleton } from '../ui/Skeleton'
 
 const dateText = (iso: string) => new Date(iso).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -62,7 +63,7 @@ export function CalendarFeedPanel({ project }: { project?: { id: string; name: s
           ? 'Alle Aufgaben mit Termin und die Meilensteine dieses Projekts erscheinen in Outlook, Google oder Apple Kalender und aktualisieren sich von selbst.'
           : 'Deine Aufgaben mit Termin und die Meilensteine deiner Projekte erscheinen in Outlook, Google oder Apple Kalender und aktualisieren sich von selbst.'}
       </p>
-      {status === null && !error && <p>Wird geladen …</p>}
+      {status === null && !error && <Skeleton count={2} label="Kalender wird geladen" />}
       {url && (
         <div className="calendar-feed-url">
           <label htmlFor={inputId}>Deine Kalender-Adresse</label>

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectDetails } from '../projects/api'
 import { fakeApi, json } from '../test/fakeApi'
-import { Toaster } from '../ui/toast'
+import { Toaster } from '../ui/Toaster'
 import { TaskTransfer } from './TaskTransfer'
 
 function project(canContribute: boolean) {

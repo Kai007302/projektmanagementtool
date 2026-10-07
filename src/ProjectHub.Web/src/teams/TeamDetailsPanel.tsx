@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { User } from '../identity/api'
 import { addTeamMember, fetchTeam, fetchUsers, removeTeamMember, type TeamDetails, type TeamMember } from './api'
+import { Skeleton } from '../ui/Skeleton'
 
 const roleLabel: Record<TeamMember['role'], string> = { owner: 'Owner', member: 'Mitglied' }
 
@@ -25,7 +26,7 @@ export function TeamDetailsPanel({ teamId, onChanged }: { teamId: string; onChan
     }
   }
 
-  if (!team) return error ? <p role="alert">{error}</p> : <p>Team wird geladen …</p>
+  if (!team) return error ? <p role="alert">{error}</p> : <Skeleton label="Team wird geladen" />
 
   return (
     <div className="team-details">

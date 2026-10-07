@@ -8,13 +8,15 @@ import { useLatest } from '../api/useLatest'
 import { EmptyState } from '../ui/EmptyState'
 import { Reveal } from '../ui/Reveal'
 import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
+import { rememberVisit } from '../ui/recent'
 
-type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
+type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialBoardId?: string | null }
 
 /** The whiteboards of a project: list, create, rename, delete, and the selected board. */
-export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
+export function WhiteboardPanel({ project, me, revision, onChanged, initialBoardId = null }: Props) {
   const [boards, setBoards] = useState<Whiteboard[] | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialBoardId)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const { canEdit } = project.capabilities
@@ -32,6 +34,11 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
 
   // Reloads when anyone changes the project, so renamed or deleted boards show up for everyone.
   useEffect(load, [load, revision])
+
+  const selectedName = boards?.find((b) => b.id === selectedId)?.name
+  useEffect(() => {
+    if (selectedId && selectedName) rememberVisit(me.id, { kind: 'whiteboard', id: selectedId, title: selectedName, projectId: project.id })
+  }, [me.id, project.id, selectedId, selectedName])
 
   async function run(action: () => Promise<void>) {
     setError(null)
@@ -98,7 +105,7 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
       </div>
       {error && <p role="alert">{error}</p>}
       {boards === null ? (
-        <p className="muted">Whiteboards werden geladen …</p>
+        <Skeleton kind="list" count={2} label="Whiteboards werden geladen" />
       ) : !selected ? (
         <EmptyState emoji="🎨">{canEdit ? 'Noch kein Whiteboard. Lege mit „+ Whiteboard“ das erste an.' : 'Dieses Projekt hat noch kein Whiteboard.'}</EmptyState>
       ) : (

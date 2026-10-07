@@ -11,6 +11,7 @@ import {
   type NotificationPreferences,
 } from './api'
 import { EmptyState } from '../ui/EmptyState'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { onOpen: (notification: Notification) => void }
 
@@ -118,7 +119,7 @@ export function NotificationBell({ onOpen }: Props) {
           </header>
           {error && <p role="alert">{error}</p>}
           {items === null ? (
-            <p className="muted">Wird geladen …</p>
+            <Skeleton kind="list" label="Benachrichtigungen werden geladen" />
           ) : items.length === 0 ? (
             <EmptyState emoji="🔔">Keine Benachrichtigungen. Alles im Blick ✨</EmptyState>
           ) : (

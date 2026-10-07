@@ -20,6 +20,7 @@ import { ArticleView } from './ArticleView'
 import { typeColors } from './galaxy/graph'
 import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
 import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { me: Me; initialArticleId?: string | null }
 
@@ -113,7 +114,7 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
           <div className="project-layout">
             <div>
               {articles === null ? (
-                <p>Artikel werden geladen …</p>
+                <Skeleton kind="list" count={4} label="Artikel werden geladen" />
               ) : articles.length === 0 ? (
                 <EmptyState emoji="🔍" hint="Probier einen anderen Suchbegriff oder Filter.">
                   Keine Artikel gefunden.

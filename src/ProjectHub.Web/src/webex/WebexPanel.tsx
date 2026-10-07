@@ -13,6 +13,7 @@ import {
 import { useLatest } from '../api/useLatest'
 import { Reveal } from '../ui/Reveal'
 import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { project: ProjectDetails; revision: number; onChanged: () => void }
 
@@ -80,7 +81,7 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
       <h3 id="webex-heading">Webex</h3>
       {error && <p role="alert">{error}</p>}
       {webex === null ? (
-        <p>Wird geladen …</p>
+        <Skeleton count={2} label="Webex-Links werden geladen" />
       ) : webex.links.length === 0 ? (
         <p className="muted">Noch keine Meetings oder Spaces verknüpft.</p>
       ) : (

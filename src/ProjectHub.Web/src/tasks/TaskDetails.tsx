@@ -30,6 +30,7 @@ import {
 import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = {
   taskId: string
@@ -132,7 +133,7 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
       </header>
       {error && <p role="alert">{error}</p>}
       {!task ? (
-        !error && <p>Aufgabe wird geladen …</p>
+        !error && <Skeleton count={6} label="Aufgabe wird geladen" />
       ) : (
         <article className="task-details">
           <h4 id="task-heading" className="task-drawer-title">

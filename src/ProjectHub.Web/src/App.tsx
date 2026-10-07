@@ -14,7 +14,7 @@ import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import { CommandPalette } from './ui/CommandPalette'
-import { Toaster } from './ui/toast'
+import { Toaster } from './ui/Toaster'
 import './App.css'
 
 const statusText: Record<ApiStatus, string> = {

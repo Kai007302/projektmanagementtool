@@ -7,6 +7,7 @@ import { TaskDetails } from './TaskDetails'
 import { TaskTransfer } from './TaskTransfer'
 import { useLatest } from '../api/useLatest'
 import { QuickCreate } from '../ui/QuickCreate'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
 
@@ -80,7 +81,7 @@ export function TaskBoard({ project, me, revision, onChanged, initialTaskId = nu
         />
       )}
       {tasks === null ? (
-        <p>Aufgaben werden geladen …</p>
+        <Skeleton kind="list" count={5} label="Aufgaben werden geladen" />
       ) : tasks.length === 0 ? (
         <p className="muted">Noch keine Aufgaben.</p>
       ) : (

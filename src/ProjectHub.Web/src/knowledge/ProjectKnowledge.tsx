@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { articleTypeEmoji, articleTypes, fetchLinkedKnowledge, type ArticleSummary } from './api'
 import { EmptyState } from '../ui/EmptyState'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = { projectId: string; revision: number; onOpenArticle?: (id: string) => void }
 
@@ -16,7 +17,7 @@ export function ProjectKnowledge({ projectId, revision, onOpenArticle }: Props) 
     <section className="panel" aria-labelledby="project-knowledge-heading">
       <h3 id="project-knowledge-heading">Wissen</h3>
       {articles === null ? (
-        <p>Wird geladen …</p>
+        <Skeleton count={2} label="Wissen wird geladen" />
       ) : articles.length === 0 ? (
         <EmptyState emoji="📚">Noch keine Artikel mit diesem Projekt verknüpft.</EmptyState>
       ) : (

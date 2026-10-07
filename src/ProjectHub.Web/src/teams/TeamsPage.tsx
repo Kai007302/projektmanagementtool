@@ -6,6 +6,7 @@ import { TeamDetailsPanel } from './TeamDetailsPanel'
 import { EmptyState } from '../ui/EmptyState'
 import { Reveal } from '../ui/Reveal'
 import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 export function TeamsPage({ me }: { me: Me }) {
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -44,7 +45,7 @@ export function TeamsPage({ me }: { me: Me }) {
       </header>
       {error && <p role="alert">{error}</p>}
       {teams === null ? (
-        <p>Teams werden geladen …</p>
+        <Skeleton kind="tiles" label="Teams werden geladen" />
       ) : teams.length === 0 ? (
         <EmptyState emoji="👥" hint="Leg oben das erste Team an.">
           Noch keine Teams.

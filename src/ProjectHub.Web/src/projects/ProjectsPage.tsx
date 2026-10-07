@@ -10,9 +10,11 @@ import { greeting, projectLook, today } from '../ui/personality'
 import { canEditProject, createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
 import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
+import { ContinueSection } from './ContinueSection'
 import { ProjectView } from './ProjectView'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
 import { toast } from '../ui/toast'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = {
   me: Me
@@ -25,6 +27,7 @@ type Props = {
 export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(initialProjectId)
+  const [openBoard, setOpenBoard] = useState<string | null>(null)
   const [openTask, setOpenTask] = useState<{ projectId: string; taskId: string } | null>(
     initialProjectId && initialTaskId ? { projectId: initialProjectId, taskId: initialTaskId } : null,
   )
@@ -47,10 +50,13 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
         projectId={selected}
         me={me}
         initialTaskId={openTask?.projectId === selected ? openTask.taskId : null}
+        initialView={openBoard ? 'whiteboard' : 'board'}
+        initialBoardId={openBoard}
         onOpenArticle={onOpenArticle}
         onBack={() => {
           setSelected(null)
           setOpenTask(null)
+          setOpenBoard(null)
           load()
         }}
       />
@@ -67,6 +73,18 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
           setSelected(task.projectId)
         }}
       />
+      {projects && (
+        <ContinueSection
+          me={me}
+          projects={projects}
+          tasksOf={(projectId) => overview.get(projectId)?.tasks}
+          onOpenArticle={onOpenArticle}
+          onOpenProject={(projectId, boardId) => {
+            setOpenBoard(boardId ?? null)
+            setSelected(projectId)
+          }}
+        />
+      )}
       <header className="page-header">
         <h2 id="projects-heading">Projekte</h2>
         <Reveal label="Projekt" title="Neues Projekt" primary>
@@ -82,7 +100,7 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
       </header>
       {error && <p role="alert">{error}</p>}
       {projects === null ? (
-        <p>Projekte werden geladen …</p>
+        <Skeleton kind="tiles" label="Projekte werden geladen" />
       ) : projects.length === 0 ? (
         <EmptyState emoji="🚀" hint="Leg mit „+ Projekt“ dein erstes Projekt an.">
           Du bist noch in keinem Projekt.

@@ -506,14 +506,6 @@ button.danger:hover:not(:disabled) {
   background: var(--danger-soft);
 }
 
-.project-layout.wide {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.project-layout.wide .project-side {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-}
-
 .kanban-columns {
   display: flex;
   gap: 1rem;
@@ -3435,4 +3427,190 @@ kbd {
     opacity: 0;
     transform: translateY(0.5rem);
   }
+}
+
+/* Loading placeholders (ui/Skeleton.tsx) */
+.skeleton {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0.75rem 0;
+}
+
+.skeleton-tiles {
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.skeleton-board {
+  display: flex;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.skeleton-column {
+  flex: 0 0 17rem;
+  display: grid;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.skeleton-bar,
+.skeleton-block {
+  display: block;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--border) 50%, var(--surface-muted) 75%) 0 0 / 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-bar {
+  height: 0.875rem;
+}
+
+.skeleton-bar:nth-child(3n) {
+  width: 70%;
+}
+
+.skeleton-bar.short {
+  width: 40%;
+}
+
+.skeleton-block {
+  height: 5.5rem;
+}
+
+.skeleton-list .skeleton-block {
+  height: 2.5rem;
+}
+
+.skeleton-block.card {
+  height: 4.5rem;
+  background-color: var(--surface);
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-bar,
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+/* Start page: "Weiter, wo du warst" */
+.continue {
+  margin-bottom: 1.5rem;
+}
+
+.continue h3 {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.continue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+}
+
+.continue-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  color: inherit;
+  text-align: left;
+}
+
+.continue-item:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--accent-text);
+}
+
+.continue-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.continue-text {
+  display: grid;
+  min-width: 0;
+}
+
+.continue-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.continue-kind {
+  font-size: 0.75rem;
+}
+
+.continue-milestone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+.meter {
+  flex: 1 1 8rem;
+  max-width: 16rem;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+/* Project header: team and "…" on the right */
+.project-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.members-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.375rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.members-button .avatar-stack {
+  margin: 0;
+}
+
+.project-content > .panel + .panel {
+  margin-top: 1.25rem;
 }

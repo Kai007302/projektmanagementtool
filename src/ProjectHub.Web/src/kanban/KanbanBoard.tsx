@@ -24,6 +24,7 @@ import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
 import { Reveal } from '../ui/Reveal'
+import { Skeleton } from '../ui/Skeleton'
 
 type Props = {
   project: ProjectDetails
@@ -132,7 +133,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
     if (dropTarget?.columnId !== column.id) setDropTarget({ columnId: column.id, index: column.cards.length })
   }
 
-  if (!board) return error ? <p role="alert">{error}</p> : <p>Board wird geladen …</p>
+  if (!board) return error ? <p role="alert">{error}</p> : <Skeleton kind="board" label="Board wird geladen" />
 
   return (
     <section className="panel kanban" aria-labelledby="board-heading">

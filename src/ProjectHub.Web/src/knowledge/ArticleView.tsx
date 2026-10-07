@@ -24,6 +24,8 @@ import { BlockEditor } from './BlockEditor'
 import { BlockView } from './BlockView'
 import { Menu } from '../ui/Menu'
 import type { Block } from './blocks'
+import { Skeleton } from '../ui/Skeleton'
+import { rememberVisit } from '../ui/recent'
 
 type Props = { articleId: string; me: Me; startEditing?: boolean; onBack: () => void; onOpenArticle: (id: string) => void; onChanged: () => void }
 
@@ -65,6 +67,11 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
 
   useEffect(load, [load])
 
+  const title = details?.article.title
+  useEffect(() => {
+    if (title) rememberVisit(me.id, { kind: 'article', id: articleId, title })
+  }, [me.id, articleId, title])
+
   const changed = useCallback(() => {
     load()
     setRevision((r) => r + 1)
@@ -98,7 +105,7 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
         <button type="button" className="link-button" onClick={onBack}>
           ← Alle Artikel
         </button>
-        {error ? <p role="alert">{error}</p> : <p>Artikel wird geladen …</p>}
+        {error ? <p role="alert">{error}</p> : <Skeleton count={8} label="Artikel wird geladen" />}
       </section>
     )
   }
