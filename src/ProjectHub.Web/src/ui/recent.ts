@@ -25,12 +25,3 @@ export function rememberVisit(userId: string, visit: Visit) {
     // Storage may be blocked; the start page then simply shows no recent items.
   }
 }
-
-/** Removes an entry that no longer opens (deleted, or access withdrawn). */
-export function forgetVisit(userId: string, visit: Pick<Visit, 'kind' | 'id'>) {
-  try {
-    localStorage.setItem(key(userId), JSON.stringify(recentVisits(userId).filter((v) => !(v.kind === visit.kind && v.id === visit.id))))
-  } catch {
-    // See rememberVisit.
-  }
-}

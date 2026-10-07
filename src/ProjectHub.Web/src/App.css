@@ -3661,3 +3661,50 @@ kbd {
   opacity: 0;
   pointer-events: none;
 }
+
+/* New project: template choice */
+.template-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.template-picker legend {
+  margin-bottom: 0.25rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.stacked-form .template-option {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.template-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.template-option input {
+  margin-top: 0.2rem;
+}
+
+.template-option span {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.template-option small {
+  font-weight: 400;
+}

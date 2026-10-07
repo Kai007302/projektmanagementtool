@@ -11,6 +11,7 @@ import { canEditProject, createProject, fetchProjects, projectRoles, projectStat
 import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
 import { ContinueSection } from './ContinueSection'
+import { applyTemplate, projectTemplates, type ProjectTemplate } from './templates'
 import { ProjectView } from './ProjectView'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
 import { toast } from '../ui/toast'
@@ -219,19 +220,31 @@ function Greeting({ me, overview, onOpen }: { me: Me; overview: Map<string, Proj
 
 function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary) => void }) {
   const [name, setName] = useState('')
+  const [template, setTemplate] = useState<ProjectTemplate['id']>('empty')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setBusy(true)
+    let project: ProjectSummary
     try {
-      const project = await createProject(name, '')
-      toast(`Projekt „${project.name}“ angelegt. 🎉`)
-      setName('')
-      onCreated(project)
+      project = await createProject(name, '')
     } catch (e) {
       setError((e as Error).message)
+      setBusy(false)
+      return
     }
+    try {
+      await applyTemplate(project.id, projectTemplates.find((t) => t.id === template)!)
+      toast(`Projekt „${project.name}“ angelegt. 🎉`)
+    } catch {
+      toast(`Projekt „${project.name}“ angelegt. Die Vorlage wurde nicht vollständig übernommen.`)
+    }
+    setName('')
+    setBusy(false)
+    onCreated(project)
   }
 
   return (
@@ -240,7 +253,21 @@ function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary)
         Name des Projekts
         <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
       </label>
-      <button type="submit">Projekt anlegen</button>
+      <fieldset className="template-picker">
+        <legend>Vorlage</legend>
+        {projectTemplates.map((option) => (
+          <label key={option.id} className="template-option">
+            <input type="radio" name="template" value={option.id} checked={template === option.id} onChange={() => setTemplate(option.id)} />
+            <span>
+              <strong>{option.name}</strong>
+              <small className="muted">{option.description}</small>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <button type="submit" disabled={busy}>
+        {busy ? 'Wird angelegt …' : 'Projekt anlegen'}
+      </button>
       {error && <p role="alert">{error}</p>}
     </form>
   )
