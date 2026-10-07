@@ -3,10 +3,10 @@ import type { Block } from './blocks'
 
 export type ArticleType = 'article' | 'how_to' | 'best_practice' | 'process' | 'policy' | 'faq' | 'template' | 'checklist' | 'glossary'
 export type ArticleStatus = 'draft' | 'review' | 'published' | 'archived'
-export type Visibility = 'organization' | 'restricted'
+export type Visibility = 'organization' | 'department' | 'restricted'
 export type Grant = 'view' | 'edit' | 'admin'
 export type RelationType = 'RELATED' | 'REQUIRES' | 'PART_OF' | 'SUPERSEDES' | 'REFERENCES'
-export type ResourceType = 'project' | 'task' | 'team' | 'whiteboard'
+export type ResourceType = 'project' | 'task' | 'department' | 'whiteboard'
 
 export const articleTypes: Record<ArticleType, string> = {
   article: 'Artikel',
@@ -40,9 +40,11 @@ export const articleStatuses: Record<ArticleStatus, string> = {
   archived: 'Archiviert',
 }
 
+/** Published articles are read by these people (ADR 0021); drafts only by their author and those with a grant. */
 export const visibilities: Record<Visibility, string> = {
+  department: 'Abteilung (sobald veröffentlicht)',
   organization: 'Ganze Organisation (sobald veröffentlicht)',
-  restricted: 'Nur freigegebene Personen und Teams',
+  restricted: 'Nur freigegebene Personen und Abteilungen',
 }
 
 export const grants: Record<Grant, string> = { view: 'Lesen', edit: 'Bearbeiten', admin: 'Verwalten' }
@@ -55,7 +57,7 @@ export const relationTypes: Record<RelationType, { outgoing: string; incoming: s
   REFERENCES: { outgoing: 'Verweist auf', incoming: 'Referenziert von' },
 }
 
-export const resourceTypes: Record<ResourceType, string> = { project: 'Projekt', task: 'Aufgabe', team: 'Team', whiteboard: 'Whiteboard' }
+export const resourceTypes: Record<ResourceType, string> = { project: 'Projekt', task: 'Aufgabe', department: 'Abteilung', whiteboard: 'Whiteboard' }
 
 export type ArticleSummary = {
   id: string
@@ -73,6 +75,8 @@ export type ArticleSummary = {
   updatedAt: string
   publishedAt: string | null
   version: number
+  departmentId?: string | null
+  departmentName?: string | null
 }
 
 export type Relation = { id: string; relationType: RelationType; direction: 'outgoing' | 'incoming'; articleId: string; title: string; articleType: ArticleType }
@@ -84,18 +88,19 @@ export type ArticleDetails = {
   content: { blocks: Block[] }
   versionNumber: number
   reviewDueAt: string | null
-  capabilities: { canEdit: boolean; canAdmin: boolean }
+  /** canShareWithOrganization: organization admins and leads of the article's department (ADR 0021). */
+  capabilities: { canEdit: boolean; canAdmin: boolean; canShareWithOrganization?: boolean }
   relations: Relation[]
   references: Reference[]
 }
 
 export type VersionSummary = { id: string; versionNumber: number; createdBy: string; createdByName: string | null; changeNote: string | null; createdAt: string }
 
-export type Space = { id: string; name: string; description: string | null; articleCount: number; version: number }
+export type Space = { id: string; name: string; description: string | null; articleCount: number; version: number; departmentId?: string | null }
 
 export type Tag = { name: string; articleCount: number }
 
-export type Permission = { principalType: 'user' | 'team'; principalId: string; name: string; permission: Grant }
+export type Permission = { principalType: 'user' | 'department'; principalId: string; name: string; permission: Grant }
 
 export type KnowledgeComment = {
   id: string
@@ -108,7 +113,7 @@ export type KnowledgeComment = {
   version: number
 }
 
-export type ArticleFilter = { q?: string; type?: string; status?: string; spaceId?: string; tag?: string }
+export type ArticleFilter = { q?: string; type?: string; status?: string; spaceId?: string; tag?: string; departmentId?: string }
 
 const base = '/api/v1/knowledge'
 
@@ -120,7 +125,15 @@ export function searchArticles(filter: ArticleFilter) {
 
 export const fetchArticle = (id: string) => apiFetch<ArticleDetails>(`${base}/articles/${id}`)
 
-export type NewArticle = { title: string; articleType: ArticleType; summary: string; spaceId: string | null; visibility: Visibility }
+export type NewArticle = {
+  title: string
+  articleType: ArticleType
+  summary: string
+  spaceId: string | null
+  visibility: Visibility
+  /** Without one the article goes to the space's department, else my first department. */
+  departmentId?: string | null
+}
 
 export const createArticle = (article: NewArticle) => apiFetch<ArticleDetails>(`${base}/articles`, { method: 'POST', body: jsonBody(article) })
 
@@ -146,10 +159,11 @@ export const setTags = (id: string, tags: string[]) => apiFetch<ArticleDetails>(
 
 export const fetchTags = () => apiFetch<Tag[]>(`${base}/tags`)
 
-export const fetchSpaces = () => apiFetch<Space[]>(`${base}/spaces`)
+/** The knowledge spaces I can see; with a department only those of that department. */
+export const fetchSpaces = (departmentId = '') => apiFetch<Space[]>(`${base}/spaces${departmentId ? `?departmentId=${departmentId}` : ''}`)
 
-export const createSpace = (name: string, description: string) =>
-  apiFetch<Space>(`${base}/spaces`, { method: 'POST', body: jsonBody({ name, description }) })
+export const createSpace = (name: string, description: string, departmentId = '') =>
+  apiFetch<Space>(`${base}/spaces`, { method: 'POST', body: jsonBody({ name, description, departmentId: departmentId || null }) })
 
 export const fetchPermissions = (id: string) => apiFetch<Permission[]>(`${base}/articles/${id}/permissions`)
 
@@ -173,6 +187,6 @@ export const addKnowledgeComment = (id: string, content: string, mentionedUserId
 
 export const deleteKnowledgeComment = (commentId: string) => apiFetch<void>(`${base}/comments/${commentId}`, { method: 'DELETE' })
 
-/** Visible articles that reference a project, task or team. */
+/** Visible articles that reference a project, task or department. */
 export const fetchLinkedKnowledge = (resourceType: ResourceType, id: string) =>
   apiFetch<ArticleSummary[]>(`/api/v1/${resourceType}s/${id}/knowledge`)

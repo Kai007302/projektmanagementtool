@@ -4,6 +4,7 @@ using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Audit;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Projects;
@@ -186,14 +187,17 @@ public sealed class TaskTransferService(
 
     /// <summary>
     /// The people who may be assigned tasks in the project (as <see cref="IProjectHubAuthorization.CanBeAssignedAsync"/>):
-    /// active users of the organization who are organization admins or members with a contributing role.
+    /// active users of the organization who are organization admins, leads of the project's department or members with
+    /// a contributing role.
     /// </summary>
     private async Task<AssignablePeople> AssignablePeopleAsync(UserContext user, Guid projectId, CancellationToken ct)
     {
         var contributing = new[] { ProjectRole.Admin, ProjectRole.Editor, ProjectRole.Member };
+        var departmentId = await db.Set<Project>().Where(p => p.Id == projectId).Select(p => p.DepartmentId).SingleAsync(ct);
         var people = await db.Set<AppUser>().AsNoTracking()
             .Where(u => u.OrganizationId == user.OrganizationId && u.Status == UserStatus.Active)
             .Where(u => u.OrganizationRole == OrganizationRole.Admin
+                        || db.Set<DepartmentMember>().Any(m => m.DepartmentId == departmentId && m.UserId == u.Id && m.Role == DepartmentRole.Lead)
                         || db.Set<ProjectMember>().Any(m => m.ProjectId == projectId && m.UserId == u.Id && contributing.Contains(m.Role)))
             .Select(u => new { u.Id, u.Email, u.DisplayName })
             .ToListAsync(ct);

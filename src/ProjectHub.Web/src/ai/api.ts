@@ -40,7 +40,7 @@ export const toolText: Record<string, string> = {
   list_tasks: 'Sieht die Aufgaben an …',
   get_task: 'Liest eine Aufgabe …',
   find_people: 'Sucht Personen …',
-  list_teams: 'Sieht die Teams an …',
+  list_departments: 'Sieht die Abteilungen an …',
   list_knowledge_spaces: 'Sieht die Wissensbereiche an …',
 }
 

@@ -6,7 +6,7 @@ ProjectHub ist eine browserbasierte interne Projektmanagement- und Collaboration
 
 ## Kernfunktionen
 
-- Organisationen, Benutzer, Teams
+- Organisationen, Abteilungen, Benutzer
 - Projekte
 - Aufgaben und Subtasks
 - Kommentare und @Mentions
@@ -21,7 +21,7 @@ ProjectHub ist eine browserbasierte interne Projektmanagement- und Collaboration
 - Knowledge Hub
 - Knowledge Galaxy (animierte Knowledge-Graph-Darstellung)
 - Knowledge Articles, How-Tos, Best Practices, Prozesse, FAQs, Checklisten und Templates
-- Beziehungen zwischen Wissen, Projekten, Tasks, Teams und Whiteboards
+- Beziehungen zwischen Wissen, Projekten, Tasks, Abteilungen und Whiteboards
 - semantische Suche / AI-RAG als optional aktivierbare Schicht
 
 ## Integrationen

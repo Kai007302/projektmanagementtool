@@ -19,6 +19,9 @@ public sealed class AppUser
 
     /// <summary>Set when the person was anonymized (Art. 17 GDPR, ADR 0017); the row then identifies nobody.</summary>
     public DateTimeOffset? AnonymizedAt { get; set; }
+
+    /// <summary>Hash of the Entra groups at the last department sync (ADR 0021); null makes the next sign-in sync.</summary>
+    public string? EntraGroupsHash { get; set; }
     public long Version { get; set; }
 }
 

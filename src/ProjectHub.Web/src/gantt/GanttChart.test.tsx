@@ -7,7 +7,7 @@ import { fakeApi, json } from '../test/fakeApi'
 import type { Gantt, GanttTask } from './api'
 import { GanttChart } from './GanttChart'
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 
 const all = { canContribute: true, canEdit: true, canManage: true }
 const memberRights = { canContribute: true, canEdit: false, canManage: false }

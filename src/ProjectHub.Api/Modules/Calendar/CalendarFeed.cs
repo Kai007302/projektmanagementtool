@@ -45,7 +45,13 @@ public sealed record CalendarFeedCreated(string Url, DateTimeOffset CreatedAt);
 /// milestones of the projects they are a member of. Calendar programs fetch it without signing in, so the address
 /// carries a random token; access to every entry is checked again on each fetch, as for the person themselves.
 /// </summary>
-public sealed class CalendarFeedService(ProjectHubDbContext db, ProjectAccess projectAccess, IAuditLog audit, NotificationOptions app, TimeProvider clock)
+public sealed class CalendarFeedService(
+    ProjectHubDbContext db,
+    ProjectAccess projectAccess,
+    IProjectHubAuthorization authorization,
+    IAuditLog audit,
+    NotificationOptions app,
+    TimeProvider clock)
 {
     public const string FeedPath = "/api/v1/calendar-feed.ics";
     public const int MaxEntries = 1_000;
@@ -214,9 +220,7 @@ public sealed class CalendarFeedService(ProjectHubDbContext db, ProjectAccess pr
         var memberships = db.Set<ProjectMember>().Where(m => m.OrganizationId == user.OrganizationId && m.UserId == user.UserId);
 
         // Tasks: assigned to the person, in projects they can still see (organization admins see all of them).
-        var visibleProjects = user.IsOrganizationAdmin
-            ? activeProjects
-            : activeProjects.Where(p => memberships.Any(m => m.ProjectId == p.Id));
+        var visibleProjects = authorization.VisibleProjects(user);
         var tasks = await (
                 from task in db.Set<ProjectTask>().AsNoTracking()
                 join project in visibleProjects on task.ProjectId equals project.Id

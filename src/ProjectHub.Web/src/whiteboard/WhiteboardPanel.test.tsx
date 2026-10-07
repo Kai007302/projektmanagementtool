@@ -21,7 +21,7 @@ vi.mock('./sync', () => ({
   }),
 }))
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 
 const all = { canContribute: true, canEdit: true, canManage: true }
 const viewerRights = { canContribute: false, canEdit: false, canManage: false }

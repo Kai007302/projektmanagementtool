@@ -12,6 +12,12 @@ public sealed class Project : IVersioned
     public string? Description { get; set; }
     public string Status { get; set; } = ProjectStatus.Active;
     public Guid OwnerId { get; set; }
+
+    /// <summary>The department the project belongs to (ADR 0021).</summary>
+    public Guid DepartmentId { get; set; }
+
+    /// <summary><see cref="ProjectVisibility"/>: who sees the project beyond its members.</summary>
+    public string Visibility { get; set; } = ProjectVisibility.Department;
     public DateOnly? StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
 
@@ -36,6 +42,21 @@ public static class ProjectStatus
     public const string Archived = "archived";
 
     public static readonly IReadOnlyList<string> All = [Planned, Active, OnHold, Completed, Archived];
+}
+
+/// <summary>Who sees a project beyond its members, the department's leads and organization admins (ADR 0021).</summary>
+public static class ProjectVisibility
+{
+    /// <summary>Only members, the department's leads and organization admins.</summary>
+    public const string Private = "private";
+
+    /// <summary>Additionally every lead and member of the department, read-only.</summary>
+    public const string Department = "department";
+
+    /// <summary>Additionally everyone in the organization, read-only.</summary>
+    public const string Organization = "organization";
+
+    public static readonly IReadOnlyList<string> All = [Private, Department, Organization];
 }
 
 public sealed class ProjectMember

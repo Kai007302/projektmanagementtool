@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { fetchAiStatus, type AiStatus } from './ai/api'
 import { AssistantPage } from './ai/AssistantPage'
 import { fetchApiStatus, type ApiStatus } from './api/health'
+import { AdminPage } from './departments/AdminPage'
+import { managesAnything, readDepartment, rememberDepartment } from './departments/currentDepartment'
+import { DepartmentSwitcher } from './departments/DepartmentSwitcher'
 import { fetchMe, fetchOrganization, type Me, type Organization } from './identity/api'
 import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
@@ -12,7 +15,6 @@ import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
 import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
-import { TeamsPage } from './teams/TeamsPage'
 import { CommandPalette } from './ui/CommandPalette'
 import { Toaster } from './ui/Toaster'
 import './App.css'
@@ -31,9 +33,9 @@ const roleText: Record<Me['organizationRole'], string> = {
 
 type Session = { me: Me; organization: Organization; ai: AiStatus | null }
 
-type Tab = 'projects' | 'knowledge' | 'teams' | 'assistant'
+type Tab = 'projects' | 'knowledge' | 'admin' | 'assistant'
 
-const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', teams: 'Teams', assistant: 'Assistent' }
+const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', admin: 'Verwaltung', assistant: 'Assistent' }
 
 function App() {
   const [status, setStatus] = useState<ApiStatus>('checking')
@@ -45,6 +47,9 @@ function App() {
   // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
   const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  // The department whose projects and knowledge are shown; '' for all (ADR 0021).
+  const [department, setDepartment] = useState('')
+  const [meRevision, setMeRevision] = useState(0)
 
   // Ctrl+K (Cmd+K on a Mac) opens the search from anywhere, like in Linear or Notion.
   useEffect(() => {
@@ -67,7 +72,11 @@ function App() {
   useEffect(() => {
     let current = true
     Promise.all([fetchMe(), fetchOrganization(), fetchAiStatus().catch(() => null)]).then(
-      ([me, organization, ai]) => current && setSession({ me, organization, ai }),
+      ([me, organization, ai]) => {
+        if (!current) return
+        setSession({ me, organization, ai })
+        setDepartment(readDepartment(me))
+      },
       (e: Error) => current && setError(e.message),
     )
     return () => {
@@ -75,8 +84,20 @@ function App() {
     }
   }, [devUser])
 
+  // Department memberships changed in the administration: reload who I am, keeping the page as it is.
+  useEffect(() => {
+    if (meRevision === 0) return
+    let current = true
+    fetchMe().then((me) => current && setSession((s) => (s ? { ...s, me } : s)), () => {})
+    return () => {
+      current = false
+    }
+  }, [meRevision])
+
   function openNotification(notification: Notification) {
-    if (notification.resourceType === 'knowledge_article' && notification.resourceId) {
+    if (notification.resourceType === 'user') {
+      goTo('admin')
+    } else if (notification.resourceType === 'knowledge_article' && notification.resourceId) {
       showArticle(notification.resourceId)
     } else if (notification.projectId) {
       showProject(notification.projectId, notification.resourceType === 'task' ? notification.resourceId : null)
@@ -99,7 +120,19 @@ function App() {
     setTab('knowledge')
   }
 
-  const tabs = session ? (Object.keys(tabText) as Tab[]).filter((value) => value !== 'assistant' || session.ai?.enabled) : []
+  const tabs = session
+    ? (Object.keys(tabText) as Tab[]).filter(
+        (value) => (value !== 'assistant' || session.ai?.enabled) && (value !== 'admin' || managesAnything(session.me)),
+      )
+    : []
+
+  function switchDepartment(departmentId: string) {
+    if (!session) return
+    rememberDepartment(session.me, departmentId)
+    setDepartment(departmentId)
+    setOpenArticle(null)
+    setOpenProject(null)
+  }
 
   function switchUser(objectId: string) {
     setDevUser(objectId)
@@ -148,6 +181,7 @@ function App() {
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
               <div className="account-row">
+                <DepartmentSwitcher me={session.me} value={department} onChange={switchDepartment} />
                 <NotificationBell key={session.me.id} onOpen={openNotification} />
                 <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} onSignOut={signedInWithEntra() ? () => void signOut() : undefined} />
               </div>
@@ -162,19 +196,30 @@ function App() {
       </header>
       <main className="content">
         {error && <p role="alert">{error}</p>}
+        {session && session.me.departments.length === 0 && session.me.organizationRole !== 'admin' && (
+          <div className="notice" role="status">
+            <strong>Du bist noch keiner Abteilung zugeordnet.</strong> Die Abteilungsleitungen und Admins wissen Bescheid und nehmen dich auf.
+            Bis dahin siehst du die Projekte, zu denen du eingeladen bist, und was für die ganze Organisation freigegeben ist.
+          </div>
+        )}
         {session && (
           <>
             {tab === 'projects' && (
               <ProjectsPage
-                key={`${session.me.id}:${openProject?.jump ?? 0}`}
+                key={`${session.me.id}:${department}:${openProject?.jump ?? 0}`}
                 me={session.me}
+                departmentId={department}
                 initialProjectId={openProject?.projectId ?? null}
                 initialTaskId={openProject?.taskId ?? null}
                 onOpenArticle={showArticle}
               />
             )}
-            {tab === 'knowledge' && <KnowledgePage key={`${session.me.id}:${openArticle}`} me={session.me} initialArticleId={openArticle} />}
-            {tab === 'teams' && <TeamsPage key={session.me.id} me={session.me} />}
+            {tab === 'knowledge' && (
+              <KnowledgePage key={`${session.me.id}:${department}:${openArticle}`} me={session.me} departmentId={department} initialArticleId={openArticle} />
+            )}
+            {tab === 'admin' && managesAnything(session.me) && (
+              <AdminPage key={session.me.id} me={session.me} onChanged={() => setMeRevision((r) => r + 1)} />
+            )}
             {tab === 'assistant' && session.ai?.enabled && (
               <AssistantPage
                 key={session.me.id}

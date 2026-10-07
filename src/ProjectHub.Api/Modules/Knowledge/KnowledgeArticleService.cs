@@ -35,7 +35,8 @@ public sealed record CreateArticleRequest(
     string? Summary,
     Guid? SpaceId,
     string? Visibility,
-    JsonObject? Content);
+    JsonObject? Content,
+    Guid? DepartmentId = null);
 
 public sealed record SaveContentRequest(long? Version, JsonObject? Content, string? ChangeNote);
 
@@ -61,6 +62,7 @@ public sealed class KnowledgeArticleService(
     KnowledgeAccess access,
     KnowledgeLinkService links,
     IAuditLog audit,
+    IProjectHubAuthorization authorization,
     TimeProvider clock)
 {
     public const int MaxTitleLength = 300;
@@ -86,24 +88,57 @@ public sealed class KnowledgeArticleService(
     public async Task<ServiceResult<ArticleDetails>> GetAsync(UserContext user, Guid articleId, CancellationToken ct)
     {
         var (article, reader, right, failure) = await access.RequireAsync(user, articleId, KnowledgeRight.View, ct);
-        return failure ?? (ServiceResult<ArticleDetails>)await DetailsAsync(user, reader, article!, right, ct);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        await access.RecordAdminAccessAsync(user, reader, article!, ct);
+        await db.SaveChangesAsync(ct);
+        return await DetailsAsync(user, reader, article!, right, ct);
     }
 
-    /// <summary>Any active member creates articles and becomes their owner; new articles start as drafts.</summary>
+    /// <summary>
+    /// Leads and members of a department create articles in it and become their owner; new articles start as drafts.
+    /// Without a department the article goes to the space's department, else to the caller's first one (ADR 0021).
+    /// </summary>
     public async Task<ServiceResult<ArticleDetails>> CreateAsync(UserContext user, CreateArticleRequest request, CancellationToken ct)
     {
+        var departmentId = request.DepartmentId
+                           ?? (request.SpaceId is { } requestedSpace
+                               ? await db.Set<KnowledgeSpace>().Where(s => s.Id == requestedSpace && s.OrganizationId == user.OrganizationId)
+                                   .Select(s => (Guid?)s.DepartmentId).SingleOrDefaultAsync(ct)
+                               : null)
+                           ?? await db.Set<Departments.DepartmentMember>()
+                               .Where(m => m.OrganizationId == user.OrganizationId && m.UserId == user.UserId && DepartmentRole.Working.Contains(m.Role))
+                               .OrderBy(m => m.CreatedAt).ThenBy(m => m.DepartmentId)
+                               .Select(m => (Guid?)m.DepartmentId)
+                               .FirstOrDefaultAsync(ct);
+        if (departmentId is null)
+        {
+            return ServiceFailure.Invalid("departmentId", "Required: you belong to no department you can write articles in.");
+        }
+
+        if (!await authorization.CanCreateInDepartmentAsync(user, departmentId.Value, ct))
+        {
+            return await db.Set<Departments.Department>().AnyAsync(d => d.Id == departmentId && d.OrganizationId == user.OrganizationId, ct)
+                ? ServiceFailure.Forbidden("Only leads and members of the department write articles in it.")
+                : ServiceFailure.Invalid("departmentId", "Must be a department of the organization.");
+        }
+
         var now = clock.GetUtcNow();
         var article = new KnowledgeArticle
         {
             Id = Guid.CreateVersion7(),
             OrganizationId = user.OrganizationId,
             KnowledgeSpaceId = request.SpaceId,
+            DepartmentId = departmentId.Value,
             Title = request.Title?.Trim() ?? string.Empty,
             Slug = string.Empty,
             ArticleType = request.ArticleType ?? "article",
             Summary = Normalize(request.Summary),
             OwnerId = user.UserId,
-            Visibility = request.Visibility ?? KnowledgeVisibility.Organization,
+            Visibility = request.Visibility ?? KnowledgeVisibility.Department,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -121,6 +156,11 @@ public sealed class KnowledgeArticleService(
         }
 
         var reader = await access.ReaderAsync(user, ct);
+        if (article.Visibility == KnowledgeVisibility.Organization && !KnowledgeAccess.CanShareWithOrganization(reader, article.DepartmentId))
+        {
+            return ServiceFailure.Forbidden("Only the department's leads and organization admins share articles with the whole organization.");
+        }
+
         if (await links.ValidateBlockReferencesAsync(user, reader, content.References, ct) is { } referenceError)
         {
             return referenceError;
@@ -167,17 +207,39 @@ public sealed class KnowledgeArticleService(
             || !patch.TryApply<string>("articleType", v => article.ArticleType = v ?? string.Empty, changed, out error)
             || !patch.TryApply<Guid?>("spaceId", v => article.KnowledgeSpaceId = v, changed, out error)
             || !patch.TryApply<string>("visibility", v => article.Visibility = v ?? string.Empty, changed, out error)
+            || !patch.TryApply<Guid?>("departmentId", v => article.DepartmentId = v ?? Guid.Empty, changed, out error)
             || !patch.TryApply<DateOnly?>("reviewDueAt", v => article.ReviewDueAt = v, changed, out error))
         {
             return error!;
         }
 
-        if (changed.Contains("visibility") && right < KnowledgeRight.Admin)
+        if ((changed.Contains("visibility") || changed.Contains("departmentId")) && right < KnowledgeRight.Admin)
         {
-            return ServiceFailure.Forbidden("Only article admins change the visibility.");
+            return ServiceFailure.Forbidden("Only article admins change the visibility or the department.");
         }
 
-        if (await ValidateAsync(user, article, changed.Contains("spaceId"), ct) is { } invalid)
+        if (changed.Contains("departmentId") && !await authorization.CanCreateInDepartmentAsync(user, article.DepartmentId, ct))
+        {
+            return await db.Set<Departments.Department>().AnyAsync(d => d.Id == article.DepartmentId && d.OrganizationId == user.OrganizationId, ct)
+                ? ServiceFailure.Forbidden("Articles can only be moved to departments you work in.")
+                : ServiceFailure.Invalid("departmentId", "Must be a department of the organization.");
+        }
+
+        if (changed.Contains("departmentId") && !changed.Contains("spaceId"))
+        {
+            // Spaces belong to one department; a moved article leaves its old one.
+            article.KnowledgeSpaceId = null;
+        }
+
+        // Moving to another department, or (re)sharing with the organization, is decided by the target department.
+        if ((changed.Contains("visibility") || changed.Contains("departmentId"))
+            && article.Visibility == KnowledgeVisibility.Organization
+            && !KnowledgeAccess.CanShareWithOrganization(reader, article.DepartmentId))
+        {
+            return ServiceFailure.Forbidden("Only the department's leads and organization admins share articles with the whole organization.");
+        }
+
+        if (await ValidateAsync(user, article, changed.Contains("spaceId") || changed.Contains("departmentId"), ct) is { } invalid)
         {
             return invalid;
         }
@@ -190,9 +252,9 @@ public sealed class KnowledgeArticleService(
             }
 
             db.Touch(article, expectedVersion, clock.GetUtcNow());
-            if (changed.Contains("visibility"))
+            if (changed.Contains("visibility") || changed.Contains("departmentId"))
             {
-                audit.Record(user, AuditActions.KnowledgeVisibilityChanged, "knowledge_article", article.Id, new { article.Visibility });
+                audit.Record(user, AuditActions.KnowledgeVisibilityChanged, "knowledge_article", article.Id, new { article.Visibility, article.DepartmentId });
             }
 
             if (await SaveVersionedUniqueAsync(article, ct) is { } conflict)
@@ -450,10 +512,10 @@ public sealed class KnowledgeArticleService(
 
         foreach (var entry in entries)
         {
-            if (entry.PrincipalType is not ("user" or "team") || entry.PrincipalId is null
+            if (entry.PrincipalType is not (KnowledgePrincipal.User or KnowledgePrincipal.Department) || entry.PrincipalId is null
                 || entry.Permission is null || !KnowledgeGrant.All.Contains(entry.Permission))
             {
-                return ServiceFailure.Invalid("permissions", "Each entry needs principalType user|team, principalId and permission view|edit|admin.");
+                return ServiceFailure.Invalid("permissions", "Each entry needs principalType user|department, principalId and permission view|edit|admin.");
             }
         }
 
@@ -462,13 +524,13 @@ public sealed class KnowledgeArticleService(
             return ServiceFailure.Invalid("permissions", "Each principal may appear only once.");
         }
 
-        var userIds = entries.Where(e => e.PrincipalType == "user").Select(e => e.PrincipalId!.Value).ToList();
-        var teamIds = entries.Where(e => e.PrincipalType == "team").Select(e => e.PrincipalId!.Value).ToList();
+        var userIds = entries.Where(e => e.PrincipalType == KnowledgePrincipal.User).Select(e => e.PrincipalId!.Value).ToList();
+        var departmentIds = entries.Where(e => e.PrincipalType == KnowledgePrincipal.Department).Select(e => e.PrincipalId!.Value).ToList();
         var knownUsers = await db.Set<AppUser>().CountAsync(u => u.OrganizationId == user.OrganizationId && userIds.Contains(u.Id), ct);
-        var knownTeams = await db.Set<Teams.Team>().CountAsync(t => t.OrganizationId == user.OrganizationId && teamIds.Contains(t.Id), ct);
-        if (knownUsers != userIds.Count || knownTeams != teamIds.Count)
+        var knownDepartments = await db.Set<Departments.Department>().CountAsync(d => d.OrganizationId == user.OrganizationId && departmentIds.Contains(d.Id), ct);
+        if (knownUsers != userIds.Count || knownDepartments != departmentIds.Count)
         {
-            return ServiceFailure.Invalid("permissions", "Users and teams must belong to the organization.");
+            return ServiceFailure.Invalid("permissions", "Users and departments must belong to the organization.");
         }
 
         var now = clock.GetUtcNow();
@@ -503,7 +565,8 @@ public sealed class KnowledgeArticleService(
             current is null ? BlockContent.Empty() : ParseContent(current.ContentJson),
             current?.VersionNumber ?? 0,
             article.ReviewDueAt,
-            new KnowledgeCapabilities(right >= KnowledgeRight.Edit, right >= KnowledgeRight.Admin),
+            new KnowledgeCapabilities(
+                right >= KnowledgeRight.Edit, right >= KnowledgeRight.Admin, KnowledgeAccess.CanShareWithOrganization(reader, article.DepartmentId)),
             await links.RelationsOfAsync(reader, article.Id, ct),
             await links.ReferencesOfAsync(user, article.Id, ct));
     }
@@ -566,11 +629,11 @@ public sealed class KnowledgeArticleService(
         var grants = await db.Set<KnowledgePermission>().AsNoTracking().Where(p => p.ArticleId == articleId).ToListAsync(ct);
         var ids = grants.Select(g => g.PrincipalId).ToList();
         var users = await db.Set<AppUser>().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct);
-        var teams = await db.Set<Teams.Team>().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name, ct);
+        var departments = await db.Set<Departments.Department>().Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.Name, ct);
         return grants
             .Select(g => new PermissionResponse(
                 g.PrincipalType, g.PrincipalId,
-                (g.PrincipalType == "user" ? users.GetValueOrDefault(g.PrincipalId) : teams.GetValueOrDefault(g.PrincipalId)) ?? "?",
+                (g.PrincipalType == KnowledgePrincipal.User ? users.GetValueOrDefault(g.PrincipalId) : departments.GetValueOrDefault(g.PrincipalId)) ?? "?",
                 g.Permission))
             .OrderBy(p => p.PrincipalType).ThenBy(p => p.Name)
             .ToList();
@@ -599,9 +662,10 @@ public sealed class KnowledgeArticleService(
         }
 
         if (spaceChanged && article.KnowledgeSpaceId is { } spaceId
-            && !await db.Set<KnowledgeSpace>().AnyAsync(s => s.Id == spaceId && s.OrganizationId == user.OrganizationId, ct))
+            && !await db.Set<KnowledgeSpace>().AnyAsync(
+                s => s.Id == spaceId && s.OrganizationId == user.OrganizationId && s.DepartmentId == article.DepartmentId, ct))
         {
-            return ServiceFailure.Invalid("spaceId", "Must be a knowledge space of the organization.");
+            return ServiceFailure.Invalid("spaceId", "Must be a knowledge space of the article's department.");
         }
 
         return null;

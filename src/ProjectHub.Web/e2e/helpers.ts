@@ -4,7 +4,7 @@ import { expect, type Page } from '@playwright/test'
 export const cspViolations: string[] = []
 
 /** Signs in as one of the synthetic development users (DevelopmentSeedData) and opens a tab. */
-export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | 'Wissen' | 'Teams' | 'Assistent' = 'Wissen') {
+export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | 'Wissen' | 'Verwaltung' | 'Assistent' = 'Wissen') {
   page.on('console', (message) => {
     if (message.type() === 'error' && message.text().includes('Content Security Policy')) cspViolations.push(message.text())
   })

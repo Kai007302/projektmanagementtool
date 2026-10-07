@@ -5,7 +5,7 @@ import type { Me } from '../identity/api'
 import { fakeApi, json } from '../test/fakeApi'
 import { KnowledgePage } from './KnowledgePage'
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 const empty = { items: [], nextOffset: null }
 
 const summary = {
@@ -62,7 +62,7 @@ function routes(article = details()) {
     'GET /api/v1/knowledge/articles/a-1/permissions': () => json([]),
     'GET /api/v1/projects/p-1': () => json({ id: 'p-1', name: 'Intranet-Relaunch' }),
     'GET /api/v1/users?limit=100': () => json(empty),
-    'GET /api/v1/teams?limit=100': () => json(empty),
+    'GET /api/v1/departments?limit=100': () => json(empty),
     'GET /api/v1/projects?limit=100': () => json(empty),
   }
 }
@@ -205,7 +205,8 @@ describe('KnowledgePage', () => {
       articleType: 'article',
       summary: '',
       spaceId: null,
-      visibility: 'organization',
+      visibility: 'department',
+      departmentId: null,
     })
   })
 })

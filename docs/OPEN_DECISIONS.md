@@ -7,24 +7,24 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-001 | Azure Region | offen | Deutschland / Unternehmensvorgabe |
 | DEC-002 | Azure Hosting | offen | App Service oder Container Apps |
 | DEC-003 | System-Mailbox | offen | dediziertes Funktionspostfach |
-| DEC-004 | Entra Gruppenmodell | offen | Teams/Abteilungen über Entra Groups, wo sinnvoll |
+| DEC-004 | Entra Gruppenmodell | entschieden (Kai, 2026-10-07) | Abteilungen lassen sich mit je einer Entra-Sicherheitsgruppe verbinden; Mitgliedschaften kommen aus dem `groups`-Claim, wenn `PROJECTHUB_DEPARTMENTS_FROM_ENTRA_GROUPS=true` (ADR 0021) |
 | DEC-005 | Datenretention | entschieden (Kai, 2026-10-05), vorerst | Benachrichtigungen, Projektaktivität und Audit-Log je 3 Jahre (1095 Tage), einstellbar über `PROJECTHUB_RETENTION_*` (ADR 0017); Mail-Warteschlange 7/30 Tage, Webhook-Ereignisse 30 Tage, Sicherungen 14 Tage |
 | DEC-006 | erlaubte Dateitypen | offen | Security/IT Vorgabe |
 | DEC-007 | maximale Dateigröße | offen | 100 MB als Startwert, bestätigen |
 | DEC-008 | Whiteboard Storage | entschieden (Kai, 2026-10-03) | Synchronisation im API-Server, Updates in PostgreSQL, Snapshots im Blob-Speicher, Yjs-Dekodierung in einem isolierten Kindprozess (ADR 0009) |
 | DEC-009 | Webex OAuth App Ownership | entschieden (Kai, 2026-10-03) | ein zentraler Bot der Organisation, kein OAuth je Person (ADR 0011) |
 | DEC-010 | RPO/RTO | offen | RPO 15 min / RTO 2 h als Startziel; Sicherung, Wiederherstellung und Übung in `docs/OPERATIONS.md` |
-| DEC-011 | Mandantenmodell | offen | eine Org, aber schema-/API-seitig org-aware |
+| DEC-011 | Mandantenmodell | entschieden (Kai, 2026-10-07) | eine Organisation je Mandant, darin Abteilungen mit Leitung, Mitgliedern und Gästen; Projekte und Wissen gehören zu einer Abteilung, Sichtbarkeit privat/Abteilung/Organisation; Mitgliedschaften optional aus Entra-Gruppen (ADR 0021). Ersetzt die Teams |
 | DEC-012 | Mail als Benutzer | offen | zunächst nein; nur System-Mailbox |
 | DEC-013 | Benutzer-Provisionierung | entschieden (Kai, 2026-10-04) für den eigenen Server | `PROJECTHUB_USER_PROVISIONING=first-sign-in`: Personen des konfigurierten Mandanten werden beim ersten Login angelegt, die erste wird Admin; Einschränkung über „Zuweisung erforderlich“ in Entra (ADR 0014). Standard bleibt `off` (unbekannte Benutzer erhalten 403). SCIM/Gruppen-Abgleich bleibt Option für große Organisationen |
 | DEC-014 | Rolle `member` vs. `editor` im Projekt | offen | `member` arbeitet an Inhalten (Tasks, Kommentare), `editor` ändert zusätzlich Projektdaten und Struktur; mit Fachbereich bestätigen |
 | DEC-015 | Status-Workflow für Aufgaben | offen | feste Status `todo`/`in_progress`/`done`, frei wechselbar; Kanban-Spalten sind frei benennbar und gehören je zu einem Status (Migration 005). Eigene Status je Projekt erst bei Bedarf |
-| DEC-016 | Wer darf Projekte anlegen | offen | jeder aktive Benutzer der Organisation, die anlegende Person wird Projekt-Admin; einschränkbar über `CanCreateProject` |
+| DEC-016 | Wer darf Projekte anlegen | entschieden mit DEC-011 (2026-10-07) | Leitung und Mitglieder einer Abteilung legen Projekte in ihr an, Gäste nicht; die anlegende Person wird Projekt-Admin (ADR 0021) |
 | DEC-017 | Ablage von Dateianhängen | offen | lokal hinter `IAttachmentStorage` (Development); produktiv Azure Blob Storage mit Virenscan, Umsetzung mit Azure-Anbindung |
 | DEC-018 | WIP-Limit im Kanban | offen | nur Hinweis (Spalte wird rot markiert), kein Sperren beim Verschieben |
 | DEC-019 | Was das Board zeigt | offen | Aufgaben der obersten Ebene; Unteraufgaben als Zähler auf der Karte |
-| DEC-020 | Sichtbarkeit veröffentlichten Wissens | entschieden (Kai, 2026-10-03) | veröffentlichte und archivierte Artikel lesen alle in der Organisation; einzelne Artikel können auf „eingeschränkt“ gestellt werden und sind dann nur über Freigaben sichtbar. Entwürfe und Artikel in Prüfung sind nie organisationsweit sichtbar |
-| DEC-021 | Wer Wissensartikel veröffentlicht | offen | Artikel-Admins: Organisations-Admins, die verantwortliche Person (Owner) und Personen/Teams mit Freigabe „Verwalten“. Zur Prüfung geben darf, wer bearbeiten darf |
+| DEC-020 | Sichtbarkeit veröffentlichten Wissens | entschieden (Kai, 2026-10-03), erweitert mit DEC-011 (2026-10-07) | veröffentlichte und archivierte Artikel lesen standardmäßig alle der Abteilung, auf Wunsch der Leitung oder eines Admins alle in der Organisation; einzelne Artikel können auf „eingeschränkt“ gestellt werden und sind dann nur über Freigaben sichtbar. Entwürfe und Artikel in Prüfung sind nie abteilungs- oder organisationsweit sichtbar. Bestehende Artikel behalten ihre Sichtbarkeit (ADR 0021) |
+| DEC-021 | Wer Wissensartikel veröffentlicht | offen | Artikel-Admins: Organisations-Admins, die Leitung der Abteilung, die verantwortliche Person (Owner) und Personen/Abteilungen mit Freigabe „Verwalten“. Zur Prüfung geben darf, wer bearbeiten darf |
 | DEC-022 | Verweise von Wissen auf Whiteboards | umgesetzt (Phase 7) | Wissensartikel verweisen auf Whiteboards; sichtbar nur, wer das Whiteboard sehen darf |
 | DEC-023 | Abhängigkeiten im Gantt | offen | nur Warnung: verletzte Abhängigkeiten werden markiert, Nachfolger werden nicht automatisch verschoben. Nur innerhalb eines Projekts, höchstens eine Abhängigkeit je Aufgabenpaar, keine Kreise |
 | DEC-024 | Wer Gantt-Termine und Meilensteine pflegt | offen | Termine verschieben und Abhängigkeiten pflegen: Contribute (wie Aufgaben ändern); Meilensteine: Edit (Projektstruktur) |
@@ -65,4 +65,4 @@ Provider-neutral behind `IChatClient` (Microsoft.Extensions.AI) and chosen per i
 ### Knowledge visibility model
 Status: decided (DEC-020)
 
-Published knowledge is organization-wide by default; single articles can be restricted to explicit user/team permissions.
+Published knowledge is visible to its department by default; leads and admins can share it with the whole organization, and single articles can be restricted to explicit user/department permissions (ADR 0021).

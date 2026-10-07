@@ -8,6 +8,7 @@ using ProjectHub.Api.Modules.Ai;
 using ProjectHub.Api.Modules.Attachments;
 using ProjectHub.Api.Modules.Audit;
 using ProjectHub.Api.Modules.Calendar;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Comments;
 using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity;
@@ -22,7 +23,6 @@ using ProjectHub.Api.Modules.Privacy;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Realtime;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
 using ProjectHub.Api.Modules.Users;
 using ProjectHub.Api.Modules.Whiteboard;
 
@@ -55,7 +55,7 @@ builder.Services.AddProjectHubDatabase(settings);
 builder.Services.AddIdentityModule(builder.Environment, builder.Configuration);
 builder.Services.AddAuditModule();
 builder.Services.AddDomainEvents();
-builder.Services.AddTeamsModule();
+builder.Services.AddDepartmentsModule(builder.Configuration);
 builder.Services.AddProjectsModule();
 builder.Services.AddTasksModule();
 builder.Services.AddCommentsModule();
@@ -107,7 +107,7 @@ app.MapApiV1()
     .MapSignInEndpoints(app.Environment, app.Configuration)
     .MapUserEndpoints()
     .MapOrganizationEndpoints()
-    .MapTeamEndpoints()
+    .MapDepartmentEndpoints()
     .MapProjectEndpoints()
     .MapTaskEndpoints()
     .MapCommentEndpoints()

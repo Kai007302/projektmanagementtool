@@ -6,7 +6,7 @@ using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.Modules.Knowledge;
@@ -16,7 +16,7 @@ public sealed record CreateRelationRequest(Guid? TargetArticleId, string? Relati
 public sealed record CreateReferenceRequest(string? ResourceType, Guid? ResourceId);
 
 /// <summary>
-/// Links between articles (relations) and from articles to projects, tasks and teams (references).
+/// Links between articles (relations) and from articles to projects, tasks, departments and whiteboards (references).
 /// Both directions are only ever shown for things the reader may see.
 /// </summary>
 public sealed class KnowledgeLinkService(
@@ -169,7 +169,7 @@ public sealed class KnowledgeLinkService(
     }
 
     /// <summary>
-    /// The other direction: visible articles that reference a project, task, team or whiteboard.
+    /// The other direction: visible articles that reference a project, task, department or whiteboard.
     /// The resource itself must be visible to the caller, otherwise it does not exist for them.
     /// </summary>
     public async Task<ServiceResult<IReadOnlyList<ArticleSummary>>> ArticlesReferencingAsync(
@@ -182,7 +182,7 @@ public sealed class KnowledgeLinkService(
                 KnowledgeResourceType.Project => "Project",
                 KnowledgeResourceType.Task => "Task",
                 KnowledgeResourceType.Whiteboard => "Whiteboard",
-                _ => "Team",
+                _ => "Department",
             });
         }
 
@@ -307,17 +307,17 @@ public sealed class KnowledgeLinkService(
             }
         }
 
-        // Teams are visible to everyone in the organization (docs/PERMISSIONS.md).
-        var teamIds = resources.Where(r => r.Type == KnowledgeResourceType.Team).Select(r => r.Id).ToList();
-        if (teamIds.Count > 0)
+        // Department names are visible to everyone in the organization (docs/PERMISSIONS.md).
+        var departmentIds = resources.Where(r => r.Type == KnowledgeResourceType.Department).Select(r => r.Id).ToList();
+        if (departmentIds.Count > 0)
         {
-            var teams = await db.Set<Team>()
-                .Where(t => teamIds.Contains(t.Id) && t.OrganizationId == user.OrganizationId)
-                .Select(t => new { t.Id, t.Name })
+            var departments = await db.Set<Department>()
+                .Where(d => departmentIds.Contains(d.Id) && d.OrganizationId == user.OrganizationId)
+                .Select(d => new { d.Id, d.Name })
                 .ToListAsync(ct);
-            foreach (var team in teams)
+            foreach (var department in departments)
             {
-                result[(KnowledgeResourceType.Team, team.Id)] = new Resolved(team.Name, null);
+                result[(KnowledgeResourceType.Department, department.Id)] = new Resolved(department.Name, null);
             }
         }
 

@@ -4,12 +4,12 @@ using ModelContextProtocol.Server;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Comments;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Gantt;
 using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
 using ProjectHub.Api.Modules.Whiteboard;
 
 namespace ProjectHub.Api.Modules.Ai;
@@ -32,9 +32,10 @@ public sealed partial class ProjectHubTools
         [Description("Optional status: planned (default), active, on_hold, completed.")] string? status = null,
         [Description("Optional start date (yyyy-MM-dd).")] DateOnly? startDate = null,
         [Description("Optional end date (yyyy-MM-dd).")] DateOnly? endDate = null,
+        [Description("Optional department id from list_departments; default: the user's first department.")] Guid? departmentId = null,
         CancellationToken ct = default)
     {
-        var result = await projects.CreateAsync(user, new CreateProjectRequest(name, description, status, startDate, endDate), ct);
+        var result = await projects.CreateAsync(user, new CreateProjectRequest(name, description, status, startDate, endDate, departmentId), ct);
         return result.Succeeded ? new Changed("Project created.", result.Value!.Id, result.Value.Name) : Error(result);
     }
 
@@ -224,10 +225,11 @@ public sealed partial class ProjectHubTools
         [Description("Kind: article (default), how_to, best_practice, process, policy, faq, template, checklist or glossary.")] string? articleType = null,
         [Description("Optional one or two sentence summary.")] string? summary = null,
         [Description("Optional knowledge space id from list_knowledge_spaces.")] Guid? spaceId = null,
+        [Description("Optional department id from list_departments; default: the space's department, else the user's first.")] Guid? departmentId = null,
         CancellationToken ct = default)
     {
         var result = await articles.CreateAsync(
-            user, new CreateArticleRequest(title, articleType, summary, spaceId, null, MarkdownBlocks.ToContent(markdown)), ct);
+            user, new CreateArticleRequest(title, articleType, summary, spaceId, null, MarkdownBlocks.ToContent(markdown), departmentId), ct);
         if (!result.Succeeded)
         {
             return Error(result);
@@ -316,11 +318,11 @@ public sealed partial class ProjectHubTools
     }
 
     [McpServerTool(Name = "link_article", Title = "Artikel verknüpfen", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
-    [Description("Links a knowledge article to a project, task, team or whiteboard, so it shows up there.")]
+    [Description("Links a knowledge article to a project, task, department or whiteboard, so it shows up there.")]
     public async Task<object> LinkArticle(
         [Description("Article id.")] Guid articleId,
-        [Description("project, task, team or whiteboard.")] string resourceType,
-        [Description("Id of the project, task, team or whiteboard.")] Guid resourceId,
+        [Description("project, task, department or whiteboard.")] string resourceType,
+        [Description("Id of the project, task, department or whiteboard.")] Guid resourceId,
         CancellationToken ct = default)
     {
         var result = await links.AddReferenceAsync(user, articleId, new CreateReferenceRequest(resourceType, resourceId), ct);
@@ -346,44 +348,29 @@ public sealed partial class ProjectHubTools
         return result.Succeeded ? new Changed("Article deleted.", articleId) : Error(result);
     }
 
-    // Teams
+    // Departments
 
-    [McpServerTool(Name = "create_team", Title = "Team anlegen", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
-    [Description("Creates a team (organization admins only).")]
-    public async Task<object> CreateTeam(
-        [Description("Name of the team.")] string name,
+    [McpServerTool(Name = "create_department", Title = "Abteilung anlegen", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Creates a department (organization admins only).")]
+    public async Task<object> CreateDepartment(
+        [Description("Name of the department.")] string name,
         [Description("Optional description.")] string? description = null,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > TeamService.MaxNameLength)
-        {
-            return new ToolError($"Invalid name: 1 to {TeamService.MaxNameLength} characters.");
-        }
-
-        if (description?.Length > TeamService.MaxDescriptionLength)
-        {
-            return new ToolError($"Invalid description: at most {TeamService.MaxDescriptionLength} characters.");
-        }
-
-        var (outcome, team) = await teams.CreateAsync(user, name.Trim(), description, ct);
-        return outcome == TeamOutcome.Success ? new Changed("Team created.", team!.Id, team.Name) : TeamError(outcome);
+        var result = await departments.CreateAsync(user, new CreateDepartmentRequest(name, description), ct);
+        return result.Succeeded ? new Changed("Department created.", result.Value!.Id, result.Value.Name) : Error(result);
     }
 
-    [McpServerTool(Name = "add_team_member", Title = "Teammitglied hinzufügen", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("Adds a person to a team. Find the person with find_people first.")]
-    public async Task<object> AddTeamMember(
-        [Description("Team id from list_teams.")] Guid teamId,
+    [McpServerTool(Name = "add_department_member", Title = "Person in Abteilung aufnehmen", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
+    [Description("Adds a person to a department (organization admins and the department's leads). Find the person with find_people first.")]
+    public async Task<object> AddDepartmentMember(
+        [Description("Department id from list_departments.")] Guid departmentId,
         [Description("User id from find_people.")] Guid userId,
-        [Description("owner or member (default).")] string? role = null,
+        [Description("lead, member (default) or guest.")] string? role = null,
         CancellationToken ct = default)
     {
-        if (role is not null && !TeamRole.All.Contains(role))
-        {
-            return new ToolError("Invalid role: owner or member.");
-        }
-
-        var outcome = await teams.AddMemberAsync(user, teamId, userId, role ?? TeamRole.Member, ct);
-        return outcome == TeamOutcome.Success ? new Changed("Member added.", userId) : TeamError(outcome);
+        var result = await departments.AddMemberAsync(user, departmentId, new AddDepartmentMemberRequest(userId, role), ct);
+        return result.Succeeded ? new Changed("Member added.", userId) : Error(result);
     }
 
     /// <summary>A merge-patch body with the version and the given fields; null values are left out (unchanged).</summary>
@@ -402,13 +389,4 @@ public sealed partial class ProjectHubTools
     }
 
     private static PatchDocument Patch(long version, params (string Name, object? Value)[] fields) => PatchDocument.From(JsonPatch(version, fields));
-
-    private static ToolError TeamError(TeamOutcome outcome) => new(outcome switch
-    {
-        TeamOutcome.NotFound => "Team not found.",
-        TeamOutcome.Forbidden => "The user is not allowed to do this.",
-        TeamOutcome.UserNotFound => "User not found.",
-        TeamOutcome.Duplicate => "Already exists.",
-        _ => "The request could not be completed.",
-    });
 }

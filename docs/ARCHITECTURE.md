@@ -35,7 +35,7 @@
 - Identity
 - Organizations
 - Users
-- Teams
+- Departments (Abteilungen, ADR 0021)
 - Projects
 - Tasks
 - Kanban

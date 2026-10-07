@@ -19,13 +19,22 @@ public static class ProjectRole
     public static readonly IReadOnlyList<string> All = [Admin, Editor, Member, Viewer, Guest];
 }
 
-/// <summary>Per-team roles (team_member.role).</summary>
-public static class TeamRole
+/// <summary>Per-department roles (department_member.role, ADR 0021).</summary>
+public static class DepartmentRole
 {
-    public const string Owner = "owner";
+    /// <summary>Manages the department's members, and holds every right on its projects and knowledge.</summary>
+    public const string Lead = "lead";
+
+    /// <summary>Works in the department: sees its open projects and its knowledge, creates projects and articles.</summary>
     public const string Member = "member";
 
-    public static readonly IReadOnlyList<string> All = [Owner, Member];
+    /// <summary>Only sees the projects they are invited to; no department knowledge.</summary>
+    public const string Guest = "guest";
+
+    public static readonly IReadOnlyList<string> All = [Lead, Member, Guest];
+
+    /// <summary>Roles that see the department's projects and knowledge and may create in it.</summary>
+    public static readonly IReadOnlyList<string> Working = [Lead, Member];
 }
 
 public enum ProjectPermission

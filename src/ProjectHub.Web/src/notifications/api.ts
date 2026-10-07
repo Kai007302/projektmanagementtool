@@ -7,7 +7,7 @@ export type Notification = {
   type: NotificationType
   title: string
   body: string | null
-  resourceType: 'task' | 'knowledge_article' | 'project' | null
+  resourceType: 'task' | 'knowledge_article' | 'project' | 'user' | null
   resourceId: string | null
   projectId: string | null
   createdAt: string

@@ -139,16 +139,16 @@
   margin: 0 0 1.25rem;
 }
 
-.team-list,
-.member-list {
+.department-list {
   list-style: none;
-  margin: 1rem 0;
+  margin: 0;
   padding: 0;
   display: grid;
   gap: 0.5rem;
+  align-content: start;
 }
 
-.team {
+.department {
   width: 100%;
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -164,63 +164,78 @@
   cursor: pointer;
 }
 
-.team:hover:not(:disabled) {
+.department:hover:not(:disabled) {
   background: var(--surface);
   border-color: var(--border-strong);
 }
 
-.team-name {
+.department-name {
   font-weight: 600;
 }
 
-.team.selected {
+.department.selected {
   border-color: var(--accent-text);
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.team-count,
-.member-list small {
+.department-count {
   color: var(--muted);
   font-size: 0.875rem;
 }
 
-.team-details {
-  margin-top: 1.5rem;
-  padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow);
+/* Administration: departments on the left, the chosen one on the right; stacked on narrow screens. */
+.admin-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) 1fr;
+  gap: 1.25rem;
+  align-items: start;
 }
 
-.team-details h3 {
+@media (max-width: 48rem) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.department-details h3 {
   margin-top: 0;
 }
 
-.member-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+.department-details h4 {
+  margin: 1.25rem 0 0.5rem;
 }
 
-.create-team,
-.add-member {
-  display: flex;
+.entra-group {
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.75rem;
-  margin: 1rem 0;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
 }
 
-.create-team label,
-.add-member label {
+.entra-group label {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.8125rem;
-  font-weight: 500;
   color: var(--muted);
+}
+
+.unassigned {
+  margin-bottom: 1.25rem;
+}
+
+/* Hint for people who are in no department yet. */
+.notice {
+  margin: 0 0 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.department-switcher {
+  max-width: 12rem;
 }
 
 [role='alert'] {

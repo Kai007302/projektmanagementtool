@@ -35,6 +35,9 @@ public static class NotificationTypes
     public const string TaskCommentMention = "task_comment_mention";
     public const string KnowledgeCommentMention = "knowledge_comment_mention";
     public const string ProjectMemberAdded = "project_member_added";
+
+    /// <summary>Someone signed in for the first time and belongs to no department yet (ADR 0021).</summary>
+    public const string PersonWithoutDepartment = "person_without_department";
 }
 
 public static class NotificationResources
@@ -42,6 +45,7 @@ public static class NotificationResources
     public const string Task = "task";
     public const string KnowledgeArticle = "knowledge_article";
     public const string Project = "project";
+    public const string User = "user";
 }
 
 internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notification>

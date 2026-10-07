@@ -103,8 +103,8 @@ test('knowledge list, galaxy and an article', async ({ page }) => {
   await expectAccessible(page)
 })
 
-test('notifications and teams', async ({ page }) => {
-  await signInAs(page, 'dev-ben', 'Teams')
+test('notifications and administration', async ({ page }) => {
+  await signInAs(page, 'dev-ben', 'Verwaltung')
   await expectAccessible(page)
   await page.getByRole('button', { name: /^Benachrichtigungen, / }).click()
   await expect(page.getByRole('region', { name: 'Benachrichtigungen' })).toBeVisible()

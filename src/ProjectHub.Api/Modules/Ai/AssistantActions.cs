@@ -8,7 +8,7 @@ using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Users;
 using ProjectHub.Api.Modules.Whiteboard;
 
@@ -36,7 +36,7 @@ public sealed class AssistantActions(
     TaskService tasks,
     KnowledgeArticleService articles,
     KnowledgeSpaceService spaces,
-    TeamService teams,
+    DepartmentService departments,
     WhiteboardService whiteboards)
 {
     private static readonly Dictionary<string, (string Title, bool ReadOnly, bool Destructive)> Tools =
@@ -45,7 +45,7 @@ public sealed class AssistantActions(
 
     private static readonly Dictionary<string, string> Labels = new()
     {
-        ["projectId"] = "Projekt", ["taskId"] = "Aufgabe", ["articleId"] = "Artikel", ["teamId"] = "Team",
+        ["projectId"] = "Projekt", ["taskId"] = "Aufgabe", ["articleId"] = "Artikel", ["departmentId"] = "Abteilung",
         ["title"] = "Titel", ["name"] = "Name", ["description"] = "Beschreibung", ["summary"] = "Zusammenfassung",
         ["status"] = "Status", ["priority"] = "Priorität", ["assigneeId"] = "Zuständig", ["unassign"] = "Zuständigkeit entfernen",
         ["parentTaskId"] = "Übergeordnete Aufgabe", ["startDate"] = "Start", ["endDate"] = "Ende", ["dueDate"] = "Fällig",
@@ -61,8 +61,8 @@ public sealed class AssistantActions(
         ["low"] = "Niedrig", ["normal"] = "Normal", ["high"] = "Hoch", ["urgent"] = "Dringend",
         ["planned"] = "Geplant", ["active"] = "Aktiv", ["on_hold"] = "Pausiert", ["completed"] = "Abgeschlossen",
         ["draft"] = "Entwurf", ["review"] = "In Prüfung", ["published"] = "Veröffentlicht", ["archived"] = "Archiviert",
-        ["admin"] = "Admin", ["editor"] = "Bearbeiten", ["member"] = "Mitglied", ["viewer"] = "Lesen", ["guest"] = "Gast", ["owner"] = "Verantwortlich",
-        ["project"] = "Projekt", ["task"] = "Aufgabe", ["team"] = "Team", ["whiteboard"] = "Whiteboard",
+        ["admin"] = "Admin", ["editor"] = "Bearbeiten", ["member"] = "Mitglied", ["viewer"] = "Lesen", ["guest"] = "Gast", ["owner"] = "Verantwortlich", ["lead"] = "Leitung",
+        ["project"] = "Projekt", ["task"] = "Aufgabe", ["department"] = "Abteilung", ["whiteboard"] = "Whiteboard",
         ["finish_to_start"] = "Ende → Anfang", ["start_to_start"] = "Anfang → Anfang", ["finish_to_finish"] = "Ende → Ende", ["start_to_finish"] = "Anfang → Ende",
         ["article"] = "Artikel", ["how_to"] = "Anleitung", ["best_practice"] = "Best Practice", ["process"] = "Prozess", ["policy"] = "Richtlinie",
         ["faq"] = "FAQ", ["template"] = "Vorlage", ["checklist"] = "Checkliste", ["glossary"] = "Glossar",
@@ -139,7 +139,7 @@ public sealed class AssistantActions(
         "projectId" or KnowledgeResourceType.Project => (await projects.GetAsync(user, id, ct)).Value?.Name,
         "taskId" or "parentTaskId" or "sourceTaskId" or "targetTaskId" or KnowledgeResourceType.Task => (await tasks.GetAsync(user, id, ct)).Value?.Title,
         "articleId" => (await articles.GetAsync(user, id, ct)).Value?.Article.Title,
-        "teamId" or KnowledgeResourceType.Team => (await teams.GetAsync(user, id, ct))?.Name,
+        "departmentId" or KnowledgeResourceType.Department => (await departments.GetAsync(user, id, ct)).Value?.Name,
         "spaceId" => (await spaces.ListAsync(user, ct)).FirstOrDefault(s => s.Id == id)?.Name,
         KnowledgeResourceType.Whiteboard => (await whiteboards.GetAsync(user, id, ct)).Value?.Name,
         "userId" or "assigneeId" => await db.Set<AppUser>().AsNoTracking()

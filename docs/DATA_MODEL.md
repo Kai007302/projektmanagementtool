@@ -19,6 +19,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `013_calendar_feed.sql`: `calendar_feed` (geheime Adresse des Kalender-Abos je Person, ADR 0018)
 - `014_project_calendar_feed.sql`: `calendar_feed.project_id` (Kalender je Projekt, ADR 0020)
 - `015_project_icon_logo.sql`: `project.icon`, `project.logo_version` und `project_logo` (Projektsymbol und Logo, ADR 0020)
+- `016_departments.sql`: `department` und `department_member` ersetzen `team` und `team_member` (Teams werden zu Abteilungen mit derselben ID), `project.department_id` und `project.visibility`, `department_id` an `knowledge_space` und `knowledge_article`, Sichtbarkeit `department` für Artikel, `app_user.entra_groups_hash` (ADR 0021)
 
 ## Regeln
 
@@ -149,7 +150,7 @@ Kommentare auf Knowledge Articles. @Mentions verwenden die bestehende Notificati
 
 ## KnowledgePermission
 
-Knowledge kann auf Organization-, Team- oder expliziter User-Ebene sichtbar gemacht werden. Backend-Authorization ist verbindlich. Regeln: `docs/PERMISSIONS.md` (Abschnitt Wissen).
+Knowledge kann auf Organization-, Abteilungs- oder expliziter User-Ebene sichtbar gemacht werden (`principal_type` `user` oder `department`). Backend-Authorization ist verbindlich. Regeln: `docs/PERMISSIONS.md` (Abschnitt Wissen).
 
 ## Gantt
 
@@ -199,7 +200,7 @@ Knowledge kann referenzieren:
 
 - Project
 - Task
-- Team
+- Department
 - Whiteboard
 
 Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren Business-State. Ein Verweis ist nur sichtbar, wer das Ziel sehen darf; Verweise auf gelöschte Whiteboards bleiben verborgen.
@@ -211,3 +212,12 @@ Die Referenzen sind Links auf die autoritativen Objekte und keine Kopien deren B
 - `app_user.organization_role`: organisationsweite Rolle, `admin` oder `member` (Default). Projektrollen stehen weiterhin in `project_member.role`.
 
 Ein Request wird über `tid` → Organisation und `oid` → `app_user.entra_object_id` innerhalb dieser Organisation einem aktiven Benutzer zugeordnet. Alle weiteren Abfragen starten von dieser `organization_id`.
+
+# Abteilungen (Migration 016, ADR 0021)
+
+- `department`: Name (eindeutig je Organisation, ohne Groß-/Kleinschreibung), Beschreibung, optionale `entra_group_id` (Objekt-ID einer Entra-Sicherheitsgruppe, eindeutig je Organisation), versioniert.
+- `department_member`: Person in einer Abteilung mit `role` (`lead`, `member`, `guest`) und `source` (`manual`, `entra`). Der Entra-Abgleich entfernt nur Zeilen mit `source = 'entra'`.
+- `project.department_id` (Pflicht) und `project.visibility` (`private`, `department`, `organization`; bestehende Projekte `private`).
+- `knowledge_space.department_id` und `knowledge_article.department_id` (Pflicht). `knowledge_article.visibility` kennt zusätzlich `department` (Standard für neue Artikel).
+- `app_user.entra_groups_hash`: Hash der Gruppen beim letzten Abgleich; leer erzwingt einen neuen Abgleich.
+- Abteilungen mit Projekten, Bereichen oder Artikeln lassen sich nicht löschen (Fremdschlüssel ohne Kaskade).

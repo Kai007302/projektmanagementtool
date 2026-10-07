@@ -19,8 +19,8 @@ Seit Oktober 2026 gilt: Eine Ansicht zeigt ihren Inhalt und genau eine Hauptakti
 
 - **Direkt bearbeiten statt Formular:** Titel (Projekt, Spalte, Whiteboard, Aufgabe) sind Text, den man anklickt (`ui/InlineEdit.tsx`); Enter oder Verlassen speichert, Esc bricht ab.
 - **Seltenes ins „…“-Menü:** Löschen, Spalten verschieben, Statuswechsel außer dem nächsten Schritt, Karten verschieben per Tastatur (`ui/Menu.tsx`).
-- **Hinzufügen auf Klick:** „+ Aufgabe“ unten in jeder Kanban-Spalte öffnet ein Feld direkt in der Spalte (`ui/QuickCreate.tsx`). Alle anderen seltenen Formulare („+ Projekt“, „+ Team“, „+ Spalte“, „+ Person hinzufügen“, „+ Webex-Link“, „+ Bereich“, Tags, Beziehungen, Freigaben, Import, Person anonymisieren) öffnen sich in einem kleinen Fenster über der Seite (`ui/Reveal.tsx`, `ui/Dialog.tsx`) und schließen sich nach dem Speichern; die Seite darunter verschiebt sich nicht.
-- **Eine Hauptaktion je Seite:** oben rechts neben der Überschrift, gefüllt in der Akzentfarbe („+ Projekt“, „+ Artikel“, „+ Team“, Klasse `primary-button`).
+- **Hinzufügen auf Klick:** „+ Aufgabe“ unten in jeder Kanban-Spalte öffnet ein Feld direkt in der Spalte (`ui/QuickCreate.tsx`). Alle anderen seltenen Formulare („+ Projekt“, „+ Abteilung“, „+ Spalte“, „+ Person hinzufügen“, „+ Webex-Link“, „+ Bereich“, Tags, Beziehungen, Freigaben, Import, Person anonymisieren) öffnen sich in einem kleinen Fenster über der Seite (`ui/Reveal.tsx`, `ui/Dialog.tsx`) und schließen sich nach dem Speichern; die Seite darunter verschiebt sich nicht.
+- **Eine Hauptaktion je Seite:** oben rechts neben der Überschrift, gefüllt in der Akzentfarbe („+ Projekt“, „+ Artikel“, „+ Abteilung“, Klasse `primary-button`).
 - **Aufgaben im eigenen Fenster:** Ein Klick irgendwo auf eine Board-Karte (oder auf eine Zeile in der Liste) öffnet die ganze Aufgabe in einem Fenster über der Seite, wie bei Trello. Dort lassen sich alle Felder ändern, auch Start und Fälligkeit (Zeitraum); jedes Feld speichert sofort, es gibt keinen Speichern-Knopf. Esc, ✕ oder ein Klick daneben schließt das Fenster.
 - **Suchen statt Navigieren:** Strg+K (Cmd+K) oder das breite Suchfeld in der Mitte der Kopfzeile (ohne Wort, Lupe links, Tastenkürzel grau in der Mitte) springt zu Bereichen, Projekten und Wissensartikeln (`ui/CommandPalette.tsx`). Die Wissenssuche sucht beim Tippen; die Filter erscheinen erst nach Klick auf „Filter“, aktive Filter stehen als Chips daneben und verschwinden mit einem Klick.
 - **Projektmenü:** Jede Projektkachel und die Projektansicht haben ein „…“-Menü mit „Kalender abonnieren“, „Daten herunterladen (Excel)“ und „Symbol und Logo ändern“ (ADR 0020). Persönliches (eigene Termine, eigene Daten) steht im Menü am Avatar, nicht auf der Übersicht.
@@ -28,7 +28,7 @@ Seit Oktober 2026 gilt: Eine Ansicht zeigt ihren Inhalt und genau eine Hauptakti
 
 ## Muster
 
-- **Kopfzeile:** feste, schmale Leiste mit Logo, Bereichsnavigation (Projekte, Wissen, Teams), Suchfeld, Benachrichtigungen und Avatar. Helles/dunkles Design und Abmelden stehen im Avatar-Menü. Die Dev-Anmeldung ist gestrichelt markiert, weil sie nur in Development erscheint.
+- **Kopfzeile:** feste, schmale Leiste mit Logo, Bereichsnavigation (Projekte, Wissen, für Admins und Abteilungsleitungen Verwaltung), Suchfeld, Abteilungswahl, Benachrichtigungen und Avatar. Helles/dunkles Design und Abmelden stehen im Avatar-Menü. Die Dev-Anmeldung ist gestrichelt markiert, weil sie nur in Development erscheint.
 - **Projektansicht:** Reiter Board, Liste, Gantt, Whiteboard, Wissen, Aktivität und – wenn Webex eingerichtet ist oder Links bestehen – Webex. Die Mitglieder stehen als Avatare oben rechts im Projektkopf und öffnen sich in einem Fenster.
 - **Ansichtswechsel** innerhalb einer Seite (Board/Liste/Gantt/Whiteboard, Artikel/Galaxie) als Segment-Schalter (`.tabs`).
 - **Karten und Panels:** weiß, 1 px Rahmen, großer Radius, sehr leichter Schatten. Überschriften von Seitenpanels klein in Versalien.

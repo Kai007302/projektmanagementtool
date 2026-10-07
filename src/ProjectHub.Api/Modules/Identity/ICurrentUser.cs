@@ -18,4 +18,10 @@ public interface ICurrentUser
     string? DisplayName { get; }
 
     string? Email { get; }
+
+    /// <summary>
+    /// Object ids of the Entra ID security groups in the token (claim "groups"), empty when it has none. Null when
+    /// the token only says there are too many groups to include ("group overage"), so the groups are unknown.
+    /// </summary>
+    IReadOnlyList<string>? EntraGroupIds { get; }
 }

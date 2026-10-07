@@ -42,9 +42,14 @@ public abstract class ApiTestBase(InfrastructureFixture infrastructure) : IAsync
     }
 
     /// <summary>Creates a project owned by <paramref name="owner"/> with the given additional members.</summary>
-    protected async Task<ProjectSummary> CreateProjectAsync(SeedUser owner, params (SeedUser User, string Role)[] members)
+    protected Task<ProjectSummary> CreateProjectAsync(SeedUser owner, params (SeedUser User, string Role)[] members) =>
+        CreateProjectAsync(owner, null, members);
+
+    /// <summary>A project in the owner's first department; <paramref name="visibility"/> null for the default.</summary>
+    protected async Task<ProjectSummary> CreateProjectAsync(SeedUser owner, string? visibility, params (SeedUser User, string Role)[] members)
     {
-        var response = await As(owner).PostAsJsonAsync("/api/v1/projects", new CreateProjectRequest($"Projekt {Guid.NewGuid():N}", null, null, null, null));
+        var response = await As(owner).PostAsJsonAsync(
+            "/api/v1/projects", new CreateProjectRequest($"Projekt {Guid.NewGuid():N}", null, null, null, null, Visibility: visibility));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var project = (await response.Content.ReadFromJsonAsync<ProjectSummary>())!;
 
@@ -58,8 +63,9 @@ public abstract class ApiTestBase(InfrastructureFixture infrastructure) : IAsync
     }
 
     /// <summary>Ben (admin), Clara (editor), David (member), Eva (viewer), Gina (guest).</summary>
+    /// <summary>A private project: only its members see it, as every project did before departments (ADR 0021).</summary>
     protected Task<ProjectSummary> CreateTeamProjectAsync() =>
-        CreateProjectAsync(Ben, (Clara, "editor"), (David, "member"), (Eva, "viewer"), (Gina, "guest"));
+        CreateProjectAsync(Ben, "private", (Clara, "editor"), (David, "member"), (Eva, "viewer"), (Gina, "guest"));
 
     protected async Task<TaskResponse> CreateTaskAsync(SeedUser user, Guid projectId, CreateTaskRequest? request = null)
     {

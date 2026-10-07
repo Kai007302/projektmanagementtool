@@ -6,8 +6,27 @@ Zentral definiert in `src/ProjectHub.Api/Modules/Identity/Authorization/`. Gepr�
 
 | Rolle | Bedeutung |
 |---|---|
-| `admin` (OrganizationAdmin) | verwaltet die Organisation und Teams, hat alle Projektrechte auf allen Projekten der eigenen Organisation |
-| `member` | Standard; Rechte ergeben sich aus Team- und Projektmitgliedschaften |
+| `admin` (OrganizationAdmin) | verwaltet die Organisation und ihre Abteilungen, hat alle Rechte auf allen Projekten und Artikeln der eigenen Organisation. Zugriff auf Projekte und Artikel, die er nur als Admin sieht, steht im `audit_log` (`OrganizationAdminAccess`, ADR 0021) |
+| `member` | Standard; Rechte ergeben sich aus Abteilungs- und Projektmitgliedschaften |
+
+## Abteilungen (`department_member.role`, ADR 0021)
+
+| Rolle | Bedeutung |
+|---|---|
+| `lead` (Abteilungsleitung) | verwaltet die Abteilung und ihre Personen, hat alle Rechte auf allen Projekten und Artikeln der Abteilung, auch ohne Projektmitgliedschaft; gibt Projekte und Artikel der Abteilung für die ganze Organisation frei |
+| `member` | legt Projekte und Artikel in der Abteilung an, liest alles mit Sichtbarkeit „Abteilung“ |
+| `guest` | sieht nur Projekte, zu denen er eingeladen ist, und kein Wissen der Abteilung |
+
+| Aktion | Wer |
+|---|---|
+| Namen der Abteilungen sehen (z. B. zum Freigeben) | alle Benutzer der Organisation |
+| Personen einer Abteilung sehen | ihre Leitungen, Mitglieder und Gäste, Organisations-Admins |
+| Abteilung anlegen, löschen (nur wenn leer), mit Entra-Gruppe verbinden | OrganizationAdmin |
+| Name und Beschreibung ändern, Personen hinzufügen, Rollen ändern, entfernen | OrganizationAdmin, Leitung der Abteilung |
+| Personen ohne Abteilung sehen (`/departments/unassigned`) | OrganizationAdmin, jede Abteilungsleitung |
+
+- Mit `PROJECTHUB_DEPARTMENTS_FROM_ENTRA_GROUPS=true` kommen Mitglieder verbundener Entra-Gruppen bei der Anmeldung in die Abteilung und gehen, wenn sie die Gruppe verlassen. Von Hand hinzugefügte Mitgliedschaften bleiben unberührt.
+- Anlage, Änderung, Löschung und jede Mitgliedschaftsänderung (auch aus Entra) stehen im `audit_log` (`DepartmentCreated`, `DepartmentUpdated`, `DepartmentDeleted`, `DepartmentMemberAdded`, `DepartmentMemberRoleChanged`, `DepartmentMemberRemoved`).
 
 ## Projektrollen (`project_member.role`)
 
@@ -24,13 +43,22 @@ Zentral definiert in `src/ProjectHub.Api/Modules/Identity/Authorization/`. Gepr�
 - **Edit**: Projektdaten und Struktur ändern
 - **Manage**: Einstellungen, Mitglieder, Löschen
 
-Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff auf ein Projekt. Die Abgrenzung `member`/`editor` ist ein Default-Vorschlag (DEC-014).
+Dazu kommt die Abteilung des Projekts (ADR 0021): Ihre Leitung hat alle Rechte. Je nach Sichtbarkeit des Projekts haben weitere Personen das Recht View:
+
+| Sichtbarkeit (`project.visibility`) | lesen dürfen außerdem |
+|---|---|
+| `private` | niemand (nur Projektmitglieder, Leitung, Admins) |
+| `department` (Standard für neue Projekte) | Mitglieder der Abteilung (keine Gäste) |
+| `organization` | alle aktiven Benutzer der Organisation |
+
+Bestehende Projekte sind nach Migration 016 `private`. Die Abgrenzung `member`/`editor` ist ein Default-Vorschlag (DEC-014).
 
 ## Projekte, Aufgaben, Kommentare, Dateien
 
 | Aktion | benötigtes Recht |
 |---|---|
-| Projekt anlegen | jeder aktive Benutzer der Organisation; wird dabei Projekt-`admin` (DEC-016) |
+| Projekt anlegen | Leitung und Mitglieder der gewählten Abteilung, Organisations-Admins; wird dabei Projekt-`admin` (DEC-016) |
+| Sichtbarkeit und Abteilung ändern | Manage; verschieben nur in eine Abteilung, in der man Leitung oder Mitglied ist; `organization` nur Leitung der Abteilung und Organisations-Admins (ADR 0021) |
 | Projekt, Aufgaben, Kommentare, Dateien, Aktivität lesen | View |
 | Projektdaten ändern (Name, Beschreibung, Status, Termine) | Edit |
 | Mitglieder verwalten, Projekt löschen | Manage |
@@ -61,16 +89,6 @@ Ohne Mitgliedschaft (und ohne Organisations-Admin-Rolle) gibt es keinen Zugriff 
 - Änderungen per `PATCH` brauchen die aktuelle `version`; ist sie veraltet, antwortet die API mit 409 und ändert nichts.
 - Protokolliert werden Anlage/Änderung/Löschung im `audit_log`, sichtbare Änderungen zusätzlich im Aktivitätsfeed des Projekts (`activity_log`).
 
-## Teams (`team_member.role`)
-
-| Aktion | Wer |
-|---|---|
-| Teams und Mitglieder ansehen | alle Benutzer der Organisation |
-| Team anlegen | OrganizationAdmin |
-| Mitglieder hinzufügen/entfernen | OrganizationAdmin, Team-`owner` |
-
-Team-Anlage und Mitgliederänderungen werden im `audit_log` protokolliert (`TeamCreated`, `TeamMemberAdded`, `TeamMemberRemoved`).
-
 ## Wissen (Knowledge Hub)
 
 Rechte je Artikel: Lesen, Bearbeiten, Verwalten. Sie ergeben sich aus (das höchste gilt):
@@ -78,25 +96,28 @@ Rechte je Artikel: Lesen, Bearbeiten, Verwalten. Sie ergeben sich aus (das höch
 | Quelle | Recht |
 |---|---|
 | Organisations-Admin | Verwalten (alle Artikel der Organisation) |
+| Leitung der Abteilung des Artikels | Verwalten (ADR 0021) |
 | verantwortliche Person (`owner_id`, beim Anlegen die anlegende Person) | Verwalten |
-| Freigabe für die Person oder eines ihrer Teams (`knowledge_permission`: `view`/`edit`/`admin`) | Lesen/Bearbeiten/Verwalten |
+| Freigabe für die Person oder eine ihrer Abteilungen als Leitung oder Mitglied (`knowledge_permission`: `view`/`edit`/`admin`) | Lesen/Bearbeiten/Verwalten |
+| Artikel ist veröffentlicht oder archiviert, Sichtbarkeit `department`, Person ist Leitung oder Mitglied der Abteilung | Lesen (ADR 0021) |
 | Artikel ist veröffentlicht oder archiviert und hat die Sichtbarkeit `organization` | Lesen (DEC-020) |
 
-Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte hat. Artikel mit Sichtbarkeit `restricted` sind ausschließlich über Freigaben sichtbar.
+Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten vier Rechte hat. Artikel mit Sichtbarkeit `restricted` sind ausschließlich über Freigaben sichtbar. Gäste einer Abteilung sehen ihr Wissen nicht.
 
 | Aktion | benötigtes Recht |
 |---|---|
-| Artikel anlegen | jeder aktive Benutzer der Organisation; wird verantwortliche Person |
+| Artikel anlegen | Leitung und Mitglieder der Abteilung (bzw. der Abteilung des Bereichs), Organisations-Admins; wird verantwortliche Person |
 | Artikel, Versionen, Beziehungen, Verweise, Kommentare lesen | Lesen |
 | Kommentieren | Lesen |
 | Inhalt speichern (neue Version), Metadaten, Tags, Beziehungen, Verweise ändern, Version wiederherstellen | Bearbeiten |
 | Entwurf ⇄ In Prüfung | Bearbeiten |
 | Veröffentlichen, Archivieren, Veröffentlichtes zurück in Entwurf | Verwalten (DEC-021) |
-| Sichtbarkeit ändern, Freigaben verwalten, Artikel löschen | Verwalten |
+| Sichtbarkeit ändern, Freigaben verwalten, Artikel löschen | Verwalten; Sichtbarkeit `organization` nur Leitung der Abteilung und Organisations-Admins (ADR 0021) |
 | Kommentar bearbeiten | nur die Autorin/der Autor |
 | Kommentar löschen | Autorin/Autor oder Verwalten |
 | Erwähnen (`@`) | nur Personen, die den Artikel lesen dürfen |
-| Wissensbereiche anlegen und ändern | Organisations-Admin |
+| Wissensbereiche anlegen und ändern | Organisations-Admin, Leitung der Abteilung des Bereichs |
+| Wissensbereiche sehen | Leitung, Mitglieder der Abteilung, Organisations-Admins |
 | Knowledge Galaxy | zeigt nur lesbare Artikel und nur Beziehungen zwischen ihnen |
 
 - Nicht sichtbare Artikel sind „nicht gefunden“ (404), sichtbare ohne ausreichendes Recht „verboten“ (403).
@@ -117,7 +138,7 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 ## Datenschutz
 
 - Den Export der eigenen Daten (`/me/data-export`) bekommt jede angemeldete Person, nur für sich selbst. Jeder Export steht im `audit_log`.
-- Personen anonymisieren (`/admin/users/{id}/anonymize`) dürfen nur Organisations-Admins, nur in ihrer Organisation (sonst 404) und nie sich selbst (400). Die Anonymisierung steht im `audit_log`.
+- Personen anonymisieren (`/admin/users/{id}/anonymize`, in der Oberfläche unter „Verwaltung“) dürfen nur Organisations-Admins, nur in ihrer Organisation (sonst 404) und nie sich selbst (400). Die Anonymisierung steht im `audit_log`.
 - Die Links auf Datenschutzhinweise und Impressum (`/legal`) sind ohne Anmeldung lesbar.
 
 ## Webex
@@ -146,4 +167,4 @@ Entwürfe und Artikel in Prüfung sieht nur, wer eines der ersten drei Rechte ha
 - Außerhalb von Development: Microsoft Entra ID. Die API validiert Bearer-Tokens gegen `https://login.microsoftonline.com/{ENTRA_TENANT_ID}/v2.0` mit Audience `ENTRA_CLIENT_ID`. Die App-Registrierung selbst ist ein Human Review Gate; ohne sie ist kein Login möglich (401). Der Login-Flow im Frontend (MSAL) folgt, sobald die Registrierung existiert.
 - Development: ein gekapselter Development-Identity-Provider meldet einen der synthetischen Benutzer aus `DevelopmentSeedData` an (Header `X-Dev-User`, Standard `dev-ada`). Er stellt dieselben Claims wie Entra aus (`oid`, `tid`, `name`, `preferred_username`) und verweigert den Start außerhalb von Development.
 - Realtime (SignalR, `/api/v1/hubs/projects`): Browser können bei WebSockets keine Header senden. Mit Entra kommt das Token deshalb als `access_token` in der Query, im Development-Modus der synthetische Benutzer als `devUser`. Beides gilt nur für Pfade unter `/api/v1/hubs`. Nachrichten enthalten nur die Projekt-ID; Inhalte lädt der Client über die autorisierte API.
-- Benutzer werden nur angelegt, wenn `PROJECTHUB_USER_PROVISIONING=first-sign-in` gesetzt ist (DEC-013, ADR 0014): dann beim ersten Login, die erste Person einer Organisation als `admin`, alle weiteren als `member`. Name und E-Mail übernimmt die API bei jeder Anmeldung aus dem Token, wenn sie sich in Entra geändert haben (DEC-039); Rolle und Status nie. Sonst und für gesperrte (`inactive`) Benutzer gilt: Authentifizierte Konten ohne aktiven ProjectHub-Benutzer erhalten 403.
+- Benutzer werden nur angelegt, wenn `PROJECTHUB_USER_PROVISIONING=first-sign-in` gesetzt ist (DEC-013, ADR 0014): dann beim ersten Login, die erste Person einer Organisation als `admin`, alle weiteren als `member`. Name und E-Mail übernimmt die API bei jeder Anmeldung aus dem Token, wenn sie sich in Entra geändert haben (DEC-039); Rolle und Status nie. Die erste Person wird zusätzlich Leitung der Abteilung „Allgemein“. Wer beim ersten Login in keine Abteilung kommt, wird Admins und Abteilungsleitungen gemeldet (ADR 0021). Sonst und für gesperrte (`inactive`) Benutzer gilt: Authentifizierte Konten ohne aktiven ProjectHub-Benutzer erhalten 403.

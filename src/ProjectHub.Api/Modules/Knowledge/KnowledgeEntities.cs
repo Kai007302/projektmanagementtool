@@ -5,11 +5,12 @@ using ProjectHub.Api.Infrastructure.Database;
 
 namespace ProjectHub.Api.Modules.Knowledge;
 
-/// <summary>Optional container for a subject area. Projects are never bound to a space.</summary>
+/// <summary>Optional container for a subject area of one department (ADR 0021). Projects are never bound to a space.</summary>
 public sealed class KnowledgeSpace : IVersioned
 {
     public Guid Id { get; init; }
     public Guid OrganizationId { get; init; }
+    public Guid DepartmentId { get; init; }
     public required string Name { get; set; }
     public string? Description { get; set; }
     public Guid? OwnerId { get; set; }
@@ -23,13 +24,17 @@ public sealed class KnowledgeArticle : IVersioned
     public Guid Id { get; init; }
     public Guid OrganizationId { get; init; }
     public Guid? KnowledgeSpaceId { get; set; }
+
+    /// <summary>The department the article belongs to (ADR 0021); its leads administer it.</summary>
+    public Guid DepartmentId { get; set; }
+
     public required string Title { get; set; }
     public required string Slug { get; set; }
     public required string ArticleType { get; set; }
     public string? Summary { get; set; }
     public Guid? OwnerId { get; set; }
     public string Status { get; set; } = KnowledgeStatus.Draft;
-    public string Visibility { get; set; } = KnowledgeVisibility.Organization;
+    public string Visibility { get; set; } = KnowledgeVisibility.Department;
     public Guid? CurrentVersionId { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public DateOnly? ReviewDueAt { get; set; }
@@ -97,7 +102,7 @@ public sealed class KnowledgeComment : IVersioned
     public long Version { get; set; }
 }
 
-/// <summary>A link from an article to a project, task, team or whiteboard.</summary>
+/// <summary>A link from an article to a project, task, department or whiteboard.</summary>
 public sealed class KnowledgeReference
 {
     public Guid Id { get; init; }
@@ -109,7 +114,7 @@ public sealed class KnowledgeReference
     public DateTimeOffset CreatedAt { get; init; }
 }
 
-/// <summary>An explicit grant on one article for a user or a team.</summary>
+/// <summary>An explicit grant on one article for a user or a department (its leads and members).</summary>
 public sealed class KnowledgePermission
 {
     public Guid Id { get; init; }
@@ -131,12 +136,26 @@ public static class KnowledgeStatus
     public static readonly IReadOnlyList<string> All = [Draft, Review, Published, Archived];
 }
 
+/// <summary>Who reads a published or archived article besides its owner, grants and leads (ADR 0021, DEC-020).</summary>
 public static class KnowledgeVisibility
 {
+    /// <summary>Everyone in the organization. Only the department's leads and organization admins choose it.</summary>
     public const string Organization = "organization";
+
+    /// <summary>Leads and members of the article's department.</summary>
+    public const string Department = "department";
+
+    /// <summary>Only explicit grants ("private").</summary>
     public const string Restricted = "restricted";
 
-    public static readonly IReadOnlyList<string> All = [Organization, Restricted];
+    public static readonly IReadOnlyList<string> All = [Organization, Department, Restricted];
+}
+
+/// <summary>Who an explicit grant (<see cref="KnowledgePermission"/>) is for.</summary>
+public static class KnowledgePrincipal
+{
+    public const string User = "user";
+    public const string Department = "department";
 }
 
 public static class KnowledgeArticleType
@@ -160,10 +179,10 @@ public static class KnowledgeResourceType
 {
     public const string Project = "project";
     public const string Task = "task";
-    public const string Team = "team";
+    public const string Department = "department";
     public const string Whiteboard = "whiteboard";
 
-    public static readonly IReadOnlyList<string> Supported = [Project, Task, Team, Whiteboard];
+    public static readonly IReadOnlyList<string> Supported = [Project, Task, Department, Whiteboard];
 }
 
 /// <summary>Levels of an explicit grant; each includes the ones before it.</summary>

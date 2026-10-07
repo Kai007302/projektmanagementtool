@@ -16,10 +16,11 @@ export type GraphEdge = { id: string; source: string; target: string; relationTy
 
 export type KnowledgeGraph = { nodes: GraphNode[]; edges: GraphEdge[]; truncated: boolean }
 
-export function fetchGraph(filter: { spaceId?: string; type?: string }) {
+export function fetchGraph(filter: { spaceId?: string; type?: string; departmentId?: string }) {
   const query = new URLSearchParams()
   if (filter.spaceId) query.set('spaceId', filter.spaceId)
   if (filter.type) query.set('type', filter.type)
+  if (filter.departmentId) query.set('departmentId', filter.departmentId)
   const suffix = query.size > 0 ? `?${query}` : ''
   return apiFetch<KnowledgeGraph>(`/api/v1/knowledge/graph${suffix}`)
 }

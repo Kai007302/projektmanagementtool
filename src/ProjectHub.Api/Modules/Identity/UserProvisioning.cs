@@ -24,7 +24,8 @@ public sealed record UserProvisioningOptions(bool OnFirstSignIn, string? Allowed
 
 /// <summary>
 /// Creates the organization of the configured tenant and the signed-in person's user. The first person of an
-/// organization becomes its admin, everyone after that a member. Existing users only get a changed name or e-mail
+/// organization becomes its admin and the lead of its first department "Allgemein" (ADR 0021), everyone after that a
+/// member without a department until an Entra group or a lead takes them in. Existing users only get a changed name or e-mail
 /// from the token (RefreshProfileAsync, DEC-039); role and status are never changed: an inactive
 /// user stays inactive, so deactivating someone keeps them out.
 /// </summary>
@@ -33,20 +34,23 @@ internal sealed class UserProvisioning(
     ProjectHubDbContext db,
     ILogger<UserProvisioning> logger)
 {
-    public async Task TryProvisionAsync(ICurrentUser caller, CancellationToken ct)
+    public const string FirstDepartmentName = "Allgemein";
+
+    /// <summary>True when a user was created.</summary>
+    public async Task<bool> TryProvisionAsync(ICurrentUser caller, CancellationToken ct)
     {
         if (!options.OnFirstSignIn
             || caller.TenantId is not { Length: > 0 } tenantId
             || caller.EntraObjectId is not { Length: > 0 } objectId
             || !string.Equals(tenantId, options.AllowedTenantId, StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            return false;
         }
 
         if (caller.Email is not { Length: > 0 } email)
         {
             logger.LogWarning("A first sign-in without an e-mail claim was not provisioned.");
-            return;
+            return false;
         }
 
         var displayName = caller.DisplayName is { Length: > 0 } name ? name : email;
@@ -76,16 +80,39 @@ internal sealed class UserProvisioning(
              on conflict do nothing
              """, ct);
 
+        if (created == 1)
+        {
+            // A new organization starts with one department, led by its first admin.
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 insert into department (organization_id, name, description)
+                 select o.id, {FirstDepartmentName}, null
+                 from organization o
+                 where o.entra_tenant_id = {tenantId}
+                       and not exists (select 1 from department d where d.organization_id = o.id)
+                 """, ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 insert into department_member (organization_id, department_id, user_id, role)
+                 select u.organization_id, d.id, u.id, {DepartmentRole.Lead}
+                 from app_user u
+                 join organization o on o.id = u.organization_id
+                 join department d on d.organization_id = u.organization_id and lower(d.name) = lower({FirstDepartmentName})
+                 where o.entra_tenant_id = {tenantId} and u.entra_object_id = {objectId} and u.organization_role = {OrganizationRole.Admin}
+                 on conflict do nothing
+                 """, ct);
+        }
+
         await transaction.CommitAsync(ct);
 
         if (created == 1)
         {
             logger.LogInformation("Provisioned a ProjectHub user at first sign-in.");
+            return true;
         }
-        else
-        {
-            logger.LogWarning("First sign-in was not provisioned: the account or its e-mail address already has a user.");
-        }
+
+        logger.LogWarning("First sign-in was not provisioned: the account or its e-mail address already has a user.");
+        return false;
     }
 
     /// <summary>

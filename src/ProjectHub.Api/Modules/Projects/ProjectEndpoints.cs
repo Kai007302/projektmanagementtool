@@ -20,15 +20,17 @@ public static class ProjectEndpoints
     {
         var projects = api.MapGroup("/projects");
 
-        projects.MapGet("/", async (UserContext user, ProjectService service, int? limit, int? offset, CancellationToken ct) =>
+        projects.MapGet("/", async (UserContext user, ProjectService service, int? limit, int? offset, Guid? departmentId, CancellationToken ct) =>
             Paging.TryCreate(limit, offset, out var paging, out var error)
-                ? Results.Ok(paging.ToPage(await service.ListAsync(user, paging, ct)))
+                ? Results.Ok(paging.ToPage(await service.ListAsync(user, paging, ct, departmentId)))
                 : error!);
 
         projects.MapPost("/", async (CreateProjectRequest request, UserContext user, ProjectService service, CancellationToken ct) =>
             ApiResults.From(await service.CreateAsync(user, request, ct), project => Results.Created(
                 $"/api/v1/projects/{project.Id}",
-                new ProjectSummary(project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, "admin", project.Version))));
+                new ProjectSummary(
+                    project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, "admin", project.Version,
+                    DepartmentId: project.DepartmentId, Visibility: project.Visibility))));
 
         projects.MapGet("/{id:guid}", async (Guid id, UserContext user, ProjectService service, CancellationToken ct) =>
             ApiResults.Ok(await service.GetAsync(user, id, ct)));

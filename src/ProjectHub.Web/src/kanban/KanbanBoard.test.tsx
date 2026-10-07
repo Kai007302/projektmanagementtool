@@ -9,7 +9,7 @@ import { fakeApi, json } from '../test/fakeApi'
 import type { KanbanBoard as Board, KanbanCard } from './api'
 import { KanbanBoard } from './KanbanBoard'
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 
 const all = { canContribute: true, canEdit: true, canManage: true }
 const viewerRights = { canContribute: false, canEdit: false, canManage: false }
