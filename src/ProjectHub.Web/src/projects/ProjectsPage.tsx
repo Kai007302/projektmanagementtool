@@ -5,6 +5,7 @@ import type { Task } from '../tasks/api'
 import { DueDate } from '../tasks/DueDate'
 import { PriorityBadge } from '../tasks/PriorityBadge'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 import { greeting, projectLook, today } from '../ui/personality'
 import { canEditProject, createProject, fetchProjects, projectRoles, projectStatuses, type ProjectSummary } from './api'
 import { ProjectIcon } from './ProjectIcon'
@@ -65,18 +66,24 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
           setSelected(task.projectId)
         }}
       />
-      <h2 id="projects-heading">Projekte</h2>
+      <header className="page-header">
+        <h2 id="projects-heading">Projekte</h2>
+        <Reveal label="Projekt" title="Neues Projekt" primary>
+          {() => (
+            <CreateProjectForm
+              onCreated={(project) => {
+                load()
+                setSelected(project.id)
+              }}
+            />
+          )}
+        </Reveal>
+      </header>
       {error && <p role="alert">{error}</p>}
-      <CreateProjectForm
-        onCreated={(project) => {
-          load()
-          setSelected(project.id)
-        }}
-      />
       {projects === null ? (
         <p>Projekte werden geladen …</p>
       ) : projects.length === 0 ? (
-        <EmptyState emoji="🚀" hint="Leg oben dein erstes Projekt an.">
+        <EmptyState emoji="🚀" hint="Leg mit „+ Projekt“ dein erstes Projekt an.">
           Du bist noch in keinem Projekt.
         </EmptyState>
       ) : (
@@ -208,10 +215,10 @@ function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary)
   }
 
   return (
-    <form className="inline-form" onSubmit={submit}>
+    <form className="stacked-form" onSubmit={submit}>
       <label>
-        Neues Projekt
-        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+        Name des Projekts
+        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
       </label>
       <button type="submit">Projekt anlegen</button>
       {error && <p role="alert">{error}</p>}

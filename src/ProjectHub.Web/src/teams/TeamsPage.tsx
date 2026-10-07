@@ -4,6 +4,7 @@ import { AnonymizePersonForm } from '../privacy/AnonymizePersonForm'
 import { createTeam, fetchTeams, type TeamSummary } from './api'
 import { TeamDetailsPanel } from './TeamDetailsPanel'
 import { EmptyState } from '../ui/EmptyState'
+import { Reveal } from '../ui/Reveal'
 
 export function TeamsPage({ me }: { me: Me }) {
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -21,10 +22,25 @@ export function TeamsPage({ me }: { me: Me }) {
 
   return (
     <section className="teams" aria-labelledby="teams-heading">
-      <h2 id="teams-heading">Teams</h2>
+      <header className="page-header">
+        <h2 id="teams-heading">Teams</h2>
+        {me.organizationRole === 'admin' && (
+          <div className="page-actions">
+            <AnonymizePersonForm myId={me.id} />
+            <Reveal label="Team" title="Neues Team" primary>
+              {(close) => (
+                <CreateTeamForm
+                  onCreated={() => {
+                    close()
+                    load()
+                  }}
+                />
+              )}
+            </Reveal>
+          </div>
+        )}
+      </header>
       {error && <p role="alert">{error}</p>}
-      {me.organizationRole === 'admin' && <CreateTeamForm onCreated={load} />}
-      {me.organizationRole === 'admin' && <AnonymizePersonForm myId={me.id} />}
       {teams === null ? (
         <p>Teams werden geladen …</p>
       ) : teams.length === 0 ? (
@@ -72,10 +88,10 @@ function CreateTeamForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form className="create-team" onSubmit={submit}>
+    <form className="stacked-form" onSubmit={submit}>
       <label>
         Teamname
-        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+        <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
       </label>
       <label>
         Beschreibung

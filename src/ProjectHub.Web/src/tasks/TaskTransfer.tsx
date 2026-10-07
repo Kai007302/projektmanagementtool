@@ -8,6 +8,7 @@ type Props = { project: ProjectDetails; onImported: () => void }
 /** Tasks as CSV or Excel file: download all of them, or import new ones after a check of the file. */
 export function TaskTransfer({ project, onImported }: Props) {
   const [error, setError] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [check, setCheck] = useState<TaskImportResult | null>(null)
   const [done, setDone] = useState<number | null>(null)
@@ -27,22 +28,22 @@ export function TaskTransfer({ project, onImported }: Props) {
     setFile(selected)
     setCheck(null)
     setDone(null)
-    setError(null)
+    setImportError(null)
     if (!selected) return
     setBusy(true)
     try {
       setCheck(await importTasks(project.id, selected, true))
     } catch (e) {
-      setError(`Die Datei konnte nicht gelesen werden: ${(e as Error).message}`)
+      setImportError(`Die Datei konnte nicht gelesen werden: ${(e as Error).message}`)
     } finally {
       setBusy(false)
     }
   }
 
-  async function runImport() {
+  async function runImport(close: () => void) {
     if (!file) return
     setBusy(true)
-    setError(null)
+    setImportError(null)
     try {
       const result = await importTasks(project.id, file, false)
       if (result.errors.length > 0) {
@@ -51,10 +52,11 @@ export function TaskTransfer({ project, onImported }: Props) {
         setDone(result.created)
         setFile(null)
         setCheck(null)
+        close()
         onImported()
       }
     } catch (e) {
-      setError((e as Error).message)
+      setImportError((e as Error).message)
     } finally {
       setBusy(false)
     }
@@ -75,7 +77,7 @@ export function TaskTransfer({ project, onImported }: Props) {
       </div>
       {project.capabilities.canContribute && (
         <Reveal label="Aufgaben importieren">
-          {() => (
+          {(close) => (
             <div className="task-import">
               <label htmlFor={inputId}>Aufgaben importieren (Excel oder CSV)</label>
               <input
@@ -118,15 +120,16 @@ export function TaskTransfer({ project, onImported }: Props) {
                 </div>
               )}
               {importable && (
-                <button type="button" disabled={busy} onClick={() => void runImport()}>
+                <button type="button" disabled={busy} onClick={() => void runImport(close)}>
                   {check.rows === 1 ? '1 Aufgabe importieren' : `${check.rows} Aufgaben importieren`}
                 </button>
               )}
-              {done !== null && <p role="status">{done === 1 ? '1 Aufgabe importiert. 🎉' : `${done} Aufgaben importiert. 🎉`}</p>}
+              {importError && <p role="alert">{importError}</p>}
             </div>
           )}
         </Reveal>
       )}
+      {done !== null && <p role="status">{done === 1 ? '1 Aufgabe importiert. 🎉' : `${done} Aufgaben importiert. 🎉`}</p>}
       {error && <p role="alert">{error}</p>}
     </div>
   )

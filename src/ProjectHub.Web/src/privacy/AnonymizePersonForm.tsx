@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { User } from '../identity/api'
+import { Reveal } from '../ui/Reveal'
 import { anonymizeUser, searchUsers } from './api'
 
 /**
@@ -40,34 +41,37 @@ export function AnonymizePersonForm({ myId }: { myId: string }) {
   }
 
   return (
-    <details className="anonymize-person">
-      <summary>Person anonymisieren (Löschung nach DSGVO)</summary>
-      <form onSubmit={find}>
-        <label>
-          Name oder E-Mail
-          <input value={search} onChange={(event) => setSearch(event.target.value)} required maxLength={200} />
-        </label>
-        <button type="submit">Suchen</button>
-      </form>
-      {results !== null &&
-        (results.length === 0 ? (
-          <p>Niemand gefunden.</p>
-        ) : (
-          <ul>
-            {results.map((user) => (
-              <li key={user.id}>
-                <span>
-                  {user.displayName} · {user.email}
-                </span>
-                <button type="button" className="danger" onClick={() => void anonymize(user)}>
-                  Anonymisieren
-                </button>
-              </li>
+    <Reveal label="Person anonymisieren" title="Person anonymisieren (Löschung nach DSGVO)" plus={false}>
+      {() => (
+        <div className="anonymize-person">
+          <form onSubmit={find}>
+            <label>
+              Name oder E-Mail
+              <input value={search} onChange={(event) => setSearch(event.target.value)} required maxLength={200} />
+            </label>
+            <button type="submit">Suchen</button>
+          </form>
+          {results !== null &&
+            (results.length === 0 ? (
+              <p>Niemand gefunden.</p>
+            ) : (
+              <ul>
+                {results.map((user) => (
+                  <li key={user.id}>
+                    <span>
+                      {user.displayName} · {user.email}
+                    </span>
+                    <button type="button" className="danger" onClick={() => void anonymize(user)}>
+                      Anonymisieren
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ))}
-          </ul>
-        ))}
-      {message && <p role="status">{message}</p>}
-      {error && <p role="alert">{error}</p>}
-    </details>
+          {message && <p role="status">{message}</p>}
+          {error && <p role="alert">{error}</p>}
+        </div>
+      )}
+    </Reveal>
   )
 }

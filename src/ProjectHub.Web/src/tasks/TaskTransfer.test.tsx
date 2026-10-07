@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectDetails } from '../projects/api'
@@ -58,7 +58,7 @@ describe('TaskTransfer', () => {
 
     expect(await screen.findByText(/2 Probleme in der Datei/)).toBeInTheDocument()
     expect(screen.getByText('Zeile 3, Status: Status unbekannt (Offen, In Arbeit, Erledigt)')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /importieren$/ })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /importieren$/ })).not.toBeInTheDocument()
   })
 
   it('offers the export to everyone and the import only with write access', async () => {

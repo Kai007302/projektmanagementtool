@@ -135,8 +135,8 @@ function App() {
               ))}
             </nav>
           )}
-          <div className="account">
-            {session && (
+          {session && (
+            <div className="header-search">
               <button type="button" className="search-trigger" aria-label="Suchen (Strg+K)" onClick={() => setPaletteOpen(true)}>
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                   <circle cx="9" cy="9" r="5.5" />
@@ -144,7 +144,9 @@ function App() {
                 </svg>
                 <kbd aria-hidden="true">Strg K</kbd>
               </button>
-            )}
+            </div>
+          )}
+          <div className="account">
             <ThemeToggle />
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (

@@ -92,7 +92,8 @@ describe('ProjectsPage', () => {
     })
     render(<ProjectsPage me={ben} />)
 
-    await userEvent.type(await screen.findByLabelText('Neues Projekt'), 'Intranet')
+    await userEvent.click(await screen.findByRole('button', { name: '+ Projekt' }))
+    await userEvent.type(screen.getByLabelText('Name des Projekts'), 'Intranet')
     await userEvent.click(screen.getByRole('button', { name: 'Projekt anlegen' }))
 
     expect(await screen.findByRole('heading', { name: 'Intranet' })).toBeInTheDocument()

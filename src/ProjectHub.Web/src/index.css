@@ -64,7 +64,7 @@
     --warning: #facc15;
     --warning-soft: rgb(250 204 21 / 0.12);
     --header-bg: rgb(18 26 43 / 0.85);
-    --segment-bg: #0b1020;
+    --segment-bg: #172036;
     --chip-fg: #c3cad8;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
@@ -93,7 +93,7 @@
   --warning: #facc15;
   --warning-soft: rgb(250 204 21 / 0.12);
   --header-bg: rgb(18 26 43 / 0.85);
-  --segment-bg: #0b1020;
+  --segment-bg: #172036;
   --chip-fg: #c3cad8;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow: 0 1px 3px rgb(0 0 0 / 0.4);
@@ -194,13 +194,15 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button[type='submit'] {
+button[type='submit'],
+.primary-button {
   background: var(--accent);
   border-color: var(--accent);
   color: #ffffff;
 }
 
-button[type='submit']:hover:not(:disabled) {
+button[type='submit']:hover:not(:disabled),
+.primary-button:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }

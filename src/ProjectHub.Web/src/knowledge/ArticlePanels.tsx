@@ -58,13 +58,13 @@ export function TagsPanel({ details, onChanged }: PanelProps) {
   const [value, setValue] = useState(details.article.tags.join(', '))
   const { error, run } = useAction(onChanged)
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
     const tags = value
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean)
-    void run(() => setTags(details.article.id, tags))
+    if (await run(() => setTags(details.article.id, tags))) close()
   }
 
   return (
@@ -83,8 +83,8 @@ export function TagsPanel({ details, onChanged }: PanelProps) {
       )}
       {details.capabilities.canEdit && (
         <Reveal label="Tags bearbeiten" plus={false}>
-          {() => (
-            <form className="stacked-form" onSubmit={submit}>
+          {(close) => (
+            <form className="stacked-form" onSubmit={(event) => void submit(event, close)}>
               <label>
                 Tags (mit Komma getrennt)
                 <input value={value} onChange={(event) => setValue(event.target.value)} />
@@ -104,9 +104,12 @@ export function RelationsPanel({ details, onChanged, onOpenArticle }: PanelProps
   const [type, setType] = useState<RelationType>('RELATED')
   const { error, run } = useAction(onChanged)
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
-    if (await run(() => addRelation(details.article.id, target, type))) setTarget('')
+    if (await run(() => addRelation(details.article.id, target, type))) {
+      setTarget('')
+      close()
+    }
   }
 
   return (
@@ -135,8 +138,8 @@ export function RelationsPanel({ details, onChanged, onOpenArticle }: PanelProps
       )}
       {details.capabilities.canEdit && (
         <Reveal label="Beziehung">
-          {() => (
-            <form className="stacked-form" onSubmit={submit}>
+          {(close) => (
+            <form className="stacked-form" onSubmit={(event) => void submit(event, close)}>
               <label>
                 Beziehung
                 <select value={type} onChange={(event) => setType(event.target.value as RelationType)}>
@@ -163,9 +166,12 @@ export function ReferencesPanel({ details, onChanged }: PanelProps) {
   const [resourceId, setResourceId] = useState('')
   const { error, run } = useAction(onChanged)
 
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
-    if (await run(() => addReference(details.article.id, type, resourceId))) setResourceId('')
+    if (await run(() => addReference(details.article.id, type, resourceId))) {
+      setResourceId('')
+      close()
+    }
   }
 
   return (
@@ -191,8 +197,8 @@ export function ReferencesPanel({ details, onChanged }: PanelProps) {
       )}
       {details.capabilities.canEdit && (
         <Reveal label="Verknüpfung">
-          {() => (
-            <form className="stacked-form" onSubmit={submit}>
+          {(close) => (
+            <form className="stacked-form" onSubmit={(event) => void submit(event, close)}>
               <label>
                 Art
                 <select
@@ -338,18 +344,20 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
   }, [])
 
   function save(next: Permission[]) {
-    void run(async () => {
+    return run(async () => {
       setPermissionsState(await setPermissions(articleId, next.map(({ principalType, principalId, permission }) => ({ principalType, principalId, permission }))))
     })
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
     const chosen = principals.find((p) => p.key === principal)
     if (!chosen) return
     const others = permissions.filter((p) => !(p.principalType === chosen.type && p.principalId === chosen.id))
-    save([...others, { principalType: chosen.type, principalId: chosen.id, name: chosen.name, permission: grant }])
-    setPrincipal('')
+    if (await save([...others, { principalType: chosen.type, principalId: chosen.id, name: chosen.name, permission: grant }])) {
+      setPrincipal('')
+      close()
+    }
   }
 
   return (
@@ -373,7 +381,7 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
                 type="button"
                 className="link-button"
                 aria-label={`Freigabe für ${p.name} entfernen`}
-                onClick={() => save(permissions.filter((other) => other !== p))}
+                onClick={() => void save(permissions.filter((other) => other !== p))}
               >
                 Entfernen
               </button>
@@ -382,8 +390,8 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
         </ul>
       )}
       <Reveal label="Freigabe">
-        {() => (
-          <form className="stacked-form" onSubmit={submit}>
+        {(close) => (
+          <form className="stacked-form" onSubmit={(event) => void submit(event, close)}>
             <label>
               Person oder Team
               <select value={principal} onChange={(event) => setPrincipal(event.target.value)} required>

@@ -43,11 +43,12 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
     onChanged()
   }
 
-  async function create(event: FormEvent) {
+  async function create(event: FormEvent, close: () => void) {
     event.preventDefault()
     await run(async () => {
       const board = await createWhiteboard(project.id, name)
       setName('')
+      close()
       setSelectedId(board.id)
     })
   }
@@ -75,7 +76,7 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
         {canEdit && (
           <Reveal label="Whiteboard">
             {(close) => (
-              <form className="quick-create" onSubmit={create}>
+              <form className="quick-create" onSubmit={(event) => void create(event, close)}>
                 <input
                   aria-label="Neues Whiteboard"
                   value={name}
