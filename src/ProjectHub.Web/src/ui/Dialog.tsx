@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { CloseIcon } from './icons'
 
 /**
  * A small window over the page for a rare task opened from a menu (subscribe a calendar, change the project symbol).
@@ -39,7 +40,7 @@ export function Dialog({ label, title, onClose, children }: { label: string; tit
         }}
       >
         <button type="button" className="icon-button dialog-close" aria-label="Schließen" title="Schließen (Esc)" onClick={onClose}>
-          ✕
+          <CloseIcon />
         </button>
         {title && (
           <h2 id={headingId} className="dialog-title">

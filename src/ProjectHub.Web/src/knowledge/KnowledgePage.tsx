@@ -21,6 +21,7 @@ import { typeColors } from './galaxy/graph'
 import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
 import { toast } from '../ui/toast'
 import { Skeleton } from '../ui/Skeleton'
+import { CloseIcon } from '../ui/icons'
 
 type Props = { me: Me; initialArticleId?: string | null }
 
@@ -260,7 +261,7 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
         <div className="filter-chips" role="group" aria-label="Aktive Filter">
           {active.map((filter) => (
             <button key={filter.label} type="button" className="filter-chip active removable" aria-label={`Filter ${filter.label}: ${filter.value} entfernen`} onClick={filter.clear}>
-              {filter.label}: {filter.value} <span aria-hidden="true">✕</span>
+              {filter.label}: {filter.value} <CloseIcon size={12} />
             </button>
           ))}
           {active.length > 1 && (

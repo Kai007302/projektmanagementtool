@@ -32,6 +32,8 @@ import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
 import { Skeleton } from '../ui/Skeleton'
 import { DateField } from '../ui/DateField'
+import { formatDate } from '../ui/dates'
+import { CloseIcon } from '../ui/icons'
 
 type Props = {
   taskId: string
@@ -129,7 +131,7 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
         <span className="muted task-drawer-kicker">Aufgabe</span>
         {task && canEdit && <Menu label="Weitere Aktionen zur Aufgabe" items={[{ label: 'Aufgabe löschen', danger: true, onSelect: () => void remove() }]} />}
         <button type="button" className="icon-button" aria-label="Aufgabe schließen" title="Schließen (Esc)" onClick={onClose}>
-          ✕
+          <CloseIcon />
         </button>
       </header>
       {error && <p role="alert">{error}</p>}
@@ -217,7 +219,7 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         {task.dueDate && (
           <>
             <dt>Fällig am</dt>
-            <dd>{task.dueDate}</dd>
+            <dd>{formatDate(task.dueDate)}</dd>
           </>
         )}
       </dl>
@@ -417,7 +419,7 @@ function AttachmentsPanel({ taskId, project, me, onChanged }: PanelProps) {
                   aria-label={`${attachment.fileName} löschen`}
                   onClick={() => run(() => deleteAttachment(attachment.id))}
                 >
-                  ✕
+                  <CloseIcon />
                 </button>
               )}
             </span>

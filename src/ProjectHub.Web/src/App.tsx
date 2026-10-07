@@ -16,6 +16,7 @@ import { TeamsPage } from './teams/TeamsPage'
 import { CommandPalette } from './ui/CommandPalette'
 import { Toaster } from './ui/Toaster'
 import './App.css'
+import { SearchIcon } from './ui/icons'
 
 const statusText: Record<ApiStatus, string> = {
   checking: 'Verbindung wird geprüft …',
@@ -148,10 +149,7 @@ function App() {
           {session && (
             <div className="header-search">
               <button type="button" className="search-trigger" aria-label="Suchen (Strg+K)" onClick={() => setPaletteOpen(true)}>
-                <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                  <circle cx="9" cy="9" r="5.5" />
-                  <path d="M13.2 13.2 L17 17" />
-                </svg>
+                <SearchIcon />
                 <kbd aria-hidden="true">Strg K</kbd>
               </button>
             </div>

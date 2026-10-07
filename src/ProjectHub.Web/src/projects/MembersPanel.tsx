@@ -3,6 +3,7 @@ import type { User } from '../identity/api'
 import { fetchUsers } from '../teams/api'
 import { addProjectMember, changeProjectMember, projectRoles, removeProjectMember, type ProjectDetails, type ProjectRole } from './api'
 import { Reveal } from '../ui/Reveal'
+import { CloseIcon } from '../ui/icons'
 
 type Props = { project: ProjectDetails; onChanged: () => void }
 
@@ -44,7 +45,7 @@ export function MembersPanel({ project, onChanged }: Props) {
                   aria-label={`${member.displayName} entfernen`}
                   onClick={() => run(() => removeProjectMember(project.id, member.userId))}
                 >
-                  ✕
+                  <CloseIcon />
                 </button>
               </span>
             ) : (

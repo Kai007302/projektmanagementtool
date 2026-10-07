@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { fetchGantt, type GanttMilestone } from '../gantt/api'
 import type { Me } from '../identity/api'
 import type { Task } from '../tasks/api'
 import { today } from '../ui/personality'
 import { recentVisits, type Visit } from '../ui/recent'
 import type { ProjectSummary } from './api'
+import { DocumentIcon, FolderIcon, WhiteboardIcon } from '../ui/icons'
 
 const kindText: Record<Visit['kind'], string> = { project: 'Projekt', article: 'Artikel', whiteboard: 'Whiteboard' }
-const kindIcon: Record<Visit['kind'], string> = { project: '📁', article: '📄', whiteboard: '🖍️' }
+const kindIcon: Record<Visit['kind'], () => ReactNode> = { project: () => <FolderIcon />, article: () => <DocumentIcon />, whiteboard: () => <WhiteboardIcon /> }
 const dateFormat = new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'long' })
 
 type Props = {
@@ -51,9 +52,7 @@ export function ContinueSection({ me, projects, tasksOf, onOpenProject, onOpenAr
         {shown.map((visit) => (
           <li key={`${visit.kind}:${visit.id}`}>
             <button type="button" className="continue-item" onClick={() => open(visit)}>
-              <span className="continue-icon" aria-hidden="true">
-                {kindIcon[visit.kind]}
-              </span>
+              <span className="continue-icon">{kindIcon[visit.kind]()}</span>
               <span className="continue-text">
                 <span className="continue-title">{visit.title}</span>
                 <span className="muted continue-kind">{kindText[visit.kind]}</span>

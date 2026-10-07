@@ -12,6 +12,7 @@ import {
 } from './api'
 import { EmptyState } from '../ui/EmptyState'
 import { Skeleton } from '../ui/Skeleton'
+import { BellIcon } from '../ui/icons'
 
 type Props = { onOpen: (notification: Notification) => void }
 
@@ -102,7 +103,7 @@ export function NotificationBell({ onOpen }: Props) {
         aria-label={`Benachrichtigungen, ${unreadText(count)}`}
         onClick={toggle}
       >
-        <span aria-hidden="true">🔔</span>
+        <BellIcon />
         {count > 0 && (
           <span className="notification-count" aria-hidden="true">
             {count > 99 ? '99+' : count}

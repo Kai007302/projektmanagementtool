@@ -3152,7 +3152,8 @@ fieldset.block-fields {
   align-items: center;
   width: 100%;
   max-width: 28rem;
-  padding: 0.5rem 0.75rem;
+  min-height: var(--control-height);
+  padding: 0 0.75rem;
   border-color: var(--border);
   background: var(--surface);
   box-shadow: none;
@@ -3629,7 +3630,7 @@ kbd {
   padding-right: 2.25rem;
 }
 
-.date-field input[type='text']:invalid {
+.date-field input[type='text']:user-invalid {
   border-color: var(--danger);
 }
 

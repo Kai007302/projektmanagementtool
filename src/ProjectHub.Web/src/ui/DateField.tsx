@@ -1,5 +1,6 @@
 import { useRef, useState, type InputHTMLAttributes } from 'react'
 import { formatDate, parseDate } from './dates'
+import { CalendarIcon } from './icons'
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   /** The calendar day as YYYY-MM-DD, or '' for none. */
@@ -61,10 +62,7 @@ export function DateField({ value, onChange, onBlur, className, ...input }: Prop
         disabled={input.disabled}
         onClick={() => picker.current?.showPicker?.()}
       >
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-          <rect x="3" y="4.5" width="14" height="12.5" rx="2" />
-          <path d="M3 8.5h14M7 2.5v4M13 2.5v4" strokeLinecap="round" />
-        </svg>
+        <CalendarIcon />
       </button>
       <input
         ref={picker}

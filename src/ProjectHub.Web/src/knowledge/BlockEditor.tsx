@@ -3,6 +3,7 @@ import { fetchProjects, type ProjectSummary } from '../projects/api'
 import { fetchTasks, type Task } from '../tasks/api'
 import { searchArticles, type ArticleSummary } from './api'
 import { blockTypes, calloutTones, move, newBlock, type Block, type BlockType, type CalloutTone } from './blocks'
+import { CloseIcon } from '../ui/icons'
 
 type Props = { blocks: Block[]; onChange: (blocks: Block[]) => void; articleId?: string }
 
@@ -39,7 +40,7 @@ export function BlockEditor({ blocks, onChange, articleId }: Props) {
                   ↓
                 </button>
                 <button type="button" aria-label={`Block ${index + 1} entfernen`} onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
-                  ✕
+                  <CloseIcon />
                 </button>
               </span>
             </div>
@@ -155,7 +156,7 @@ function BlockFields({ block, position, onChange, articleId }: FieldsProps) {
                 onChange={(event) => onChange({ ...block, items: block.items.map((it, i) => (i === index ? { ...it, text: event.target.value } : it)) })}
               />
               <button type="button" aria-label={`Punkt ${index + 1} entfernen`} onClick={() => onChange({ ...block, items: block.items.filter((_, i) => i !== index) })}>
-                ✕
+                <CloseIcon />
               </button>
             </div>
           ))}
