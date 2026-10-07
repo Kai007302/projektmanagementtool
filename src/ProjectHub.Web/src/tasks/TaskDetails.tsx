@@ -31,6 +31,7 @@ import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
 import { QuickCreate } from '../ui/QuickCreate'
 import { Skeleton } from '../ui/Skeleton'
+import { DateField } from '../ui/DateField'
 
 type Props = {
   taskId: string
@@ -256,7 +257,7 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         ))}
       </select>
       <label htmlFor="task-due">Fällig am</label>
-      <input id="task-due" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} onBlur={() => void onSave({ dueDate: dueDate || null })} />
+      <DateField id="task-due" value={dueDate} onChange={setDueDate} onBlur={() => void onSave({ dueDate: dueDate || null })} />
       <label htmlFor="task-progress">Fortschritt (%)</label>
       <input
         id="task-progress"

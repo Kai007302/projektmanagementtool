@@ -3614,3 +3614,49 @@ kbd {
 .project-content > .panel + .panel {
   margin-top: 1.25rem;
 }
+
+/* Date field that understands "morgen", "Fr" and "+3" (ui/DateField.tsx) */
+.date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 10rem;
+}
+
+.date-field input[type='text'] {
+  flex: 1;
+  min-width: 0;
+  padding-right: 2.25rem;
+}
+
+.date-field input[type='text']:invalid {
+  border-color: var(--danger);
+}
+
+.date-field-picker {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.date-field-native {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
