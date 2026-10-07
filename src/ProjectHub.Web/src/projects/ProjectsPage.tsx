@@ -12,6 +12,7 @@ import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
 import { ProjectView } from './ProjectView'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
+import { toast } from '../ui/toast'
 
 type Props = {
   me: Me
@@ -207,6 +208,7 @@ function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary)
     setError(null)
     try {
       const project = await createProject(name, '')
+      toast(`Projekt „${project.name}“ angelegt. 🎉`)
       setName('')
       onCreated(project)
     } catch (e) {

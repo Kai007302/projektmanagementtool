@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import type { ProjectDetails } from '../projects/api'
 import { exportTasks, importErrorText, importTasks, type TaskFileFormat, type TaskImportResult } from './transfer'
 import { Reveal } from '../ui/Reveal'
+import { toast } from '../ui/toast'
 
 type Props = { project: ProjectDetails; onImported: () => void }
 
@@ -11,7 +12,6 @@ export function TaskTransfer({ project, onImported }: Props) {
   const [importError, setImportError] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [check, setCheck] = useState<TaskImportResult | null>(null)
-  const [done, setDone] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const inputId = useId()
 
@@ -27,7 +27,6 @@ export function TaskTransfer({ project, onImported }: Props) {
   async function choose(selected: File | null) {
     setFile(selected)
     setCheck(null)
-    setDone(null)
     setImportError(null)
     if (!selected) return
     setBusy(true)
@@ -49,7 +48,7 @@ export function TaskTransfer({ project, onImported }: Props) {
       if (result.errors.length > 0) {
         setCheck(result)
       } else {
-        setDone(result.created)
+        toast(result.created === 1 ? '1 Aufgabe importiert. 🎉' : `${result.created} Aufgaben importiert. 🎉`)
         setFile(null)
         setCheck(null)
         close()
@@ -129,7 +128,6 @@ export function TaskTransfer({ project, onImported }: Props) {
           )}
         </Reveal>
       )}
-      {done !== null && <p role="status">{done === 1 ? '1 Aufgabe importiert. 🎉' : `${done} Aufgaben importiert. 🎉`}</p>}
       {error && <p role="alert">{error}</p>}
     </div>
   )

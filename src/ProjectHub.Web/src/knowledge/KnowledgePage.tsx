@@ -19,6 +19,7 @@ import {
 import { ArticleView } from './ArticleView'
 import { typeColors } from './galaxy/graph'
 import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
+import { toast } from '../ui/toast'
 
 type Props = { me: Me; initialArticleId?: string | null }
 
@@ -283,6 +284,7 @@ function SpacesPanel({ me, spaces, current, onFilter, onCreated }: SpacesProps) 
     setError(null)
     try {
       await createSpace(name, '')
+      toast(`Bereich „${name}“ angelegt.`)
       setName('')
       close()
       onCreated()

@@ -40,6 +40,8 @@ type Props = {
   onClose: () => void
   /** Only shows the task; the Kanban board opens cards like this, changes happen in the list. */
   readOnly?: boolean
+  /** Read-only view on the board: jumps to the same task in the list, where it can be edited. */
+  onEditInList?: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'short', timeStyle: 'short' })
@@ -53,7 +55,7 @@ const staleText = 'Jemand anderes hat die Aufgabe inzwischen geändert. Der aktu
  * A task in a panel on the right, like in Asana: the board stays visible, every field saves as soon as it changes,
  * rare actions sit in the "…" menu. Escape or the close button closes it.
  */
-export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false }: Props) {
+export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose, readOnly = false, onEditInList }: Props) {
   const [task, setTask] = useState<Task | null>(null)
   const [error, setError] = useState<string | null>(null)
   const current = useRef<Task | null>(null)
@@ -137,7 +139,16 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
             <InlineEdit key={task.title} value={task.title} label="Titel" maxLength={500} editable={canContribute} onSave={(title) => save({ title })} />
           </h4>
           <TaskFields key={task.version} task={task} members={project.members.filter(assignable)} editable={canContribute} onSave={save} />
-          {readOnly && project.capabilities.canContribute && <p className="muted">Auf dem Board nur zum Ansehen. Bearbeiten in der Ansicht „Liste“.</p>}
+          {readOnly && project.capabilities.canContribute && (
+            <p className="read-only-hint">
+              <span className="muted">Auf dem Board nur zum Ansehen.</span>
+              {onEditInList && (
+                <button type="button" className="primary-button" onClick={onEditInList}>
+                  In der Liste bearbeiten
+                </button>
+              )}
+            </p>
+          )}
           <TaskCalendar task={task} />
           {canContribute && (
             <QuickCreate

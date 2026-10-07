@@ -5,6 +5,7 @@ import { createTeam, fetchTeams, type TeamSummary } from './api'
 import { TeamDetailsPanel } from './TeamDetailsPanel'
 import { EmptyState } from '../ui/EmptyState'
 import { Reveal } from '../ui/Reveal'
+import { toast } from '../ui/toast'
 
 export function TeamsPage({ me }: { me: Me }) {
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -32,6 +33,7 @@ export function TeamsPage({ me }: { me: Me }) {
                 <CreateTeamForm
                   onCreated={() => {
                     close()
+                    toast('Team angelegt.')
                     load()
                   }}
                 />

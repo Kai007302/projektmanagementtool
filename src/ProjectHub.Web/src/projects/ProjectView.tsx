@@ -28,6 +28,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   const [error, setError] = useState<string | null>(null)
   const [revision, setRevision] = useState(0)
   const [view, setView] = useState<View>('board')
+  const [listTask, setListTask] = useState<string | null>(null)
 
   const latest = useLatest()
   const load = useCallback(() => {
@@ -121,15 +122,28 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
                 type="button"
                 className={value === view ? 'tab active' : 'tab'}
                 aria-current={value === view ? 'page' : undefined}
-                onClick={() => setView(value)}
+                onClick={() => {
+                  setListTask(null)
+                  setView(value)
+                }}
               >
                 {viewText[value]}
               </button>
             ))}
           </nav>
           <div className={view === 'list' ? 'project-layout' : 'project-layout wide'}>
-            {view === 'board' && <KanbanBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={initialTaskId} />}
-            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} />}
+            {view === 'board' && <KanbanBoard
+                project={project}
+                me={me}
+                revision={revision}
+                onChanged={changed}
+                initialTaskId={initialTaskId}
+                onEditInList={(taskId) => {
+                  setListTask(taskId)
+                  setView('list')
+                }}
+              />}
+            {view === 'list' && <TaskBoard project={project} me={me} revision={revision} onChanged={changed} initialTaskId={listTask} />}
             {view === 'gantt' && <GanttChart project={project} me={me} revision={revision} onChanged={changed} />}
             {view === 'whiteboard' && <WhiteboardPanel project={project} me={me} revision={revision} onChanged={changed} />}
             <aside className="project-side">

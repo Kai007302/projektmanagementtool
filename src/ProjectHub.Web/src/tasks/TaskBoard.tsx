@@ -8,11 +8,11 @@ import { TaskTransfer } from './TaskTransfer'
 import { useLatest } from '../api/useLatest'
 import { QuickCreate } from '../ui/QuickCreate'
 
-type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
+type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void; initialTaskId?: string | null }
 
-export function TaskBoard({ project, me, revision, onChanged }: Props) {
+export function TaskBoard({ project, me, revision, onChanged, initialTaskId = null }: Props) {
   const [tasks, setTasks] = useState<Task[] | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(initialTaskId)
   const [error, setError] = useState<string | null>(null)
 
   const latest = useLatest()

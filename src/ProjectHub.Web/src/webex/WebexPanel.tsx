@@ -12,6 +12,7 @@ import {
 } from './api'
 import { useLatest } from '../api/useLatest'
 import { Reveal } from '../ui/Reveal'
+import { toast } from '../ui/toast'
 
 type Props = { project: ProjectDetails; revision: number; onChanged: () => void }
 
@@ -60,6 +61,7 @@ export function WebexPanel({ project, revision, onChanged }: Props) {
       setTitle('')
       setUrl('')
       close()
+      toast('Webex-Link gespeichert.')
       onChanged()
       load()
     } catch (e) {

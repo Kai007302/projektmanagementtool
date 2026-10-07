@@ -111,12 +111,6 @@
   font-size: 0.75rem;
 }
 
-.sign-out {
-  padding: 0.3125rem 0.625rem;
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
 .dev-switcher {
   display: flex;
   align-items: center;
@@ -3387,4 +3381,58 @@ kbd {
   height: auto;
   padding: 0.15rem 0.4rem 0.15rem 0.15rem;
   text-align: left;
+}
+
+/* Read-only task on the board: one clear way to edit it */
+.read-only-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.75rem 0;
+}
+
+/* Short success notes (ui/toast.tsx) */
+.toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.5rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.875rem;
+  pointer-events: auto;
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-check {
+  display: inline-grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-weight: 700;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
 }

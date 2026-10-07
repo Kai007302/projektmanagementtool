@@ -14,7 +14,7 @@ import { LegalFooter } from './privacy/LegalFooter'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { TeamsPage } from './teams/TeamsPage'
 import { CommandPalette } from './ui/CommandPalette'
-import { ThemeToggle } from './ui/ThemeToggle'
+import { Toaster } from './ui/toast'
 import './App.css'
 
 const statusText: Record<ApiStatus, string> = {
@@ -157,16 +157,15 @@ function App() {
             </div>
           )}
           <div className="account">
-            <ThemeToggle />
             {devIdentityEnabled && <DevUserSwitcher current={devUser} onChange={switchUser} />}
             {session && (
               <div className="account-row">
                 <NotificationBell key={session.me.id} onOpen={openNotification} />
-                <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} />
+                <AccountMenu me={session.me} role={roleText[session.me.organizationRole]} onSignOut={signedInWithEntra() ? () => void signOut() : undefined} />
               </div>
             )}
-            {signedInWithEntra() && (
-              <button type="button" className="sign-out" onClick={() => void signOut()}>
+            {!session && signedInWithEntra() && (
+              <button type="button" onClick={() => void signOut()}>
                 Abmelden
               </button>
             )}
@@ -212,6 +211,7 @@ function App() {
         </span>
         <LegalFooter />
       </footer>
+      <Toaster />
     </div>
   )
 }

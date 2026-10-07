@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectDetails } from '../projects/api'
 import { fakeApi, json } from '../test/fakeApi'
+import { Toaster } from '../ui/toast'
 import { TaskTransfer } from './TaskTransfer'
 
 function project(canContribute: boolean) {
@@ -22,7 +23,12 @@ describe('TaskTransfer', () => {
       'POST /api/v1/projects/p-1/tasks/import?dryRun=false': () => json({ rows: 2, created: 2, ignoredColumns: [], errors: [] }),
     })
     const onImported = vi.fn()
-    render(<TaskTransfer project={project(true)} onImported={onImported} />)
+    render(
+      <>
+        <TaskTransfer project={project(true)} onImported={onImported} />
+        <Toaster />
+      </>,
+    )
 
     await userEvent.click(screen.getByRole('button', { name: '+ Aufgaben importieren' }))
     await userEvent.upload(screen.getByLabelText('Aufgaben importieren (Excel oder CSV)'), file())

@@ -7,6 +7,7 @@ import { BoardEditor } from './BoardEditor'
 import { useLatest } from '../api/useLatest'
 import { EmptyState } from '../ui/EmptyState'
 import { Reveal } from '../ui/Reveal'
+import { toast } from '../ui/toast'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
 
@@ -49,6 +50,7 @@ export function WhiteboardPanel({ project, me, revision, onChanged }: Props) {
       const board = await createWhiteboard(project.id, name)
       setName('')
       close()
+      toast(`Whiteboard „${board.name}“ angelegt.`)
       setSelectedId(board.id)
     })
   }
