@@ -30,8 +30,10 @@ const HEIGHT = 600
 const FIT_PADDING = 90
 /** A planet this big on screen (radius in px) counts as zoomed into: its article opens in the galaxy. */
 const OPEN_RADIUS = 110
-/** Below this canvas width the article lies over the lower part of the galaxy instead of beside the planet. */
+/** Below this canvas width the article opens as a bottom sheet over the lower half of the screen instead of beside the planet. */
 const STACK_BELOW = 640
+/** Share of the screen the bottom sheet covers until it is pulled up. */
+const SHEET_SHARE = 0.5
 const POPUP_MARGIN = 16
 const POPUP_TOP = 56
 
@@ -39,11 +41,7 @@ const POPUP_TOP = 56
 type Placement = 'left' | 'right' | 'below'
 
 /** Size of the article pop-up for a canvas of the given size. */
-function popupBox(placement: Placement, width: number, height: number) {
-  if (placement === 'below') {
-    const top = Math.round(height * 0.42)
-    return { top, left: POPUP_MARGIN / 2, width: width - POPUP_MARGIN, height: height - top - POPUP_MARGIN / 2 }
-  }
+function popupBox(placement: Exclude<Placement, 'below'>, width: number, height: number) {
   const popupWidth = Math.min(416, Math.round(width * 0.55))
   return {
     top: POPUP_TOP,
@@ -55,8 +53,12 @@ function popupBox(placement: Placement, width: number, height: number) {
 
 /** Center and size of the part of the galaxy the pop-up leaves free. */
 function freeArea(placement: Placement, width: number, height: number) {
+  if (placement === 'below') {
+    // The bottom sheet covers the lower part of the screen; the galaxy is scrolled to the top of the screen when it opens.
+    const free = Math.min(height, Math.round(window.innerHeight * (1 - SHEET_SHARE)))
+    return { x: width / 2, y: free / 2, size: Math.min(width, free) }
+  }
   const box = popupBox(placement, width, height)
-  if (placement === 'below') return { x: width / 2, y: box.top / 2, size: Math.min(width, box.top) }
   const free = width - box.width - POPUP_MARGIN
   return { x: placement === 'right' ? free / 2 : width - free / 2, y: height / 2, size: Math.min(free, height) }
 }
@@ -528,6 +530,12 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
     }
   }, [selectedId, readingId, placement, graph, settled, positions, width, height, animateTo])
 
+  // On phones the article opens as a bottom sheet: bring the galaxy to the top of the screen so the planet stays visible above it.
+  const sheetOpen = Boolean(readingId) && placement === 'below'
+  useEffect(() => {
+    if (sheetOpen && !fullscreen) wrapper.current?.scrollIntoView?.({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' })
+  }, [sheetOpen, fullscreen, reducedMotion])
+
   useEffect(() => {
     const element = wrapper.current
     if (!element || typeof ResizeObserver === 'undefined') return
@@ -774,9 +782,13 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
         </button>
       </div>
       {reader ? (
-        <div className={`galaxy-popup ${placement}`} style={popupBox(placement, width, height)}>
-          {reader}
-        </div>
+        placement === 'below' ? (
+          <GalaxySheet onClose={onDismiss}>{reader}</GalaxySheet>
+        ) : (
+          <div className={`galaxy-popup ${placement}`} style={popupBox(placement, width, height)}>
+            {reader}
+          </div>
+        )
       ) : selected && (
         <div className="galaxy-card" aria-live="polite">
           <span className="galaxy-card-type">
@@ -794,6 +806,61 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
         Galaxie und hebt seine Verbindungen hervor. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Enter öffnet den gewählten Artikel, Esc schließt ihn bzw. hebt die Auswahl auf.
         Die Darstellung „Liste“ zeigt dieselben Inhalte.
       </p>
+    </div>
+  )
+}
+
+/**
+ * The article on phones: a bottom sheet over the lower half of the screen, so the galaxy stays visible and movable above it.
+ * Pulling the handle up (or tapping it) shows more of the article, pulling it down makes it smaller or closes it.
+ */
+function GalaxySheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const drag = useRef<{ y: number; moved: boolean } | null>(null)
+
+  function release() {
+    const start = drag.current
+    drag.current = null
+    setOffset(0)
+    if (!start?.moved) return setExpanded((value) => !value)
+    if (offset > 80) {
+      if (expanded) setExpanded(false)
+      else onClose()
+    } else if (offset < -60) setExpanded(true)
+  }
+
+  return (
+    <div className={expanded ? 'galaxy-popup below sheet expanded' : 'galaxy-popup below sheet'} style={offset ? { transform: `translateY(${Math.max(offset, expanded ? 0 : -160)}px)`, transition: 'none' } : undefined}>
+      <button
+        type="button"
+        className="galaxy-sheet-handle"
+        aria-label={expanded ? 'Artikel verkleinern' : 'Artikel vergrößern'}
+        aria-expanded={expanded}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture?.(event.pointerId)
+          drag.current = { y: event.clientY, moved: false }
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current
+          if (!start) return
+          const dy = event.clientY - start.y
+          if (Math.abs(dy) > 6) start.moved = true
+          if (start.moved) setOffset(dy)
+        }}
+        onPointerUp={release}
+        onPointerCancel={() => {
+          drag.current = null
+          setOffset(0)
+        }}
+        onClick={(event) => {
+          // Keyboard: Enter or space. Pointer taps are handled on pointer up.
+          if (event.detail === 0) setExpanded((value) => !value)
+        }}
+      >
+        <span aria-hidden="true" />
+      </button>
+      {children}
     </div>
   )
 }
