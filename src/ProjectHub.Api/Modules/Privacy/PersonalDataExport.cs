@@ -128,7 +128,7 @@ public sealed class PersonalDataExportService(ProjectHubDbContext db, IAuditLog 
             .ToListAsync(ct);
 
         var tasks = db.Set<ProjectTask>().AsNoTracking().Where(t => t.OrganizationId == org);
-        var assigned = await ToExport(tasks.Where(t => t.AssigneeId == me)).ToListAsync(ct);
+        var assigned = await ToExport(tasks.Where(t => db.Set<TaskAssignee>().Any(a => a.TaskId == t.Id && a.UserId == me))).ToListAsync(ct);
         var created = await ToExport(tasks.Where(t => t.CreatorId == me)).ToListAsync(ct);
 
         var taskComments = await db.Set<TaskComment>().AsNoTracking()

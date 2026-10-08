@@ -1,13 +1,12 @@
 import { apiFetch, jsonBody } from '../api/client'
-import type { TaskPriority, TaskStatus } from '../tasks/api'
+import type { TaskPerson, TaskPriority, TaskStatus } from '../tasks/api'
 
 export type KanbanCard = {
   id: string
   title: string
   status: TaskStatus
   priority: TaskPriority
-  assigneeId: string | null
-  assigneeName: string | null
+  assignees: TaskPerson[]
   dueDate: string | null
   progress: number
   subtaskCount: number

@@ -35,8 +35,7 @@ function card(id: string, title: string, overrides: Partial<KanbanCard> = {}): K
     title,
     status: 'todo',
     priority: 'normal',
-    assigneeId: null,
-    assigneeName: null,
+    assignees: [],
     dueDate: null,
     progress: 0,
     subtaskCount: 0,
@@ -168,7 +167,7 @@ describe('KanbanBoard', () => {
 
   it('opens a whole card in a window where its dates can be set', async () => {
     let version = 3
-    const design = { id: 't-1', projectId: 'p-1', title: 'Design', status: 'todo', priority: 'normal', assigneeId: null, assigneeName: null, dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 3 }
+    const design = { id: 't-1', projectId: 'p-1', title: 'Design', status: 'todo', priority: 'normal', assignees: [], dueDate: null, startDate: null, progress: 0, parentTaskId: null, version: 3 }
     const api = fakeApi({
       'GET /api/v1/projects/p-1/board': () => json(board()),
       'GET /api/v1/tasks/t-1': () => json(design),
@@ -203,7 +202,7 @@ describe('KanbanBoard', () => {
     })
     renderBoard()
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ Spalte' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Spalte hinzufügen' }))
     await userEvent.type(screen.getByLabelText('Name der neuen Spalte'), 'Review{Enter}')
 
     expect(await screen.findByRole('region', { name: 'Review' })).toBeInTheDocument()

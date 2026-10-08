@@ -47,9 +47,10 @@ public sealed class AssistantActions(
     {
         ["projectId"] = "Projekt", ["taskId"] = "Aufgabe", ["articleId"] = "Artikel", ["departmentId"] = "Abteilung",
         ["title"] = "Titel", ["name"] = "Name", ["description"] = "Beschreibung", ["summary"] = "Zusammenfassung",
-        ["status"] = "Status", ["priority"] = "Priorität", ["assigneeId"] = "Zuständig", ["unassign"] = "Zuständigkeit entfernen",
+        ["status"] = "Status", ["priority"] = "Priorität", ["assigneeIds"] = "Zuständig", ["addAssigneeIds"] = "Zuständig hinzufügen",
+        ["removeAssigneeIds"] = "Zuständig entfernen", ["unassign"] = "Alle Zuständigen entfernen",
         ["parentTaskId"] = "Übergeordnete Aufgabe", ["startDate"] = "Start", ["endDate"] = "Ende", ["dueDate"] = "Fällig",
-        ["date"] = "Datum", ["progress"] = "Fortschritt", ["text"] = "Text", ["userId"] = "Person", ["role"] = "Rolle",
+        ["date"] = "Datum", ["text"] = "Text", ["userId"] = "Person", ["role"] = "Rolle",
         ["articleType"] = "Art", ["spaceId"] = "Wissensbereich", ["tags"] = "Schlagwörter", ["changeNote"] = "Änderungsnotiz",
         ["resourceType"] = "Verknüpfen mit", ["resourceId"] = "Ziel", ["sourceTaskId"] = "Zuerst", ["targetTaskId"] = "Danach",
         ["dependencyType"] = "Art",
@@ -111,7 +112,16 @@ public sealed class AssistantActions(
 
         if (value.ValueKind == JsonValueKind.Array)
         {
-            return string.Join(", ", value.EnumerateArray().Select(v => v.ToString()));
+            var shown = new List<string>();
+            foreach (var item in value.EnumerateArray())
+            {
+                // People to assign are named, not shown as ids.
+                shown.Add(name.EndsWith("Ids", StringComparison.Ordinal) && Guid.TryParse(item.ToString(), out var itemId)
+                    ? await NameAsync("userId", itemId, ct) ?? "(nicht gefunden)"
+                    : item.ToString());
+            }
+
+            return string.Join(", ", shown);
         }
 
         var raw = value.ToString();
@@ -126,11 +136,6 @@ public sealed class AssistantActions(
             return DateOnly.TryParse(raw, CultureInfo.InvariantCulture, out var date) ? date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : raw;
         }
 
-        if (name == "progress")
-        {
-            return $"{raw} %";
-        }
-
         return Values.GetValueOrDefault(raw, raw);
     }
 
@@ -142,7 +147,7 @@ public sealed class AssistantActions(
         "departmentId" or KnowledgeResourceType.Department => (await departments.GetAsync(user, id, ct)).Value?.Name,
         "spaceId" => (await spaces.ListAsync(user, ct)).FirstOrDefault(s => s.Id == id)?.Name,
         KnowledgeResourceType.Whiteboard => (await whiteboards.GetAsync(user, id, ct)).Value?.Name,
-        "userId" or "assigneeId" => await db.Set<AppUser>().AsNoTracking()
+        "userId" => await db.Set<AppUser>().AsNoTracking()
             .Where(u => u.Id == id && u.OrganizationId == user.OrganizationId)
             .Select(u => u.DisplayName)
             .SingleOrDefaultAsync(ct),

@@ -7,7 +7,7 @@ namespace ProjectHub.Api.Modules.Tasks;
 public static class TaskEndpoints
 {
     public static IServiceCollection AddTasksModule(this IServiceCollection services) =>
-        services.AddScoped<TaskService>().AddScoped<TaskAccess>().AddScoped<TaskTransferService>();
+        services.AddScoped<TaskService>().AddScoped<TaskProgress>().AddScoped<TaskAccess>().AddScoped<TaskTransferService>();
 
     public static RouteGroupBuilder MapTaskEndpoints(this RouteGroupBuilder api)
     {

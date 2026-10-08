@@ -104,7 +104,7 @@ public static class DevelopmentSeedData
     public static readonly IReadOnlyList<SeedProject> Projects = [IntranetProject, FabrikamProject];
 
     public static readonly SeedTask ConceptTask = Task(1, IntranetProject, null, "Konzept abstimmen", "done", "high", Ben.Id, Ben.Id) with { StartDay = -14, DueDay = -5, Progress = 100 };
-    public static readonly SeedTask DesignTask = Task(2, IntranetProject, null, "Design erstellen", "in_progress", "normal", Clara.Id, Ben.Id) with { StartDay = -4, DueDay = 10, Progress = 30 };
+    public static readonly SeedTask DesignTask = Task(2, IntranetProject, null, "Design erstellen", "in_progress", "normal", Clara.Id, Ben.Id) with { StartDay = -4, DueDay = 10, Progress = 25 };
     public static readonly SeedTask StartPageTask = Task(3, IntranetProject, DesignTask.Id, "Startseite gestalten", "in_progress", "normal", Clara.Id, Clara.Id) with { StartDay = -4, DueDay = 3, Progress = 50 };
     public static readonly SeedTask NavigationTask = Task(4, IntranetProject, DesignTask.Id, "Navigation entwerfen", "todo", "low", David.Id, Clara.Id) with { StartDay = 4, DueDay = 10 };
     public static readonly SeedTask ContentTask = Task(5, IntranetProject, null, "Inhalte migrieren", "todo", "urgent", null, Ben.Id);

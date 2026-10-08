@@ -3,6 +3,9 @@ import { apiDownload, apiFetch, jsonBody, type Paged } from '../api/client'
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
 export type TaskPriority = 'low' | 'normal' | 'high' | 'urgent'
 
+/** Someone a task is assigned to; a task can have several. */
+export type TaskPerson = { id: string; displayName: string }
+
 export type Task = {
   id: string
   projectId: string
@@ -11,19 +14,23 @@ export type Task = {
   description: string | null
   status: TaskStatus
   priority: TaskPriority
-  assigneeId: string | null
-  assigneeName: string | null
+  assignees: TaskPerson[]
   startDate: string | null
   dueDate: string | null
+  /** Calculated from the status and the subtasks; it cannot be set. */
   progress: number
   estimatedHours: number | null
   subtaskCount: number
   version: number
 }
 
-export type TaskChanges = Partial<
-  Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'assigneeId' | 'startDate' | 'dueDate' | 'progress'>
->
+export type TaskChanges = Partial<Pick<Task, 'title' | 'description' | 'status' | 'priority' | 'startDate' | 'dueDate'>> & {
+  /** Replaces everyone the task is assigned to. */
+  assigneeIds?: string[]
+}
+
+/** "Clara, David" for lists and cards. */
+export const assigneeText = (names: string[]) => names.join(', ')
 
 export type Comment = {
   id: string

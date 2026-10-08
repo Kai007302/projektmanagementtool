@@ -32,7 +32,7 @@ test('an assignment shows up live in the bell, opens the task and respects the m
     await page.keyboard.press('Escape')
 
     // Ben assigns a task; Clara's bell counts up without reloading.
-    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: task, assigneeId: clara })
+    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: task, assigneeIds: [clara] })
     await expect(bell).toHaveAccessibleName('Benachrichtigungen, 1 ungelesen')
 
     // Opening the notification jumps to the task in its project and marks it read.
@@ -49,7 +49,7 @@ test('an assignment shows up live in the bell, opens the task and respects the m
     await expect(mail).toBeEnabled()
     await mail.uncheck()
     await expect(panel.getByText('Gespeichert.')).toBeVisible()
-    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: second, assigneeId: clara })
+    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: second, assigneeIds: [clara] })
     await expect(bell).toHaveAccessibleName('Benachrichtigungen, 1 ungelesen')
 
     // Mails leave through the outbox in the background (ADR 0010), right after the notification is stored.

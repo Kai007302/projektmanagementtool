@@ -4,7 +4,7 @@ import type { TaskStatus } from '../tasks/api'
 export type Whiteboard = { id: string; projectId: string; name: string; createdAt: string; updatedAt: string; version: number }
 
 /** Live data of a task card; never stored in the whiteboard document. */
-export type WhiteboardTask = { id: string; title: string; status: TaskStatus; assigneeName: string | null; dueDate: string | null }
+export type WhiteboardTask = { id: string; title: string; status: TaskStatus; assigneeNames: string[]; dueDate: string | null }
 
 export type TaskWhiteboard = { id: string; name: string }
 

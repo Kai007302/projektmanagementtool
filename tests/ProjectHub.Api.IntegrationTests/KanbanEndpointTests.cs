@@ -76,6 +76,7 @@ public sealed class KanbanEndpointTests(InfrastructureFixture infrastructure) : 
         Assert.Equal(task.Id, Assert.Single(moved.Columns[2].Cards).Id);
         var current = await As(Ben).GetFromJsonAsync<TaskResponse>($"/api/v1/tasks/{task.Id}");
         Assert.Equal("done", current!.Status);
+        Assert.Equal(100, current.Progress);
         Assert.Equal(task.Version + 1, current.Version);
         Assert.Equal(1L, await ScalarAsync("select count(*) from activity_log where action = 'TaskMoved' and resource_id = $1", task.Id));
     }

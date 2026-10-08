@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { knowledgePath, showPath } from '../navigation/location'
 import { canManageDepartment } from '../departments/currentDepartment'
 import type { Me } from '../identity/api'
 import { EmptyState } from '../ui/EmptyState'
@@ -25,20 +26,22 @@ import { Skeleton } from '../ui/Skeleton'
 import { CloseIcon } from '../ui/icons'
 
 /** departmentId: only the knowledge of this department; '' for all I can see (ADR 0021). */
-type Props = { me: Me; departmentId?: string; initialArticleId?: string | null }
+type Props = { me: Me; departmentId?: string; initialArticleId?: string | null; initialMode?: Mode }
 
 type Open = { id: string; editing: boolean }
 
 type Mode = 'articles' | 'galaxy'
 
-export function KnowledgePage({ me, departmentId = '', initialArticleId = null }: Props) {
+export function KnowledgePage({ me, departmentId = '', initialArticleId = null, initialMode = 'articles' }: Props) {
   const [open, setOpen] = useState<Open | null>(initialArticleId ? { id: initialArticleId, editing: false } : null)
   const [filter, setFilter] = useState<ArticleFilter>({})
   const [articles, setArticles] = useState<ArticleSummary[] | null>(null)
   const [spaces, setSpaces] = useState<Space[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<Mode>('articles')
+  const [mode, setMode] = useState<Mode>(initialMode)
+  const openId = open?.id ?? null
+  useEffect(() => showPath(knowledgePath(openId, mode)), [openId, mode])
 
   const load = useCallback(() => {
     searchArticles({ ...filter, departmentId }).then(

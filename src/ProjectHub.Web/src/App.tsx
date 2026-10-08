@@ -11,6 +11,7 @@ import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
 import { AccountMenu } from './identity/AccountMenu'
 import { signedInWithEntra, signOut } from './identity/signIn'
 import { KnowledgePage } from './knowledge/KnowledgePage'
+import { areaPath, currentPlace, showPath, type Area, type KnowledgeMode, type ProjectView } from './navigation/location'
 import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
 import { LegalFooter } from './privacy/LegalFooter'
@@ -33,7 +34,7 @@ const roleText: Record<Me['organizationRole'], string> = {
 
 type Session = { me: Me; organization: Organization; ai: AiStatus | null }
 
-type Tab = 'projects' | 'knowledge' | 'admin' | 'assistant'
+type Tab = Area
 
 const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', admin: 'Verwaltung', assistant: 'Assistent' }
 
@@ -42,10 +43,15 @@ function App() {
   const [devUser, setDevUserState] = useState<string | null>(getDevUser)
   const [session, setSession] = useState<Session | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('projects')
-  const [openArticle, setOpenArticle] = useState<string | null>(null)
+  // The page in the address when the app starts (e.g. after reloading the browser) is the page shown first.
+  const [start] = useState(currentPlace)
+  const [tab, setTab] = useState<Tab>(start.area)
+  const [openArticle, setOpenArticle] = useState<string | null>(start.articleId)
+  const [knowledgeMode, setKnowledgeMode] = useState<KnowledgeMode | null>(start.knowledgeMode)
   // A project (and task) to open, e.g. from a notification; the counter remounts the page on every jump.
-  const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; jump: number } | null>(null)
+  const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; view: ProjectView | null; jump: number } | null>(
+    start.projectId ? { projectId: start.projectId, taskId: null, view: start.view, jump: 0 } : null,
+  )
   const [paletteOpen, setPaletteOpen] = useState(false)
   // The department whose projects and knowledge are shown; '' for all (ADR 0021).
   const [department, setDepartment] = useState('')
@@ -107,11 +113,12 @@ function App() {
   function goTo(value: Tab) {
     setTab(value)
     setOpenArticle(null)
+    setKnowledgeMode(null)
     setOpenProject(null)
   }
 
   function showProject(projectId: string, taskId: string | null = null) {
-    setOpenProject((current) => ({ projectId, taskId, jump: (current?.jump ?? 0) + 1 }))
+    setOpenProject((current) => ({ projectId, taskId, view: null, jump: (current?.jump ?? 0) + 1 }))
     setTab('projects')
   }
 
@@ -125,6 +132,14 @@ function App() {
         (value) => (value !== 'assistant' || session.ai?.enabled) && (value !== 'admin' || managesAnything(session.me)),
       )
     : []
+
+  // An area I cannot open (e.g. an old link to the administration) shows the projects instead.
+  const shown: Tab = !session || tabs.includes(tab) ? tab : 'projects'
+
+  // The pages write their own part of the address (project, view, article); this only switches the area.
+  useEffect(() => {
+    if (currentPlace().area !== shown) showPath(areaPath(shown))
+  }, [shown])
 
   function switchDepartment(departmentId: string) {
     if (!session) return
@@ -160,8 +175,8 @@ function App() {
                 <button
                   key={value}
                   type="button"
-                  className={value === tab ? 'main-nav-item active' : 'main-nav-item'}
-                  aria-current={value === tab ? 'page' : undefined}
+                  className={value === shown ? 'main-nav-item active' : 'main-nav-item'}
+                  aria-current={value === shown ? 'page' : undefined}
                   onClick={() => goTo(value)}
                 >
                   {tabText[value]}
@@ -204,23 +219,30 @@ function App() {
         )}
         {session && (
           <>
-            {tab === 'projects' && (
+            {shown === 'projects' && (
               <ProjectsPage
                 key={`${session.me.id}:${department}:${openProject?.jump ?? 0}`}
                 me={session.me}
                 departmentId={department}
                 initialProjectId={openProject?.projectId ?? null}
                 initialTaskId={openProject?.taskId ?? null}
+                initialView={openProject?.view ?? null}
                 onOpenArticle={showArticle}
               />
             )}
-            {tab === 'knowledge' && (
-              <KnowledgePage key={`${session.me.id}:${department}:${openArticle}`} me={session.me} departmentId={department} initialArticleId={openArticle} />
+            {shown === 'knowledge' && (
+              <KnowledgePage
+                key={`${session.me.id}:${department}:${openArticle}`}
+                me={session.me}
+                departmentId={department}
+                initialArticleId={openArticle}
+                initialMode={knowledgeMode ?? 'articles'}
+              />
             )}
-            {tab === 'admin' && managesAnything(session.me) && (
+            {shown === 'admin' && managesAnything(session.me) && (
               <AdminPage key={session.me.id} me={session.me} onChanged={() => setMeRevision((r) => r + 1)} />
             )}
-            {tab === 'assistant' && session.ai?.enabled && (
+            {shown === 'assistant' && session.ai?.enabled && (
               <AssistantPage
                 key={session.me.id}
                 status={session.ai}

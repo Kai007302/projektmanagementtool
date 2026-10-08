@@ -88,7 +88,8 @@ export function TaskTransfer({ project, onImported }: Props) {
               />
               <p className="muted">
                 Erste Zeile mit Spaltennamen, mindestens „Titel“. Weitere Spalten wie im Export: Beschreibung, Status, Priorität,
-                Zuständig (E-Mail), Start, Fällig, Fortschritt (%), Aufwand (h). Es werden immer neue Aufgaben angelegt.
+                Zuständig (E-Mail, mehrere mit „;“ getrennt), Start, Fällig, Aufwand (h). Der Fortschritt ergibt sich aus dem Status.
+                Es werden immer neue Aufgaben angelegt.
               </p>
               {busy && <p role="status">Datei wird geprüft …</p>}
               {check && (

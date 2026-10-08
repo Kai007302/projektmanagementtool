@@ -18,7 +18,7 @@ public sealed record GanttTask(
     Guid? ParentTaskId,
     string Title,
     string Status,
-    string? AssigneeName,
+    IReadOnlyList<string> AssigneeNames,
     DateOnly? StartDate,
     DateOnly? DueDate,
     short Progress,
@@ -301,11 +301,13 @@ public sealed class GanttService(
     {
         var tasks = await (
                 from task in ActiveTasks(user, projectId)
-                join assignee in db.Set<AppUser>() on task.AssigneeId equals assignee.Id into assignees
-                from assignee in assignees.DefaultIfEmpty()
                 orderby task.CreatedAt, task.Id
                 select new GanttTask(
-                    task.Id, task.ParentTaskId, task.Title, task.Status, assignee == null ? null : assignee.DisplayName,
+                    task.Id, task.ParentTaskId, task.Title, task.Status,
+                    db.Set<TaskAssignee>().Where(a => a.TaskId == task.Id)
+                        .Join(db.Set<AppUser>(), a => a.UserId, u => u.Id, (a, u) => u)
+                        .OrderBy(u => u.DisplayName).ThenBy(u => u.Id)
+                        .Select(u => u.DisplayName).ToList(),
                     task.StartDate, task.DueDate, task.Progress, task.Version))
             .ToListAsync(ct);
 

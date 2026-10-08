@@ -15,8 +15,8 @@ public sealed class GanttEndpointTests(InfrastructureFixture infrastructure) : A
     public async Task Gantt_shows_all_active_tasks_with_their_dates()
     {
         var project = await CreateTeamProjectAsync();
-        var parent = await CreateTaskAsync(Ben, project.Id, NewTask("Phase", startDate: Day, dueDate: Day.AddDays(9), progress: 40));
-        var child = await CreateTaskAsync(Ben, project.Id, NewTask("Schritt", parentTaskId: parent.Id, dueDate: Day.AddDays(2)));
+        var parent = await CreateTaskAsync(Ben, project.Id, NewTask("Phase", startDate: Day, dueDate: Day.AddDays(9)));
+        var child = await CreateTaskAsync(Ben, project.Id, NewTask("Schritt", parentTaskId: parent.Id, dueDate: Day.AddDays(2), status: "in_progress"));
         var undated = await CreateTaskAsync(Ben, project.Id, NewTask("Ohne Termin"));
         var deleted = await CreateTaskAsync(Ben, project.Id, NewTask("Gelöscht"));
         await As(Ben).DeleteAsync($"/api/v1/tasks/{deleted.Id}");
@@ -25,7 +25,8 @@ public sealed class GanttEndpointTests(InfrastructureFixture infrastructure) : A
 
         Assert.Equal([parent.Id, child.Id, undated.Id], gantt.Tasks.Select(t => t.Id));
         var bar = gantt.Tasks[0];
-        Assert.Equal((Day, Day.AddDays(9), (short)40, parent.Version), (bar.StartDate!.Value, bar.DueDate!.Value, bar.Progress, bar.Version));
+        // The progress of the phase comes from its subtask in progress (ADR 0022).
+        Assert.Equal((Day, Day.AddDays(9), (short)50, parent.Version), (bar.StartDate!.Value, bar.DueDate!.Value, bar.Progress, bar.Version));
         Assert.Equal(parent.Id, gantt.Tasks[1].ParentTaskId);
         Assert.Null(gantt.Tasks[2].StartDate);
     }

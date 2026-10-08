@@ -17,6 +17,7 @@ import {
   fetchAttachments,
   fetchComments,
   fetchTask,
+  assigneeText,
   taskPriorities,
   taskStatuses,
   updateTask,
@@ -35,6 +36,15 @@ import { Skeleton } from '../ui/Skeleton'
 import { DateField } from '../ui/DateField'
 import { formatDate } from '../ui/dates'
 import { CloseIcon } from '../ui/icons'
+
+/** True when a change would leave the task as it is (assignees compare by person, in any order). */
+function sameValue(task: Task, field: string, value: unknown) {
+  if (field === 'assigneeIds') {
+    const ids = value as string[]
+    return ids.length === task.assignees.length && task.assignees.every((assignee) => ids.includes(assignee.id))
+  }
+  return task[field as keyof Task] === value
+}
 
 type Props = {
   taskId: string
@@ -84,7 +94,7 @@ export function TaskDetails({ taskId, project, me, onChanged, onDeleted, onClose
     queue.current = queue.current.then(async () => {
       const before = current.current
       if (!before) return
-      const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => before[field as keyof TaskChanges] !== value)) as TaskChanges
+      const changed = Object.fromEntries(Object.entries(changes).filter(([field, value]) => !sameValue(before, field, value))) as TaskChanges
       if (Object.keys(changed).length === 0) return
       setError(null)
       try {
@@ -209,7 +219,8 @@ type FieldsProps = { task: Task; members: ProjectMember[]; editable: boolean; on
 function TaskFields({ task, members, editable, onSave }: FieldsProps) {
   const [startDate, setStartDate] = useState(task.startDate ?? '')
   const [dueDate, setDueDate] = useState(task.dueDate ?? '')
-  const [progress, setProgress] = useState(String(task.progress))
+  const assigneeIds = task.assignees.map((assignee) => assignee.id)
+  const unassigned = members.filter((member) => !assigneeIds.includes(member.userId))
 
   if (!editable) {
     return (
@@ -219,7 +230,9 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         <dt>Priorität</dt>
         <dd>{taskPriorities[task.priority]}</dd>
         <dt>Zuständig</dt>
-        <dd>{task.assigneeName ?? 'Niemand'}</dd>
+        <dd>{task.assignees.length > 0 ? assigneeText(task.assignees.map((assignee) => assignee.displayName)) : 'Niemand'}</dd>
+        <dt>Fortschritt</dt>
+        <dd>{task.progress} %</dd>
         {task.startDate && (
           <>
             <dt>Start</dt>
@@ -234,11 +247,6 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         )}
       </dl>
     )
-  }
-
-  const saveProgress = () => {
-    const value = Math.min(100, Math.max(0, Math.round(Number(progress))))
-    if (Number.isFinite(value)) void onSave({ progress: value })
   }
 
   return (
@@ -260,31 +268,57 @@ function TaskFields({ task, members, editable, onSave }: FieldsProps) {
         ))}
       </select>
       <label htmlFor="task-assignee">Zuständig</label>
-      <select id="task-assignee" value={task.assigneeId ?? ''} onChange={(event) => void onSave({ assigneeId: event.target.value || null })}>
-        <option value="">Niemand</option>
-        {members.map((member) => (
-          <option key={member.userId} value={member.userId}>
-            {member.displayName}
-          </option>
+      <div className="task-assignees">
+        {task.assignees.map((assignee) => (
+          <span key={assignee.id} className="chip">
+            {assignee.displayName}
+            <button
+              type="button"
+              className="chip-remove"
+              aria-label={`${assignee.displayName} entfernen`}
+              onClick={() => void onSave({ assigneeIds: assigneeIds.filter((id) => id !== assignee.id) })}
+            >
+              ×
+            </button>
+          </span>
         ))}
-      </select>
+        {unassigned.length > 0 && (
+          <select
+            id="task-assignee"
+            value=""
+            onChange={(event) => {
+              if (event.target.value) void onSave({ assigneeIds: [...assigneeIds, event.target.value] })
+            }}
+          >
+            <option value="">{task.assignees.length > 0 ? '+ Person' : 'Niemand'}</option>
+            {unassigned.map((member) => (
+              <option key={member.userId} value={member.userId}>
+                {member.displayName}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       <label htmlFor="task-start">Start</label>
       <DateField id="task-start" value={startDate} onChange={setStartDate} onBlur={() => void onSave({ startDate: startDate || null })} />
       <label htmlFor="task-due">Fällig am</label>
       <DateField id="task-due" value={dueDate} onChange={setDueDate} onBlur={() => void onSave({ dueDate: dueDate || null })} />
-      <label htmlFor="task-progress">Fortschritt (%)</label>
-      <input
-        id="task-progress"
-        type="number"
-        min={0}
-        max={100}
-        value={progress}
-        onChange={(event) => setProgress(event.target.value)}
-        onBlur={saveProgress}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') saveProgress()
-        }}
-      />
+      <span className="task-prop-name" id="task-progress-label">
+        Fortschritt
+      </span>
+      <span className="task-progress">
+        <span
+          className="kanban-progress"
+          role="progressbar"
+          aria-labelledby="task-progress-label"
+          aria-valuenow={task.progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <span style={{ width: `${task.progress}%` }} />
+        </span>
+        <span title="Ergibt sich aus dem Status und den Unteraufgaben">{task.progress} %</span>
+      </span>
     </div>
   )
 }

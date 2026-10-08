@@ -19,8 +19,7 @@ public sealed record TaskResponse(
     string? Description,
     string Status,
     string Priority,
-    Guid? AssigneeId,
-    string? AssigneeName,
+    IReadOnlyList<TaskPerson> Assignees,
     Guid CreatorId,
     DateOnly? StartDate,
     DateOnly? DueDate,
@@ -36,12 +35,14 @@ public sealed record CreateTaskRequest(
     string? Description,
     string? Status,
     string? Priority,
-    Guid? AssigneeId,
+    IReadOnlyList<Guid>? AssigneeIds,
     Guid? ParentTaskId,
     DateOnly? StartDate,
     DateOnly? DueDate,
-    short? Progress,
     decimal? EstimatedHours);
+
+/// <summary>Someone a task is assigned to, as shown with the task.</summary>
+public sealed record TaskPerson(Guid Id, string DisplayName);
 
 public sealed record TaskCounts(int Todo, int InProgress, int Done, int Overdue);
 
@@ -54,10 +55,12 @@ public sealed class TaskService(
     IAuditLog audit,
     IActivityLog activity,
     IDomainEventPublisher events,
+    TaskProgress progress,
     TimeProvider clock)
 {
     public const int MaxTitleLength = 500;
     public const int MaxDescriptionLength = 20_000;
+    public const int MaxAssignees = 20;
 
     /// <summary>Guards against corrupt data when walking up the parent chain.</summary>
     private const int MaxHierarchyDepth = 100;
@@ -87,7 +90,7 @@ public sealed class TaskService(
 
         if (filter.AssigneeId is { } assigneeId)
         {
-            tasks = tasks.Where(t => t.AssigneeId == assigneeId);
+            tasks = tasks.Where(t => db.Set<TaskAssignee>().Any(a => a.TaskId == t.Id && a.UserId == assigneeId));
         }
 
         return await Project(tasks.OrderBy(t => t.CreatedAt).ThenBy(t => t.Id))
@@ -134,6 +137,7 @@ public sealed class TaskService(
         }
 
         var now = clock.GetUtcNow();
+        var status = request.Status ?? TaskStatus.Todo;
         var task = new ProjectTask
         {
             Id = Guid.CreateVersion7(),
@@ -142,29 +146,34 @@ public sealed class TaskService(
             ParentTaskId = request.ParentTaskId,
             Title = request.Title?.Trim() ?? string.Empty,
             Description = Normalize(request.Description),
-            Status = request.Status ?? TaskStatus.Todo,
+            Status = status,
             Priority = request.Priority ?? TaskPriority.Normal,
-            AssigneeId = request.AssigneeId,
             CreatorId = user.UserId,
             StartDate = request.StartDate,
             DueDate = request.DueDate,
-            Progress = request.Progress ?? 0,
+            Progress = TaskProgress.ForStatus(status),
             EstimatedHours = request.EstimatedHours,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
         };
 
-        if (await ValidateAsync(user, task, assigneeChanged: true, parentChanged: true, ct) is { } invalid)
+        var assigneeIds = request.AssigneeIds ?? [];
+        if (await ValidateAsync(user, task, assigneeIds, parentChanged: true, ct) is { } invalid)
         {
             return invalid;
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         db.Set<ProjectTask>().Add(task);
+        db.Set<TaskAssignee>().AddRange(assigneeIds.Distinct().Select(id => NewAssignee(user, task.Id, id, now)));
         activity.Record(user, projectId, ActivityActions.TaskCreated, "task", task.Id, new { task.Title, task.ParentTaskId });
         await db.SaveChangesAsync(ct);
+        await progress.RecalculateAsync(user.OrganizationId, projectId, ct);
+        await transaction.CommitAsync(ct);
+
         await events.PublishAsync(new ProjectContentChanged(projectId, ProjectContentChanged.Tasks), ct);
-        if (task.AssigneeId is { } assigneeId)
+        foreach (var assigneeId in assigneeIds.Distinct())
         {
             await events.PublishAsync(new TaskAssigned(user.OrganizationId, projectId, task.Id, assigneeId, user.UserId), ct);
         }
@@ -195,39 +204,70 @@ public sealed class TaskService(
             return ServiceFailure.StaleVersion(task.Version);
         }
 
-        var previousAssignee = task.AssigneeId;
+        if (patch.Has("progress"))
+        {
+            return ServiceFailure.Invalid("progress", "Calculated from the status and the subtasks; it cannot be set.");
+        }
+
+        if (patch.Has("assigneeId"))
+        {
+            return ServiceFailure.Invalid("assigneeId", "Use assigneeIds: a task can have several assignees.");
+        }
+
+        var previousAssignees = await db.Set<TaskAssignee>().AsNoTracking().Where(a => a.TaskId == task.Id).Select(a => a.UserId).ToListAsync(ct);
+        IReadOnlyList<Guid> assigneeIds = previousAssignees;
         var changed = new List<string>();
         if (!patch.TryApply<string>("title", v => task.Title = v?.Trim() ?? string.Empty, changed, out var error)
             || !patch.TryApply<string>("description", v => task.Description = Normalize(v), changed, out error)
             || !patch.TryApply<string>("status", v => task.Status = v ?? string.Empty, changed, out error)
             || !patch.TryApply<string>("priority", v => task.Priority = v ?? string.Empty, changed, out error)
-            || !patch.TryApply<Guid?>("assigneeId", v => task.AssigneeId = v, changed, out error)
+            || !patch.TryApply<List<Guid>>("assigneeIds", v => assigneeIds = v ?? [], changed, out error)
             || !patch.TryApply<Guid?>("parentTaskId", v => task.ParentTaskId = v, changed, out error)
             || !patch.TryApply<DateOnly?>("startDate", v => task.StartDate = v, changed, out error)
             || !patch.TryApply<DateOnly?>("dueDate", v => task.DueDate = v, changed, out error)
-            || !patch.TryApply<short?>("progress", v => task.Progress = v ?? 0, changed, out error)
             || !patch.TryApply<decimal?>("estimatedHours", v => task.EstimatedHours = v, changed, out error))
         {
             return error!;
         }
 
-        var invalid = await ValidateAsync(user, task, changed.Contains("assigneeId"), changed.Contains("parentTaskId"), ct);
+        var added = assigneeIds.Distinct().Except(previousAssignees).ToList();
+        var removed = previousAssignees.Except(assigneeIds).ToList();
+        var invalid = await ValidateAsync(user, task, added, changed.Contains("parentTaskId"), ct, assigneeIds.Distinct().Count());
         if (invalid is not null)
         {
             return invalid;
         }
 
+        if (changed.Contains("assigneeIds") && added.Count == 0 && removed.Count == 0)
+        {
+            changed.Remove("assigneeIds");
+        }
+
         if (changed.Count > 0)
         {
-            db.Touch(task, expectedVersion, clock.GetUtcNow());
+            var now = clock.GetUtcNow();
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            db.Touch(task, expectedVersion, now);
+            db.Set<TaskAssignee>().AddRange(added.Select(id => NewAssignee(user, task.Id, id, now)));
+            if (removed.Count > 0)
+            {
+                await db.Set<TaskAssignee>().Where(a => a.TaskId == task.Id && removed.Contains(a.UserId)).ExecuteDeleteAsync(ct);
+            }
+
             activity.Record(user, task.ProjectId, ActivityActions.TaskUpdated, "task", task.Id, new { task.Title, Fields = changed });
             if (await db.SaveVersionedAsync(task, ct) is { } conflict)
             {
                 return conflict;
             }
 
+            if (changed.Contains("status") || changed.Contains("parentTaskId"))
+            {
+                await progress.RecalculateAsync(user.OrganizationId, task.ProjectId, ct);
+            }
+
+            await transaction.CommitAsync(ct);
             await events.PublishAsync(new ProjectContentChanged(task.ProjectId, ProjectContentChanged.Tasks), ct);
-            if (changed.Contains("assigneeId") && task.AssigneeId is { } assigneeId && assigneeId != previousAssignee)
+            foreach (var assigneeId in added)
             {
                 await events.PublishAsync(new TaskAssigned(user.OrganizationId, task.ProjectId, task.Id, assigneeId, user.UserId), ct);
             }
@@ -268,10 +308,14 @@ public sealed class TaskService(
 
         activity.Record(user, task.ProjectId, ActivityActions.TaskDeleted, "task", task.Id, new { task.Title, Subtasks = deleted.Count - 1 });
         audit.Record(user, AuditActions.TaskDeleted, "task", task.Id, new { task.ProjectId, Subtasks = deleted.Count - 1 });
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (await db.SaveVersionedAsync(task, ct) is { } conflict)
         {
             return conflict;
         }
+
+        await progress.RecalculateAsync(user.OrganizationId, task.ProjectId, ct);
+        await transaction.CommitAsync(ct);
 
         await events.PublishAsync(new ProjectContentChanged(task.ProjectId, ProjectContentChanged.Tasks), ct);
         return Done.Value;
@@ -282,26 +326,42 @@ public sealed class TaskService(
 
     private IQueryable<TaskResponse> Project(IQueryable<ProjectTask> tasks) =>
         from task in tasks
-        join assignee in db.Set<AppUser>() on task.AssigneeId equals assignee.Id into assignees
-        from assignee in assignees.DefaultIfEmpty()
         select new TaskResponse(
             task.Id, task.ProjectId, task.ParentTaskId, task.Title, task.Description, task.Status, task.Priority,
-            task.AssigneeId, assignee == null ? null : assignee.DisplayName, task.CreatorId, task.StartDate, task.DueDate,
+            db.Set<TaskAssignee>().Where(a => a.TaskId == task.Id)
+                .Join(db.Set<AppUser>(), a => a.UserId, u => u.Id, (a, u) => u)
+                .OrderBy(u => u.DisplayName).ThenBy(u => u.Id)
+                .Select(u => new TaskPerson(u.Id, u.DisplayName))
+                .ToList(),
+            task.CreatorId, task.StartDate, task.DueDate,
             task.Progress, task.EstimatedHours,
             db.Set<ProjectTask>().Count(s => s.ParentTaskId == task.Id && s.DeletedAt == null),
             task.CreatedAt, task.UpdatedAt, task.Version);
 
-    private async Task<ServiceFailure?> ValidateAsync(UserContext user, ProjectTask task, bool assigneeChanged, bool parentChanged, CancellationToken ct)
+    private static TaskAssignee NewAssignee(UserContext user, Guid taskId, Guid userId, DateTimeOffset now) =>
+        new() { OrganizationId = user.OrganizationId, TaskId = taskId, UserId = userId, CreatedAt = now };
+
+    /// <param name="newAssignees">People added to the task: they must be allowed to work in the project.</param>
+    /// <param name="assigneeCount">Everyone the task is assigned to afterwards.</param>
+    private async Task<ServiceFailure?> ValidateAsync(
+        UserContext user, ProjectTask task, IReadOnlyCollection<Guid> newAssignees, bool parentChanged, CancellationToken ct, int? assigneeCount = null)
     {
         if (ValidateFields(task) is { } invalid)
         {
             return invalid;
         }
 
-        if (assigneeChanged && task.AssigneeId is { } assigneeId
-            && !await authorization.CanBeAssignedAsync(user.OrganizationId, task.ProjectId, assigneeId, ct))
+        if ((assigneeCount ?? newAssignees.Distinct().Count()) > MaxAssignees)
         {
-            return ServiceFailure.Invalid("assigneeId", "The user cannot be assigned tasks in this project.");
+            return ServiceFailure.Invalid("assigneeIds", $"At most {MaxAssignees} people.");
+        }
+
+        foreach (var assigneeId in newAssignees.Distinct())
+        {
+            if (!await authorization.CanBeAssignedAsync(user.OrganizationId, task.ProjectId, assigneeId, ct))
+            {
+                return ServiceFailure.Invalid("assigneeIds", "The user cannot be assigned tasks in this project.");
+            }
         }
 
         if (parentChanged && task.ParentTaskId is { } parentId)
@@ -333,11 +393,6 @@ public sealed class TaskService(
         if (!TaskPriority.All.Contains(task.Priority))
         {
             return ServiceFailure.Invalid("priority", $"Must be one of: {string.Join(", ", TaskPriority.All)}.");
-        }
-
-        if (task.Progress is < 0 or > 100)
-        {
-            return ServiceFailure.Invalid("progress", "Must be between 0 and 100.");
         }
 
         if (task.EstimatedHours is < 0)

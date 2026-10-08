@@ -56,6 +56,23 @@ describe('signIn', () => {
     expect(msal.app.loginRedirect).toHaveBeenCalledWith({ scopes: ['api://client/access_as_user'] })
   })
 
+  it('comes back from Microsoft to the page the person was on, not to the start page', async () => {
+    answer(entra)
+    window.history.replaceState(null, '', '/projekte/0192a000-0000-7000-8000-000000000001/liste')
+    const { signIn } = await import('./signIn')
+    expect(await signIn()).toBe(false)
+
+    window.history.replaceState(null, '', '/')
+    msal.app.handleRedirectPromise.mockResolvedValue({ account })
+    vi.resetModules()
+    const again = await import('./signIn')
+    expect(await again.signIn()).toBe(true)
+
+    expect(window.location.pathname).toBe('/projekte/0192a000-0000-7000-8000-000000000001/liste')
+    expect(msal.app.handleRedirectPromise).toHaveBeenCalledWith({ navigateToLoginRequestUrl: false })
+    window.history.replaceState(null, '', '/')
+  })
+
   it('returns from Microsoft signed in and asks for API tokens with the configured scope', async () => {
     answer(entra)
     msal.app.handleRedirectPromise.mockResolvedValue({ account })

@@ -80,10 +80,10 @@ public abstract class ApiTestBase(InfrastructureFixture infrastructure) : IAsync
         Guid? assigneeId = null,
         DateOnly? startDate = null,
         DateOnly? dueDate = null,
-        short? progress = null,
         string? priority = null,
-        string? status = null) =>
-        new(title, null, status, priority, assigneeId, parentTaskId, startDate, dueDate, progress, null);
+        string? status = null,
+        IReadOnlyList<Guid>? assigneeIds = null) =>
+        new(title, null, status, priority, assigneeIds ?? (assigneeId is { } id ? [id] : null), parentTaskId, startDate, dueDate, null);
 
     protected async Task<long> ScalarAsync(string sql, params object[] values)
     {

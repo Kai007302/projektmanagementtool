@@ -20,18 +20,26 @@ public enum TaskColumn
     Id,
 }
 
-/// <summary>One row of an import, read but not yet checked against the project (assignee, field limits).</summary>
+/// <summary>One row of an import, read but not yet checked against the project (assignees, field limits).</summary>
 public sealed record TaskDraft(
     int Row,
     string Title,
     string? Description,
     string? Status,
     string? Priority,
-    string? Assignee,
+    IReadOnlyList<string> Assignees,
     DateOnly? StartDate,
     DateOnly? DueDate,
-    short? Progress,
-    decimal? EstimatedHours);
+    decimal? EstimatedHours)
+{
+    // Records compare lists by reference; tests compare drafts by value.
+    public bool Equals(TaskDraft? other) =>
+        other is not null && (Row, Title, Description, Status, Priority, StartDate, DueDate, EstimatedHours)
+            == (other.Row, other.Title, other.Description, other.Status, other.Priority, other.StartDate, other.DueDate, other.EstimatedHours)
+        && Assignees.SequenceEqual(other.Assignees);
+
+    public override int GetHashCode() => HashCode.Combine(Row, Title, Status, StartDate, DueDate);
+}
 
 /// <summary>Why a row cannot be imported. <see cref="Code"/> is stable for the UI; <see cref="Message"/> is for logs and API users.</summary>
 public sealed record TaskImportError(int Row, string Column, string Code, string Message);
@@ -69,6 +77,9 @@ public static class TaskSheet
         (TaskColumn.ParentTask, "Übergeordnete Aufgabe", 30),
         (TaskColumn.Id, "ID", 38),
     ];
+
+    /// <summary>Several people in one cell, as Excel and MS Project write them: "anna@example.org; ben@example.org".</summary>
+    public const string ListSeparator = "; ";
 
     public static readonly IReadOnlyDictionary<string, string> StatusLabels = new Dictionary<string, string>
     {
@@ -136,9 +147,10 @@ public static class TaskSheet
         var ignored = new List<string>();
         for (var i = 0; i < header.Count; i++)
         {
-            // Parent and id are exported for reference only: an import always creates new top-level tasks.
+            // Parent and id are exported for reference only: an import always creates new top-level tasks. Progress is
+            // calculated from the status (ADR 0022), so the import leaves it out as well.
             if (HeaderAliases.TryGetValue(Normalize(header[i]), out var column)
-                && column is not TaskColumn.ParentTask and not TaskColumn.Id
+                && column is not TaskColumn.ParentTask and not TaskColumn.Id and not TaskColumn.Progress
                 && columns.TryAdd(column, i))
             {
                 continue;
@@ -199,19 +211,6 @@ public static class TaskSheet
         var start = Date(TaskColumn.StartDate);
         var due = Date(TaskColumn.DueDate);
 
-        short? progress = null;
-        if (Cell(TaskColumn.Progress) is { } progressText)
-        {
-            if (ParseNumber(progressText.TrimEnd('%', ' ')) is { } value && value is >= 0 and <= 100 && value == decimal.Truncate(value))
-            {
-                progress = (short)value;
-            }
-            else
-            {
-                Fail(TaskColumn.Progress, TaskImportErrorCodes.InvalidNumber, $"'{progressText}' is not a whole number from 0 to 100.");
-            }
-        }
-
         decimal? hours = null;
         if (Cell(TaskColumn.EstimatedHours) is { } hoursText)
         {
@@ -230,8 +229,11 @@ public static class TaskSheet
             return (null, errors);
         }
 
-        var assignee = Cell(TaskColumn.AssigneeEmail) ?? Cell(TaskColumn.Assignee);
-        return (new TaskDraft(rowNumber, title, Cell(TaskColumn.Description), status, priority, assignee, start, due, progress, hours), errors);
+        var assignees = (Cell(TaskColumn.AssigneeEmail) ?? Cell(TaskColumn.Assignee))?
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+        return (new TaskDraft(rowNumber, title, Cell(TaskColumn.Description), status, priority, assignees, start, due, hours), errors);
     }
 
     public static string Header(TaskColumn column) => Columns.Single(c => c.Column == column).Header;

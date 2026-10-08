@@ -138,9 +138,9 @@ public sealed class ProductionHttpHardeningTests(InfrastructureFixture infrastru
         var project = (await (await client.PostAsJsonAsync("/api/v1/projects",
             new Modules.Projects.CreateProjectRequest("Limits", null, null, null, null))).Content.ReadFromJsonAsync<Modules.Projects.ProjectSummary>())!;
         var tooLarge = await client.PostAsJsonAsync($"/api/v1/projects/{project.Id}/tasks",
-            new CreateTaskRequest("Aufgabe", new string('x', 4000), null, null, null, null, null, null, null, null));
+            new CreateTaskRequest("Aufgabe", new string('x', 4000), null, null, null, null, null, null, null));
         var task = await client.PostAsJsonAsync($"/api/v1/projects/{project.Id}/tasks",
-            new CreateTaskRequest("Aufgabe", null, null, null, null, null, null, null, null, null));
+            new CreateTaskRequest("Aufgabe", null, null, null, null, null, null, null, null));
         var taskId = (await task.Content.ReadFromJsonAsync<TaskResponse>())!.Id;
         var upload = await client.PostAsync($"/api/v1/tasks/{taskId}/attachments",
             new MultipartFormDataContent { { new ByteArrayContent(new byte[8192]), "file", "gross.txt" } });

@@ -74,13 +74,14 @@ public sealed class UserAnonymizationService(ProjectHubDbContext db, IAuditLog a
             .Where(p => p.OrganizationId == org && p.PrincipalType == "user" && p.PrincipalId == userId)
             .ExecuteDeleteAsync(ct);
 
-        // Open work must not stay with someone who is gone; the project sees the task as unassigned.
+        // Open work must not stay with someone who is gone; the task keeps its other assignees, if any.
+        var assignments = db.Set<TaskAssignee>().Where(a => a.OrganizationId == org && a.UserId == userId);
         await db.Set<ProjectTask>()
-            .Where(t => t.OrganizationId == org && t.AssigneeId == userId)
+            .Where(t => t.OrganizationId == org && assignments.Any(a => a.TaskId == t.Id))
             .ExecuteUpdateAsync(s => s
-                .SetProperty(t => t.AssigneeId, (Guid?)null)
                 .SetProperty(t => t.UpdatedAt, now)
                 .SetProperty(t => t.Version, t => t.Version + 1), ct);
+        await assignments.ExecuteDeleteAsync(ct);
         await db.Set<KnowledgeArticle>()
             .Where(a => a.OrganizationId == org && a.OwnerId == userId)
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.OwnerId, (Guid?)null), ct);

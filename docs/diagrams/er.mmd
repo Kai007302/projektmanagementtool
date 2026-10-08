@@ -13,7 +13,8 @@ erDiagram
 
   PROJECT ||--o{ TASK : contains
   APP_USER ||--o{ TASK : creates
-  APP_USER ||--o{ TASK : assigned
+  TASK ||--o{ TASK_ASSIGNEE : assigned
+  APP_USER ||--o{ TASK_ASSIGNEE : assigned
   TASK ||--o{ TASK : parent
 
   TASK ||--o{ TASK_COMMENT : has

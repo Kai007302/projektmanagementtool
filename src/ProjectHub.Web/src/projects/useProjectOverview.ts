@@ -16,10 +16,11 @@ const LIMIT = 12
 function peopleOf(tasks: Task[]): ProjectPerson[] {
   const counts = new Map<string, ProjectPerson & { count: number }>()
   for (const task of tasks) {
-    if (!task.assigneeId) continue
-    const entry = counts.get(task.assigneeId) ?? { userId: task.assigneeId, displayName: task.assigneeName ?? '?', count: 0 }
-    entry.count++
-    counts.set(task.assigneeId, entry)
+    for (const assignee of task.assignees) {
+      const entry = counts.get(assignee.id) ?? { userId: assignee.id, displayName: assignee.displayName, count: 0 }
+      entry.count++
+      counts.set(assignee.id, entry)
+    }
   }
   return [...counts.values()].sort((a, b) => b.count - a.count).map(({ userId, displayName }) => ({ userId, displayName }))
 }

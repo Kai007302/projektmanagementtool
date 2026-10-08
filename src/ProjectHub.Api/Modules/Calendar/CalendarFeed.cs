@@ -224,7 +224,8 @@ public sealed class CalendarFeedService(
         var tasks = await (
                 from task in db.Set<ProjectTask>().AsNoTracking()
                 join project in visibleProjects on task.ProjectId equals project.Id
-                where task.OrganizationId == user.OrganizationId && task.AssigneeId == user.UserId && task.DeletedAt == null
+                where task.OrganizationId == user.OrganizationId && task.DeletedAt == null
+                      && db.Set<TaskAssignee>().Any(a => a.TaskId == task.Id && a.UserId == user.UserId)
                       && (task.StartDate != null || task.DueDate != null)
                       && (task.DueDate ?? task.StartDate) >= since
                 orderby task.StartDate ?? task.DueDate, task.Id

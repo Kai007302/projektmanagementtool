@@ -64,7 +64,7 @@ Bestehende Projekte sind nach Migration 016 `private`. Die Abgrenzung `member`/`
 | Mitglieder verwalten, Projekt löschen | Manage |
 | Aufgabe anlegen und ändern (inkl. Status, Zuständigkeit, Unteraufgaben) | Contribute |
 | Aufgabe löschen (inkl. Unteraufgaben) | Edit |
-| Zuständig sein | die Person braucht selbst Contribute im Projekt |
+| Zuständig sein (mehrere Personen je Aufgabe, ADR 0022) | wer neu hinzukommt, braucht selbst Contribute im Projekt |
 | Kommentieren, Datei hochladen | Contribute |
 | Kommentar bearbeiten | nur die Autorin/der Autor |
 | Kommentar löschen | Autorin/Autor oder Manage |

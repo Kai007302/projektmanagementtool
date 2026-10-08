@@ -8,6 +8,27 @@ type EntraSignIn = { app: IPublicClientApplication; account: AccountInfo; scope:
 
 let entra: EntraSignIn | null = null
 
+/** The page someone was on when Microsoft asked them to sign in; they come back to it, not to the start page. */
+const returnKey = 'projecthub.signInReturnTo'
+
+function rememberPage() {
+  try {
+    sessionStorage.setItem(returnKey, window.location.pathname + window.location.search)
+  } catch {
+    // Without session storage the app opens the start page after signing in.
+  }
+}
+
+function returnToPage() {
+  try {
+    const path = sessionStorage.getItem(returnKey)
+    sessionStorage.removeItem(returnKey)
+    if (path?.startsWith('/') && !path.startsWith('//')) window.history.replaceState(null, '', path)
+  } catch {
+    // See rememberPage.
+  }
+}
+
 /**
  * Signs the person in before the app renders (ADR 0014). Outside development this is Microsoft Entra ID with a
  * full-page redirect: popups would be cut off by Cross-Origin-Opener-Policy. Resolves false while the browser is
@@ -32,9 +53,12 @@ export async function signIn(): Promise<boolean> {
     cache: { cacheLocation: 'sessionStorage' },
   })
 
-  const redirect = await app.handleRedirectPromise()
+  // Microsoft sends the browser back to the redirect URI (the start page); returnToPage restores the page before.
+  const redirect = await app.handleRedirectPromise({ navigateToLoginRequestUrl: false })
+  if (redirect) returnToPage()
   const account = redirect?.account ?? app.getActiveAccount() ?? app.getAllAccounts()[0]
   if (!account) {
+    rememberPage()
     await app.loginRedirect({ scopes: [config.scope] })
     return false
   }
@@ -51,7 +75,10 @@ export async function accessToken(): Promise<string | null> {
   try {
     return (await entra.app.acquireTokenSilent(request)).accessToken
   } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) await entra.app.acquireTokenRedirect(request)
+    if (error instanceof InteractionRequiredAuthError) {
+      rememberPage()
+      await entra.app.acquireTokenRedirect(request)
+    }
     throw error
   }
 }

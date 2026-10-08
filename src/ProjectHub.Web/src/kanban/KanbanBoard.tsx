@@ -3,7 +3,7 @@ import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { initials } from '../identity/initials'
-import { createTask, taskStatuses, type TaskStatus } from '../tasks/api'
+import { assigneeText, createTask, taskStatuses, type TaskStatus } from '../tasks/api'
 import { DueDate } from '../tasks/DueDate'
 import { celebrate } from '../ui/confetti'
 import { PriorityBadge } from '../tasks/PriorityBadge'
@@ -264,12 +264,16 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                         <span style={{ width: `${card.progress}%` }} />
                       </div>
                     )}
-                    {card.assigneeName && (
+                    {card.assignees.length > 0 && (
                       <span className="kanban-assignee">
-                        <span className="avatar small" aria-hidden="true">
-                          {initials(card.assigneeName)}
+                        <span className="avatar-stack" aria-hidden="true">
+                          {card.assignees.slice(0, 3).map((assignee) => (
+                            <span key={assignee.id} className="avatar small">
+                              {initials(assignee.displayName)}
+                            </span>
+                          ))}
                         </span>
-                        {card.assigneeName}
+                        {assigneeText(card.assignees.map((assignee) => assignee.displayName))}
                       </span>
                     )}
                   </li>
@@ -285,7 +289,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
         })}
         {canEdit && (
           <div className="kanban-column new-column">
-            <Reveal label="Spalte">{(close) => <NewColumnForm onCreate={(name) => apply(() => createColumn(project.id, name, 'in_progress'))} onClose={close} />}</Reveal>
+            <Reveal label="Spalte" iconOnly>{(close) => <NewColumnForm onCreate={(name) => apply(() => createColumn(project.id, name, 'in_progress'))} onClose={close} />}</Reveal>
           </div>
         )}
       </div>

@@ -51,10 +51,14 @@ public sealed class TaskTransferService(
         var tasks = await (
                 from task in db.Set<ProjectTask>().AsNoTracking()
                 where task.OrganizationId == user.OrganizationId && task.ProjectId == projectId && task.DeletedAt == null
-                join assignee in db.Set<AppUser>() on task.AssigneeId equals assignee.Id into assignees
-                from assignee in assignees.DefaultIfEmpty()
                 orderby task.CreatedAt, task.Id
-                select new ExportRow(task, assignee == null ? null : assignee.Email, assignee == null ? null : assignee.DisplayName))
+                select new ExportRow(
+                    task,
+                    db.Set<TaskAssignee>().Where(a => a.TaskId == task.Id)
+                        .Join(db.Set<AppUser>(), a => a.UserId, u => u.Id, (a, u) => u)
+                        .OrderBy(u => u.DisplayName).ThenBy(u => u.Id)
+                        .Select(u => new ExportPerson(u.Email, u.DisplayName))
+                        .ToList()))
             .Take(MaxExportRows + 1)
             .ToListAsync(ct);
         if (tasks.Count > MaxExportRows)
@@ -120,6 +124,7 @@ public sealed class TaskTransferService(
         var now = clock.GetUtcNow();
         var errors = new List<TaskImportError>();
         var tasks = new List<ProjectTask>();
+        var assignments = new List<TaskAssignee>();
         for (var i = 1; i < table.Count; i++)
         {
             var (draft, rowErrors) = TaskSheet.ReadRow(i + 1, table[i], columns);
@@ -130,15 +135,23 @@ public sealed class TaskTransferService(
             }
 
             var task = NewTask(user, projectId, draft, now);
-            if (draft.Assignee is { } assignee)
+            if (draft.Assignees.Count > TaskService.MaxAssignees)
+            {
+                errors.Add(new TaskImportError(draft.Row, AssigneeHeader(columns), TaskImportErrorCodes.Invalid, $"At most {TaskService.MaxAssignees} people."));
+            }
+
+            foreach (var assignee in draft.Assignees)
             {
                 if (people.Find(assignee) is { } assigneeId)
                 {
-                    task.AssigneeId = assigneeId;
+                    if (assignments.All(a => a.TaskId != task.Id || a.UserId != assigneeId))
+                    {
+                        assignments.Add(new TaskAssignee { OrganizationId = user.OrganizationId, TaskId = task.Id, UserId = assigneeId, CreatedAt = now });
+                    }
                 }
                 else
                 {
-                    errors.Add(new TaskImportError(draft.Row, TaskSheet.Header(columns.ContainsKey(TaskColumn.AssigneeEmail) ? TaskColumn.AssigneeEmail : TaskColumn.Assignee),
+                    errors.Add(new TaskImportError(draft.Row, AssigneeHeader(columns),
                         TaskImportErrorCodes.UnknownAssignee, $"'{assignee}' cannot be assigned tasks in this project."));
                 }
             }
@@ -158,6 +171,7 @@ public sealed class TaskTransferService(
         }
 
         db.Set<ProjectTask>().AddRange(tasks);
+        db.Set<TaskAssignee>().AddRange(assignments);
         activity.Record(user, projectId, ActivityActions.TasksImported, "project", projectId, new { Count = tasks.Count, FileName = Path.GetFileName(fileName) });
         await db.SaveChangesAsync(ct);
 
@@ -178,7 +192,7 @@ public sealed class TaskTransferService(
         CreatorId = user.UserId,
         StartDate = draft.StartDate,
         DueDate = draft.DueDate,
-        Progress = draft.Progress ?? 0,
+        Progress = TaskProgress.ForStatus(draft.Status ?? TaskStatus.Todo),
         EstimatedHours = draft.EstimatedHours,
         CreatedAt = now,
         UpdatedAt = now,
@@ -230,7 +244,7 @@ public sealed class TaskTransferService(
         return
         [
             task.Title, task.Description, TaskSheet.StatusLabels.GetValueOrDefault(task.Status, task.Status),
-            TaskSheet.PriorityLabels.GetValueOrDefault(task.Priority, task.Priority), row.AssigneeEmail, row.AssigneeName,
+            TaskSheet.PriorityLabels.GetValueOrDefault(task.Priority, task.Priority), row.AssigneeEmails, row.AssigneeNames,
             TaskSheet.Day(task.StartDate), TaskSheet.Day(task.DueDate), TaskSheet.Number(task.Progress), TaskSheet.Number(task.EstimatedHours),
             task.ParentTaskId is { } parent ? titles.GetValueOrDefault(parent) : null, task.Id.ToString(),
         ];
@@ -244,7 +258,7 @@ public sealed class TaskTransferService(
             SheetCell.Of(task.Title), SheetCell.Of(task.Description),
             SheetCell.Of(TaskSheet.StatusLabels.GetValueOrDefault(task.Status, task.Status)),
             SheetCell.Of(TaskSheet.PriorityLabels.GetValueOrDefault(task.Priority, task.Priority)),
-            SheetCell.Of(row.AssigneeEmail), SheetCell.Of(row.AssigneeName),
+            SheetCell.Of(row.AssigneeEmails), SheetCell.Of(row.AssigneeNames),
             task.StartDate is { } start ? new SheetCell.Day(start) : null,
             task.DueDate is { } due ? new SheetCell.Day(due) : null,
             new SheetCell.Number(task.Progress),
@@ -254,7 +268,17 @@ public sealed class TaskTransferService(
         ];
     }
 
-    private sealed record ExportRow(ProjectTask Task, string? AssigneeEmail, string? AssigneeName);
+    private static string AssigneeHeader(IReadOnlyDictionary<TaskColumn, int> columns) =>
+        TaskSheet.Header(columns.ContainsKey(TaskColumn.AssigneeEmail) ? TaskColumn.AssigneeEmail : TaskColumn.Assignee);
+
+    private sealed record ExportPerson(string Email, string DisplayName);
+
+    private sealed record ExportRow(ProjectTask Task, IReadOnlyList<ExportPerson> Assignees)
+    {
+        public string? AssigneeEmails => Assignees.Count == 0 ? null : string.Join(TaskSheet.ListSeparator, Assignees.Select(a => a.Email));
+
+        public string? AssigneeNames => Assignees.Count == 0 ? null : string.Join(TaskSheet.ListSeparator, Assignees.Select(a => a.DisplayName));
+    }
 
     /// <summary>Finds a person by e-mail address or, if no one else has it, by display name (both ignoring case).</summary>
     private sealed class AssignablePeople(IReadOnlyList<(Guid Id, string Email, string DisplayName)> people)

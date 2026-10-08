@@ -51,6 +51,25 @@ describe('App', () => {
     expect(await screen.findByText('Backend bereit')).toBeInTheDocument()
   })
 
+  it('keeps the open area in the address and opens it again after reloading', async () => {
+    fakeApi(baseRoutes())
+    window.history.replaceState(null, '', '/verwaltung')
+    render(<App />)
+
+    expect(await screen.findByRole('button', { name: 'Verwaltung', current: 'page' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Projekte' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+  })
+
+  it('opens the projects instead of an area the person cannot use', async () => {
+    fakeApi(baseRoutes(eva))
+    window.history.replaceState(null, '', '/verwaltung')
+    render(<App />)
+
+    expect(await screen.findByRole('button', { name: 'Projekte', current: 'page' })).toBeInTheDocument()
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+  })
+
   it('reports an unavailable backend', async () => {
     fakeApi({ ...baseRoutes(), 'GET /health/ready': () => new Response('Unhealthy', { status: 503 }) })
     render(<App />)
