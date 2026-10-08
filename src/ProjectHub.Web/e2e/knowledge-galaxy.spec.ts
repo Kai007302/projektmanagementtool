@@ -33,12 +33,12 @@ test('the galaxy is drawn and navigable with the mouse', async ({ page }) => {
   await details.getByRole('button', { name: 'Störungen melden' }).click()
   await expect(page.getByRole('region', { name: 'Störungen melden' })).toBeVisible()
 
-  // Clicking a star selects it: the focused article sits in the center of the view.
+  // Clicking a planet opens its article right in the galaxy.
   await expect(canvas).toHaveAttribute('data-view', 'idle')
   const box = (await canvas.boundingBox())!
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-  await expect(page.getByRole('region', { name: 'Störungen melden' })).toBeVisible()
-  await expect(page.locator('.galaxy-tooltip')).toContainText('Störungen melden')
+  const popup = page.locator('.galaxy-popup')
+  await expect(popup.getByRole('heading', { name: 'Störungen melden' })).toBeVisible()
 
   // Dragging pans, the wheel zooms; the drawing follows.
   await page.mouse.move(box.x + 50, box.y + 50)
@@ -48,9 +48,37 @@ test('the galaxy is drawn and navigable with the mouse', async ({ page }) => {
   await page.mouse.wheel(0, 400)
   await expect.poll(() => paintedPixels(page)).toBeGreaterThan(1000)
 
-  // Opening the article leaves the galaxy.
-  await page.getByRole('region', { name: 'Störungen melden' }).getByRole('button', { name: 'Artikel öffnen' }).click()
+  // The full page is one more click.
+  await popup.getByRole('button', { name: 'Ganze Seite öffnen' }).click()
   await expect(page.getByRole('heading', { name: 'Störungen melden', level: 2 })).toBeVisible()
+})
+
+test('clicking or zooming into a planet opens its article in the galaxy, the planet moves beside it', async ({ page }) => {
+  const canvas = await openGalaxy(page)
+  const popup = page.locator('.galaxy-popup')
+
+  // Focus puts the planet in the middle; a click there opens it and the planet jumps to the left of the pop-up.
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Deployment-Prozess' })
+  await expect(canvas).toHaveAttribute('data-view', 'idle')
+  const box = (await canvas.boundingBox())!
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(popup.getByRole('heading', { name: 'Deployment-Prozess' })).toBeVisible()
+  await expect(popup.getByRole('heading', { name: 'Verbunden mit' })).toBeVisible()
+  await expect(canvas).toHaveAttribute('data-view', 'idle')
+  const popupBox = (await popup.boundingBox())!
+  expect(popupBox.x + popupBox.width).toBeGreaterThan(box.x + box.width - 40)
+  await page.mouse.move((box.x + popupBox.x) / 2, box.y + box.height / 2)
+  await expect(page.locator('.galaxy-tooltip')).toContainText('Deployment-Prozess')
+
+  await popup.getByRole('button', { name: 'Artikel schließen' }).click()
+  await expect(popup).toHaveCount(0)
+
+  // Scrolling into a planet opens it as well.
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Störungen melden' })
+  await expect(canvas).toHaveAttribute('data-view', 'idle')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  for (let i = 0; i < 8; i++) await page.mouse.wheel(0, -300)
+  await expect(popup.getByRole('heading', { name: 'Störungen melden' })).toBeVisible()
 })
 
 test('the galaxy works with the keyboard', async ({ page }) => {

@@ -17,6 +17,19 @@ const graph = {
   truncated: false,
 }
 
+function details(id: string, text: string) {
+  const node = graph.nodes.find((n) => n.id === id)!
+  return {
+    article: { ...node, slug: id, visibility: 'organization', spaceName: null, ownerId: null, ownerName: null, tags: [], updatedAt: '2026-10-01T10:00:00Z', publishedAt: null, version: 1 },
+    content: { blocks: [{ id: 'b-1', type: 'paragraph', text }] },
+    versionNumber: 1,
+    reviewDueAt: null,
+    capabilities: { canEdit: false, canAdmin: false },
+    relations: [],
+    references: [],
+  }
+}
+
 const spaces = [{ id: 's-1', name: 'IT & Plattform', description: null, articleCount: 2, version: 1 }]
 
 describe('KnowledgeGalaxy', () => {
@@ -56,8 +69,58 @@ describe('KnowledgeGalaxy', () => {
     const next = within(screen.getByRole('region', { name: 'Deployment-Prozess' }))
     expect(next.getByText('Vom PR in die Produktion.')).toBeInTheDocument()
     expect(next.getByText('Ist Voraussetzung für')).toBeInTheDocument()
-    await userEvent.click(next.getByRole('button', { name: 'Artikel öffnen' }))
-    expect(open).toHaveBeenCalledWith('a-1')
+  })
+
+  it('opens an article right in the galaxy, follows its relations and leads to the full page', async () => {
+    const open = vi.fn()
+    fakeApi({
+      'GET /api/v1/knowledge/graph': () => json(graph),
+      'GET /api/v1/knowledge/articles/a-1': () => json(details('a-1', 'Erst bauen, dann ausrollen.')),
+      'GET /api/v1/knowledge/articles/a-3': () => json(details('a-3', 'Changelog prüfen.')),
+    })
+    render(<KnowledgeGalaxy spaces={spaces} onOpenArticle={open} />)
+
+    await userEvent.selectOptions(await screen.findByLabelText('Artikel fokussieren'), 'a-1')
+    await userEvent.click(within(screen.getByRole('region', { name: 'Deployment-Prozess' })).getByRole('button', { name: 'Artikel öffnen' }))
+
+    const reader = within(screen.getAllByRole('region', { name: 'Deployment-Prozess' }).find((r) => r.closest('.galaxy-popup'))!)
+    expect(await reader.findByText('Erst bauen, dann ausrollen.')).toBeInTheDocument()
+    // The pop-up lies over the galaxy, beside it stay the details and the legend.
+    expect(screen.getByRole('button', { name: 'Ganze Seite öffnen' }).closest('.galaxy-popup')).not.toBeNull()
+    expect(screen.getByRole('region', { name: 'Legende' })).toBeInTheDocument()
+
+    // A relation shows the other article in the same panel.
+    await userEvent.click(reader.getByRole('button', { name: 'Release-Checkliste' }))
+    expect(await screen.findByText('Changelog prüfen.')).toBeInTheDocument()
+    const next = within(screen.getAllByRole('region', { name: 'Release-Checkliste' }).find((r) => r.closest('.galaxy-popup'))!)
+    expect(screen.getByLabelText('Artikel fokussieren')).toHaveValue('a-3')
+
+    await userEvent.click(next.getByRole('button', { name: 'Ganze Seite öffnen' }))
+    expect(open).toHaveBeenCalledWith('a-3')
+
+    // Closing keeps the selection.
+    await userEvent.click(next.getByRole('button', { name: 'Artikel schließen' }))
+    expect(screen.queryByText('Changelog prüfen.')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Release-Checkliste' })).toBeInTheDocument()
+  })
+
+  it('opens the selected article with Enter and closes it with Escape', async () => {
+    fakeApi({
+      'GET /api/v1/knowledge/graph': () => json(graph),
+      'GET /api/v1/knowledge/articles/a-2': () => json(details('a-2', 'Ticket anlegen.')),
+    })
+    render(<KnowledgeGalaxy spaces={spaces} onOpenArticle={() => {}} />)
+
+    await userEvent.selectOptions(await screen.findByLabelText('Artikel fokussieren'), 'a-2')
+    screen.getByRole('img', { name: /Wissensgalaxie/ }).focus()
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByText('Ticket anlegen.')).toBeInTheDocument()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByText('Ticket anlegen.')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Störungen melden' })).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('region', { name: 'Auswahl' })).toBeInTheDocument()
   })
 
   it('focuses an article chosen from the select and filters by space and type', async () => {

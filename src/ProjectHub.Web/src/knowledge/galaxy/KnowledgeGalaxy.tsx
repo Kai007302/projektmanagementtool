@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { articleStatuses, articleTypes, relationTypes, type ArticleType, type Space } from '../api'
 import {
   fetchGraph,
@@ -16,6 +16,7 @@ import {
   type Positions,
   type Transform,
 } from './graph'
+import { GalaxyReader } from './GalaxyReader'
 import { drawPlanet } from './planets'
 import { createSpace, drawSpace, float, wrapTitle } from './space'
 import { useLayout } from './useLayout'
@@ -25,6 +26,40 @@ type Props = { spaces: Space[]; /** Only the knowledge of this department; '' fo
 const HEIGHT = 600
 /** Room around the outermost bubbles when the whole galaxy is shown. */
 const FIT_PADDING = 90
+/** A planet this big on screen (radius in px) counts as zoomed into: its article opens in the galaxy. */
+const OPEN_RADIUS = 110
+/** Below this canvas width the article opens as a bottom sheet over the lower half of the screen instead of beside the planet. */
+const STACK_BELOW = 640
+/** Share of the screen the bottom sheet covers until it is pulled up. */
+const SHEET_SHARE = 0.5
+const POPUP_MARGIN = 16
+const POPUP_TOP = 56
+
+/** Where the article pop-up sits in the galaxy; the planet moves into the free part next to it. */
+type Placement = 'left' | 'right' | 'below'
+
+/** Size of the article pop-up for a canvas of the given size. */
+function popupBox(placement: Exclude<Placement, 'below'>, width: number, height: number) {
+  const popupWidth = Math.min(416, Math.round(width * 0.55))
+  return {
+    top: POPUP_TOP,
+    left: placement === 'left' ? POPUP_MARGIN : width - popupWidth - POPUP_MARGIN,
+    width: popupWidth,
+    height: height - POPUP_TOP - POPUP_MARGIN,
+  }
+}
+
+/** Center and size of the part of the galaxy the pop-up leaves free. */
+function freeArea(placement: Placement, width: number, height: number) {
+  if (placement === 'below') {
+    // The bottom sheet covers the lower part of the screen; the galaxy is scrolled to the top of the screen when it opens.
+    const free = Math.min(height, Math.round(window.innerHeight * (1 - SHEET_SHARE)))
+    return { x: width / 2, y: free / 2, size: Math.min(width, free) }
+  }
+  const box = popupBox(placement, width, height)
+  const free = width - box.width - POPUP_MARGIN
+  return { x: placement === 'right' ? free / 2 : width - free / 2, y: height / 2, size: Math.min(free, height) }
+}
 
 function useMediaQuery(media: string) {
   const query = useMemo(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(media) : null), [media])
@@ -50,6 +85,9 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
   const [graph, setGraph] = useState<KnowledgeGraph | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The article open in the side panel; always the selected one while open.
+  const [readingId, setReadingId] = useState<string | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   // Phones in portrait get a tall galaxy instead of a wide one, so the planets stay readable.
   const narrow = useMediaQuery('(max-width: 40rem)')
@@ -60,7 +98,9 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
       (value) => {
         if (!current) return
         setGraph(value)
-        setSelectedId((id) => (id && value.nodes.some((n) => n.id === id) ? id : null))
+        const keep = (id: string | null) => (id && value.nodes.some((n) => n.id === id) ? id : null)
+        setSelectedId(keep)
+        setReadingId(keep)
       },
       (e: Error) => current && setError(e.message),
     )
@@ -71,6 +111,38 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
 
   const layout = useLayout(graph, !reducedMotion, narrow ? 0.45 : 1)
   const selected = graph?.nodes.find((n) => n.id === selectedId) ?? null
+  const reading = graph?.nodes.find((n) => n.id === readingId) ?? null
+
+  /** Selecting another article while one is open shows that one in the side panel; selecting nothing closes it. */
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id)
+    setReadingId((open) => (open && id ? id : null))
+  }, [])
+
+  const read = useCallback((id: string) => {
+    setSelectedId(id)
+    setReadingId(id)
+  }, [])
+
+  /** Esc: first closes the article, then clears the selection. */
+  const dismiss = useCallback(() => {
+    if (readingId) setReadingId(null)
+    else setSelectedId(null)
+  }, [readingId])
+
+  const reader = graph && reading && (
+    <GalaxyReader
+      key={reading.id}
+      graph={graph}
+      node={reading}
+      onSelect={select}
+      onClose={() => setReadingId(null)}
+      onOpenArticle={(id) => {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+        onOpenArticle(id)
+      }}
+    />
+  )
 
   return (
     <section className="galaxy" aria-labelledby="galaxy-heading">
@@ -101,7 +173,7 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
         {graph && graph.nodes.length > 0 && (
           <label>
             Artikel fokussieren
-            <select value={selectedId ?? ''} onChange={(event) => setSelectedId(event.target.value || null)}>
+            <select value={selectedId ?? ''} onChange={(event) => select(event.target.value || null)}>
               <option value="">Keiner</option>
               {[...graph.nodes]
                 .sort((a, b) => a.title.localeCompare(b.title, 'de'))
@@ -127,12 +199,17 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
             positions={layout.positions}
             settled={layout.done}
             selectedId={selectedId}
+            readingId={readingId}
             reducedMotion={reducedMotion}
-            onSelect={setSelectedId}
-            onOpenArticle={onOpenArticle}
+            fullscreen={fullscreen}
+            onFullscreen={setFullscreen}
+            onSelect={select}
+            onRead={read}
+            onDismiss={dismiss}
+            reader={reader}
           />
           <aside className="project-side">
-            <GalaxyDetails graph={graph} node={selected} onSelect={setSelectedId} onOpenArticle={onOpenArticle} />
+            <GalaxyDetails graph={graph} node={selected} onSelect={select} onRead={read} />
             <Legend graph={graph} />
           </aside>
         </div>
@@ -146,12 +223,18 @@ type CanvasProps = {
   positions: Positions
   settled: boolean
   selectedId: string | null
+  readingId: string | null
   reducedMotion: boolean
+  fullscreen: boolean
+  onFullscreen: (on: boolean) => void
   onSelect: (id: string | null) => void
-  onOpenArticle: (id: string) => void
+  onRead: (id: string) => void
+  onDismiss: () => void
+  /** The open article, shown over the galaxy in full screen. */
+  reader: ReactNode
 }
 
-function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, onSelect, onOpenArticle }: CanvasProps) {
+function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reducedMotion, fullscreen, onFullscreen, onSelect, onRead, onDismiss, reader }: CanvasProps) {
   const wrapper = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const transform = useRef<Transform>(identity)
@@ -160,12 +243,24 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinch = useRef<{ distance: number; mid: { x: number; y: number }; start: Transform } | null>(null)
   const animation = useRef<number | null>(null)
+  /** Where a running glide is heading. */
+  const goal = useRef<Transform | null>(null)
   const frame = useRef<number | null>(null)
   const [width, setWidth] = useState(800)
-  const [fullscreen, setFullscreen] = useState(false)
   const [viewportHeight, setViewportHeight] = useState(HEIGHT)
   const height = fullscreen ? viewportHeight : HEIGHT
   const [hoverId, setHoverId] = useState<string | null>(null)
+
+  // The pop-up opens on the side away from the planet, so the planet only has a short way to jump.
+  const [side, setSide] = useState<'left' | 'right'>('right')
+  const placement: Placement = width < STACK_BELOW ? 'below' : side
+
+  /** Opens an article from the galaxy itself (click, zoom, Enter). */
+  function open(id: string) {
+    const p = positions[id]
+    if (p) setSide(p.x * transform.current.k + transform.current.x > width / 2 ? 'left' : 'right')
+    onRead(id)
+  }
 
   const neighborIds = useMemo(() => {
     const focus = selectedId ?? hoverId
@@ -196,24 +291,51 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         return { x: p.x + offset.x, y: p.y + offset.y }
       }
 
-      // Relations: softly curved threads of light; the ones of the focused article shine brighter.
+      // Relations: softly curved threads of light. The ones of the selected article shine bright, the others fade.
       const glow = graph.nodes.length <= 150
+      const selectedFocus = focus !== null && focus === selectedId
+      const curve = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+        const bend = 0.12
+        return { x: (a.x + b.x) / 2 - (b.y - a.y) * bend, y: (a.y + b.y) / 2 + (b.x - a.x) * bend }
+      }
       for (const highlighted of [false, true]) {
         if (highlighted && !focus) continue
-        ctx.lineWidth = (highlighted ? 2.5 : 1.4) / t.k
-        ctx.strokeStyle = highlighted ? 'rgba(251, 207, 232, 0.95)' : focus ? 'rgba(244, 170, 255, 0.12)' : 'rgba(244, 170, 255, 0.4)'
+        ctx.lineWidth = (highlighted ? (selectedFocus ? 3.5 : 2.5) : 1.4) / t.k
+        ctx.strokeStyle = highlighted ? 'rgba(251, 207, 232, 0.95)' : focus ? 'rgba(244, 170, 255, 0.08)' : 'rgba(244, 170, 255, 0.4)'
         ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
-        ctx.shadowBlur = highlighted && glow ? 12 : 0
+        ctx.shadowBlur = highlighted && glow ? (selectedFocus ? 18 : 12) : 0
         ctx.beginPath()
         for (const edge of graph.edges) {
           const a = at(edge.source)
           const b = at(edge.target)
           if (!a || !b || (edge.source === focus || edge.target === focus) !== highlighted) continue
-          const bend = 0.12
+          const c = curve(a, b)
           ctx.moveTo(a.x, a.y)
-          ctx.quadraticCurveTo((a.x + b.x) / 2 - (b.y - a.y) * bend, (a.y + b.y) / 2 + (b.x - a.x) * bend, b.x, b.y)
+          ctx.quadraticCurveTo(c.x, c.y, b.x, b.y)
         }
         ctx.stroke()
+      }
+      // Sparks travel along the selected article's relations, from source to target.
+      if (selectedFocus && time > 0) {
+        ctx.fillStyle = '#ffffff'
+        ctx.shadowColor = 'rgba(251, 207, 232, 1)'
+        ctx.shadowBlur = glow ? 10 : 0
+        ctx.beginPath()
+        for (const edge of graph.edges) {
+          if (edge.source !== focus && edge.target !== focus) continue
+          const a = at(edge.source)
+          const b = at(edge.target)
+          if (!a || !b) continue
+          const c = curve(a, b)
+          for (const phase of [0, 0.5]) {
+            const s = (time / 1600 + phase) % 1
+            const x = (1 - s) ** 2 * a.x + 2 * (1 - s) * s * c.x + s ** 2 * b.x
+            const y = (1 - s) ** 2 * a.y + 2 * (1 - s) * s * c.y + s ** 2 * b.y
+            ctx.moveTo(x + 3 / t.k, y)
+            ctx.arc(x, y, 3 / t.k, 0, Math.PI * 2)
+          }
+        }
+        ctx.fill()
       }
       ctx.shadowBlur = 0
 
@@ -229,7 +351,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         if (sx < -sr - 200 || sx > width + sr || sy < -sr || sy > height + sr) continue
         const color = typeColors[node.articleType]
         const dimmed = neighborIds !== null && !neighborIds.has(node.id)
-        ctx.globalAlpha = dimmed ? 0.25 : 1
+        ctx.globalAlpha = dimmed ? (selectedFocus ? 0.18 : 0.25) : 1
 
         drawPlanet(ctx, node.id, p.x, p.y, r, color, {
           detailed: sr >= 14 && glow,
@@ -244,6 +366,18 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
           ctx.beginPath()
           ctx.arc(p.x, p.y, r + 5 / t.k, 0, Math.PI * 2)
           ctx.stroke()
+        } else if (selectedFocus && neighborIds?.has(node.id)) {
+          // Connected planets get a glowing halo in the color of the threads.
+          ctx.lineWidth = 2 / t.k
+          ctx.strokeStyle = 'rgba(251, 207, 232, 0.9)'
+          ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
+          ctx.shadowBlur = glow ? 10 : 0
+          ctx.setLineDash([6 / t.k, 5 / t.k])
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, r + 6 / t.k, 0, Math.PI * 2)
+          ctx.stroke()
+          ctx.setLineDash([])
+          ctx.shadowBlur = 0
         }
 
         if (dimmed) continue
@@ -331,13 +465,17 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         return
       }
       if (element) element.dataset.view = 'moving'
+      goal.current = target
       const from = transform.current
       const start = performance.now()
       const step = (now: number) => {
         const progress = Math.min(1, (now - start) / 450)
         setTransform(interpolate(from, target, progress))
         animation.current = progress < 1 ? requestAnimationFrame(step) : null
-        if (progress === 1 && element) element.dataset.view = 'idle'
+        if (progress === 1) {
+          goal.current = null
+          if (element) element.dataset.view = 'idle'
+        }
       }
       animation.current = requestAnimationFrame(step)
     },
@@ -351,11 +489,27 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     if (!userMoved.current && !selectedId) fit()
   }, [fit, selectedId])
 
-  // Focus the selected article.
+  // Focus the selected article. With its article open the planet moves into the free part beside the pop-up,
+  // small enough to stay whole there.
   useEffect(() => {
     const p = selectedId ? positions[selectedId] : null
-    if (p && settled) animateTo(focusTransform(p, width, height, Math.max(transform.current.k, 1.2)))
-  }, [selectedId, settled, positions, width, height, animateTo])
+    if (!p || !settled) return
+    let k = Math.max((goal.current ?? transform.current).k, 1.2)
+    if (readingId && readingId === selectedId) {
+      const free = freeArea(placement, width, height)
+      const node = graph.nodes.find((n) => n.id === readingId)
+      if (node) k = Math.min(k, Math.max(0.6, (free.size * 0.3) / nodeRadius(node)))
+      animateTo({ k, x: free.x - p.x * k, y: free.y - p.y * k })
+    } else {
+      animateTo(focusTransform(p, width, height, k))
+    }
+  }, [selectedId, readingId, placement, graph, settled, positions, width, height, animateTo])
+
+  // On phones the article opens as a bottom sheet: bring the galaxy to the top of the screen so the planet stays visible above it.
+  const sheetOpen = Boolean(readingId) && placement === 'below'
+  useEffect(() => {
+    if (sheetOpen && !fullscreen) wrapper.current?.scrollIntoView?.({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' })
+  }, [sheetOpen, fullscreen, reducedMotion])
 
   useEffect(() => {
     const element = wrapper.current
@@ -368,18 +522,53 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     return () => observer.disconnect()
   }, [])
 
+  /** The person takes over the view: a running glide stops. */
+  const takeOver = useCallback(() => {
+    userMoved.current = true
+    if (animation.current !== null) {
+      cancelAnimationFrame(animation.current)
+      animation.current = null
+      goal.current = null
+      if (canvas.current) canvas.current.dataset.view = 'idle'
+    }
+  }, [])
+
+  /**
+   * Zooming in on a planet until it fills a good part of the view opens its article beside the galaxy.
+   * <paramref name="next"/> is the view after the zoom, (sx, sy) the screen point zoomed at.
+   */
+  const openWhenZoomedIn = useRef<(next: Transform, sx: number, sy: number) => void>(() => {})
+  useEffect(() => {
+    openWhenZoomedIn.current = (next, sx, sy) => {
+      const node = nodeAt(graph.nodes, positions, next, sx, sy)
+      if (node && node.id !== readingId && nodeRadius(node) * next.k >= Math.min(OPEN_RADIUS, 0.3 * Math.min(width, height))) open(node.id)
+    }
+  })
+
+  /** Zooms by <paramref name="factor"/> around a screen point, as the wheel, a pinch or the buttons do. */
+  const zoomBy = useCallback(
+    (from: Transform, factor: number, sx: number, sy: number, animate = false) => {
+      const next = zoomAt(from, factor, sx, sy)
+      if (animate) animateTo(next)
+      else setTransform(next)
+      if (factor > 1) openWhenZoomedIn.current(next, sx, sy)
+      return next
+    },
+    [animateTo, setTransform],
+  )
+
   useEffect(() => {
     const element = canvas.current
     if (!element) return
     const wheel = (event: WheelEvent) => {
       event.preventDefault()
-      userMoved.current = true
+      takeOver()
       const rect = element.getBoundingClientRect()
-      setTransform(zoomAt(transform.current, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top))
+      zoomBy(transform.current, Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top)
     }
     element.addEventListener('wheel', wheel, { passive: false })
     return () => element.removeEventListener('wheel', wheel)
-  }, [setTransform])
+  }, [takeOver, zoomBy])
 
   function point(event: PointerEvent<HTMLCanvasElement>) {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -411,9 +600,12 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     if (zoom && pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()]
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-      const zoomed = zoomAt(zoom.start, Math.hypot(a.x - b.x, a.y - b.y) / zoom.distance, zoom.mid.x, zoom.mid.y)
-      userMoved.current = true
-      setTransform({ ...zoomed, x: zoomed.x + mid.x - zoom.mid.x, y: zoomed.y + mid.y - zoom.mid.y })
+      const factor = Math.hypot(a.x - b.x, a.y - b.y) / zoom.distance
+      const zoomed = zoomAt(zoom.start, factor, zoom.mid.x, zoom.mid.y)
+      takeOver()
+      const next = { ...zoomed, x: zoomed.x + mid.x - zoom.mid.x, y: zoomed.y + mid.y - zoom.mid.y }
+      setTransform(next)
+      if (factor > 1) openWhenZoomedIn.current(next, mid.x, mid.y)
       return
     }
     const current = drag.current
@@ -422,7 +614,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
       const dy = p.y - current.y
       if (current.moved || Math.hypot(dx, dy) > 4) {
         current.moved = true
-        userMoved.current = true
+        takeOver()
         setTransform({ ...current.start, x: current.start.x + dx, y: current.start.y + dy })
       }
       return
@@ -442,8 +634,11 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
     const current = drag.current
     drag.current = null
     if (current && !current.moved) {
+      // A click on a planet opens its article right in the galaxy; a click into empty space closes it.
       const p = point(event)
-      onSelect(nodeAt(graph.nodes, positions, transform.current, p.x, p.y)?.id ?? null)
+      const id = nodeAt(graph.nodes, positions, transform.current, p.x, p.y)?.id
+      if (id) open(id)
+      else onSelect(null)
     }
   }
 
@@ -455,18 +650,24 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
       ArrowRight: () => ({ ...t, x: t.x - step }),
       ArrowUp: () => ({ ...t, y: t.y + step }),
       ArrowDown: () => ({ ...t, y: t.y - step }),
-      '+': () => zoomAt(t, 1.25, width / 2, height / 2),
       '-': () => zoomAt(t, 0.8, width / 2, height / 2),
     }
-    if (event.key in moves) {
+    if (event.key === '+') {
       event.preventDefault()
-      userMoved.current = true
+      takeOver()
+      zoomBy(t, 1.25, width / 2, height / 2)
+    } else if (event.key in moves) {
+      event.preventDefault()
+      takeOver()
       setTransform(moves[event.key]())
     } else if (event.key === '0') {
       event.preventDefault()
       fit()
     } else if (event.key === 'Escape') {
-      onSelect(null)
+      onDismiss()
+    } else if (event.key === 'Enter' && selectedId) {
+      event.preventDefault()
+      open(selectedId)
     }
   }
 
@@ -477,11 +678,11 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   async function toggleFullscreen() {
     userMoved.current = false
     if (fullscreen) {
-      setFullscreen(false)
+      onFullscreen(false)
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {})
       return
     }
-    setFullscreen(true)
+    onFullscreen(true)
     await wrapper.current?.requestFullscreen?.().catch(() => {})
     canvas.current?.focus()
   }
@@ -489,10 +690,10 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
   useEffect(() => {
     if (!fullscreen) return
     const change = () => {
-      if (!document.fullscreenElement) setFullscreen(false)
+      if (!document.fullscreenElement) onFullscreen(false)
     }
     const escape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape' && !document.fullscreenElement) setFullscreen(false)
+      if (event.key === 'Escape' && !document.fullscreenElement) onFullscreen(false)
     }
     document.addEventListener('fullscreenchange', change)
     window.addEventListener('keydown', escape)
@@ -500,7 +701,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
       document.removeEventListener('fullscreenchange', change)
       window.removeEventListener('keydown', escape)
     }
-  }, [fullscreen])
+  }, [fullscreen, onFullscreen])
 
   const hovered = hoverId ? graph.nodes.find((n) => n.id === hoverId) : null
   const selected = fullscreen && selectedId ? graph.nodes.find((n) => n.id === selectedId) : null
@@ -536,7 +737,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
         </div>
       )}
       <div className="galaxy-controls">
-        <button type="button" aria-label="Vergrößern" onClick={() => animateTo(zoomAt(transform.current, 1.4, width / 2, height / 2))}>
+        <button type="button" aria-label="Vergrößern" onClick={() => zoomBy(transform.current, 1.4, width / 2, height / 2, true)}>
           +
         </button>
         <button type="button" aria-label="Verkleinern" onClick={() => animateTo(zoomAt(transform.current, 1 / 1.4, width / 2, height / 2))}>
@@ -555,41 +756,99 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, reducedMotion, on
           {fullscreen ? 'Vollbild beenden' : 'Vollbild'}
         </button>
       </div>
-      {selected && (
+      {reader ? (
+        placement === 'below' ? (
+          <GalaxySheet onClose={onDismiss}>{reader}</GalaxySheet>
+        ) : (
+          <div className={`galaxy-popup ${placement}`} style={popupBox(placement, width, height)}>
+            {reader}
+          </div>
+        )
+      ) : selected && (
         <div className="galaxy-card" aria-live="polite">
           <span className="galaxy-card-type">
             <span className="legend-dot" style={{ background: typeColors[selected.articleType] }} aria-hidden="true" /> {articleTypes[selected.articleType]}
           </span>
           <strong>{selected.title}</strong>
           {selected.summary && <p>{selected.summary}</p>}
-          <button
-            type="button"
-            onClick={() => {
-              if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
-              onOpenArticle(selected.id)
-            }}
-          >
+          <button type="button" onClick={() => onRead(selected.id)}>
             Artikel öffnen
           </button>
         </div>
       )}
       <p id="galaxy-help" className="muted">
-        Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad oder zwei Finger zoomen, Klick oder Tippen wählt einen Artikel. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Esc hebt die Auswahl
-        auf bzw. beendet das Vollbild. Die Darstellung „Liste“ zeigt dieselben Inhalte.
+        Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad oder zwei Finger zoomen. Klick, Tippen oder Hineinzoomen auf einen Planeten öffnet seinen Artikel direkt in der
+        Galaxie und hebt seine Verbindungen hervor. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Enter öffnet den gewählten Artikel, Esc schließt ihn bzw. hebt die Auswahl auf.
+        Alle Artikel stehen im Reiter „Artikelliste“.
       </p>
     </div>
   )
 }
 
-type DetailsProps = { graph: KnowledgeGraph; node: GraphNode | null; onSelect: (id: string) => void; onOpenArticle: (id: string) => void }
+/**
+ * The article on phones: a bottom sheet over the lower half of the screen, so the galaxy stays visible and movable above it.
+ * Pulling the handle up (or tapping it) shows more of the article, pulling it down makes it smaller or closes it.
+ */
+function GalaxySheet({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const drag = useRef<{ y: number; moved: boolean } | null>(null)
 
-function GalaxyDetails({ graph, node, onSelect, onOpenArticle }: DetailsProps) {
+  function release() {
+    const start = drag.current
+    drag.current = null
+    setOffset(0)
+    if (!start?.moved) return setExpanded((value) => !value)
+    if (offset > 80) {
+      if (expanded) setExpanded(false)
+      else onClose()
+    } else if (offset < -60) setExpanded(true)
+  }
+
+  return (
+    <div className={expanded ? 'galaxy-popup below sheet expanded' : 'galaxy-popup below sheet'} style={offset ? { transform: `translateY(${Math.max(offset, expanded ? 0 : -160)}px)`, transition: 'none' } : undefined}>
+      <button
+        type="button"
+        className="galaxy-sheet-handle"
+        aria-label={expanded ? 'Artikel verkleinern' : 'Artikel vergrößern'}
+        aria-expanded={expanded}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture?.(event.pointerId)
+          drag.current = { y: event.clientY, moved: false }
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current
+          if (!start) return
+          const dy = event.clientY - start.y
+          if (Math.abs(dy) > 6) start.moved = true
+          if (start.moved) setOffset(dy)
+        }}
+        onPointerUp={release}
+        onPointerCancel={() => {
+          drag.current = null
+          setOffset(0)
+        }}
+        onClick={(event) => {
+          // Keyboard: Enter or space. Pointer taps are handled on pointer up.
+          if (event.detail === 0) setExpanded((value) => !value)
+        }}
+      >
+        <span aria-hidden="true" />
+      </button>
+      {children}
+    </div>
+  )
+}
+
+type DetailsProps = { graph: KnowledgeGraph; node: GraphNode | null; onSelect: (id: string) => void; onRead: (id: string) => void }
+
+function GalaxyDetails({ graph, node, onSelect, onRead }: DetailsProps) {
   if (!node) {
     return (
       <section className="panel" aria-labelledby="galaxy-details-heading">
         <h3 id="galaxy-details-heading">Auswahl</h3>
         <p className="muted">
-          {graph.nodes.length} Artikel, {graph.edges.length} Beziehungen. Wähle einen Artikel, um seine Beziehungen zu sehen.
+          {graph.nodes.length} Artikel, {graph.edges.length} Beziehungen. Ein Klick auf einen Planeten öffnet seinen Artikel und zeigt seine Beziehungen.
         </p>
       </section>
     )
@@ -606,7 +865,7 @@ function GalaxyDetails({ graph, node, onSelect, onOpenArticle }: DetailsProps) {
         {articleStatuses[node.status]}
       </p>
       {node.summary && <p>{node.summary}</p>}
-      <button type="button" onClick={() => onOpenArticle(node.id)}>
+      <button type="button" onClick={() => onRead(node.id)}>
         Artikel öffnen
       </button>
       <h4>Beziehungen</h4>
