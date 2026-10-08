@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerE
 import * as Y from 'yjs'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
-import { fetchTasks, taskStatuses, type Task } from '../tasks/api'
+import { assigneeText, fetchTasks, taskStatuses, type Task } from '../tasks/api'
 import { fetchWhiteboardTasks, type Whiteboard, type WhiteboardTask } from './api'
 import {
   addConnector,
@@ -20,6 +20,7 @@ import {
   objectTypes,
   readObjects,
   removeObject,
+  gridBackground,
   stickyGrid,
   updateObject,
   type BoardObject,
@@ -515,6 +516,7 @@ export function BoardEditor({ board, project, me, revision, onRename, onDelete }
           <svg
             ref={svgRef}
             className={drag?.kind === 'pan' ? 'board-canvas panning' : 'board-canvas'}
+            style={gridBackground(view)}
             role="application"
             aria-roledescription="Whiteboard"
             aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Rechtsklick öffnet die Optionen, Doppelklick oder Enter bearbeitet den Text. Von den Punkten am gewählten Objekt zieht man einen Pfeil zu einem anderen Objekt. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Gesperrte Objekte bleiben, wo sie sind. Die Objektliste rechts wählt Objekte per Tastatur.`}
@@ -852,7 +854,7 @@ function ObjectShape({ object, task, selected, peerSelected, editable, editing, 
               <>
                 <strong>{task.title}</strong>
                 <span className="board-task-status">{taskStatuses[task.status]}</span>
-                <span className="muted">{task.assigneeName ?? 'Nicht zugewiesen'}</span>
+                <span className="muted">{task.assigneeNames.length > 0 ? assigneeText(task.assigneeNames) : 'Nicht zugewiesen'}</span>
               </>
             ) : (
               <span className="muted">Aufgabe nicht verfügbar</span>
@@ -1136,7 +1138,7 @@ function ObjectPanel({ object, objects, task, editable, onColor, onEditText, onL
             <dt>Status</dt>
             <dd>{taskStatuses[task.status]}</dd>
             <dt>Zuständig</dt>
-            <dd>{task.assigneeName ?? 'Niemand'}</dd>
+            <dd>{task.assigneeNames.length > 0 ? assigneeText(task.assigneeNames) : 'Niemand'}</dd>
           </dl>
         ) : (
           <p className="muted">Aufgabe nicht verfügbar.</p>

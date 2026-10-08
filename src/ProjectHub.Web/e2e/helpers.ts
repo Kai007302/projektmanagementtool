@@ -3,15 +3,20 @@ import { expect, type Page } from '@playwright/test'
 /** Content Security Policy violations the browser reported on any signed-in page; see fixtures.ts. */
 export const cspViolations: string[] = []
 
-/** Signs in as one of the synthetic development users (DevelopmentSeedData) and opens a tab. */
-export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | 'Wissen' | 'Verwaltung' | 'Assistent' = 'Wissen') {
+/** Signs in as one of the synthetic development users (DevelopmentSeedData) and opens a tab; 'Artikelliste' is the list in the galaxy area. */
+export async function signInAs(page: Page, objectId: string, tab: 'Projekte' | 'Galaxie' | 'Artikelliste' | 'Verwaltung' | 'Assistent' = 'Artikelliste') {
   page.on('console', (message) => {
     if (message.type() === 'error' && message.text().includes('Content Security Policy')) cspViolations.push(message.text())
   })
   await page.goto('/')
   await page.evaluate((id) => localStorage.setItem('projecthub.devUser', id), objectId)
   await page.reload()
-  await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: tab, exact: true }).click()
+  await openArea(page, tab)
+}
+
+export async function openArea(page: Page, tab: 'Projekte' | 'Galaxie' | 'Artikelliste' | 'Verwaltung' | 'Assistent') {
+  await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: tab === 'Artikelliste' ? 'Galaxie' : tab, exact: true }).click()
+  if (tab === 'Artikelliste') await page.getByRole('navigation', { name: 'Wissen anzeigen als' }).getByRole('button', { name: 'Artikelliste' }).click()
 }
 
 export async function searchArticles(page: Page, text: string) {

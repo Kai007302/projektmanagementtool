@@ -3,7 +3,7 @@ import { expect, test } from './fixtures'
 import { signInAs } from './helpers'
 
 async function openGalaxy(page: Page) {
-  await signInAs(page, 'dev-eva')
+  await signInAs(page, 'dev-eva', 'Galaxie')
   await page.getByRole('navigation', { name: 'Wissen anzeigen als' }).getByRole('button', { name: 'Galaxie' }).click()
   const canvas = page.getByRole('img', { name: /^Wissensgalaxie mit \d+ Artikeln? und \d+ Beziehung(en)?$/ })
   await expect(canvas).toBeVisible()
@@ -21,7 +21,7 @@ const paintedPixels = (page: Page) =>
     return painted
   })
 
-// Phase 3 acceptance: navigate the Knowledge Galaxy with the mouse, the keyboard and the list alternative.
+// Phase 3 acceptance: navigate the Knowledge Galaxy with the mouse and the keyboard; the article list is the plain alternative.
 test('the galaxy is drawn and navigable with the mouse', async ({ page }) => {
   const canvas = await openGalaxy(page)
   await expect.poll(() => paintedPixels(page)).toBeGreaterThan(1000)
@@ -81,7 +81,7 @@ test('clicking or zooming into a planet opens its article in the galaxy, the pla
   await expect(popup.getByRole('heading', { name: 'Störungen melden' })).toBeVisible()
 })
 
-test('the galaxy works with the keyboard and as a list', async ({ page }) => {
+test('the galaxy works with the keyboard', async ({ page }) => {
   const canvas = await openGalaxy(page)
 
   await canvas.focus()
@@ -96,10 +96,7 @@ test('the galaxy works with the keyboard and as a list', async ({ page }) => {
   await page.keyboard.press('Escape')
   await expect(page.getByRole('region', { name: 'Auswahl' })).toBeVisible()
 
-  await page.getByRole('navigation', { name: 'Darstellung' }).getByRole('button', { name: 'Liste' }).click()
-  await expect(page.getByRole('heading', { name: /^Anleitung \(\d+\)$/ })).toBeVisible()
-  await page.getByRole('button', { name: 'Projekt-Kickoff durchführen', exact: true }).focus()
-  await page.keyboard.press('Enter')
+  await page.getByLabel('Artikel fokussieren').selectOption({ label: 'Projekt-Kickoff durchführen' })
   const details = page.getByRole('region', { name: 'Projekt-Kickoff durchführen' })
   await expect(details.getByText('Verweist auf')).toBeVisible()
   await details.getByRole('button', { name: 'Rollen im Projekt' }).click()

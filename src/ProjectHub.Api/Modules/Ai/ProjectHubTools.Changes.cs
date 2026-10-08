@@ -114,30 +114,30 @@ public sealed partial class ProjectHubTools
         [Description("Optional description.")] string? description = null,
         [Description("Optional status: todo (default), in_progress or done.")] string? status = null,
         [Description("Optional priority: low, normal, high or urgent.")] string? priority = null,
-        [Description("Optional assignee: user id from find_people or get_project.")] Guid? assigneeId = null,
+        [Description("Optional assignees: user ids from find_people.")] Guid[]? assigneeIds = null,
         [Description("Optional parent task id, to create a subtask.")] Guid? parentTaskId = null,
         [Description("Optional start date (yyyy-MM-dd).")] DateOnly? startDate = null,
         [Description("Optional due date (yyyy-MM-dd).")] DateOnly? dueDate = null,
         CancellationToken ct = default)
     {
         var result = await tasks.CreateAsync(
-            user, projectId, new CreateTaskRequest(title, description, status, priority, assigneeId, parentTaskId, startDate, dueDate, null, null), ct);
+            user, projectId, new CreateTaskRequest(title, description, status, priority, assigneeIds, parentTaskId, startDate, dueDate, null), ct);
         return result.Succeeded ? new Changed("Task created.", result.Value!.Id, result.Value.Title) : Error(result);
     }
 
     [McpServerTool(Name = "update_task", Title = "Aufgabe ändern", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false)]
-    [Description("Changes a task: title, description, status (moves it on the board), priority, assignee, dates or progress. Only the given fields change.")]
+    [Description("Changes a task: title, description, status (moves it on the board), priority, assignees or dates. Only the given fields change. Progress is calculated from status and subtasks.")]
     public async Task<object> UpdateTask(
         [Description("Task id.")] Guid taskId,
         [Description("New title.")] string? title = null,
         [Description("New description.")] string? description = null,
         [Description("New status: todo, in_progress or done.")] string? status = null,
         [Description("New priority: low, normal, high or urgent.")] string? priority = null,
-        [Description("New assignee: user id from find_people.")] Guid? assigneeId = null,
-        [Description("true removes the assignee.")] bool unassign = false,
+        [Description("People to add to the assignees: user ids from find_people.")] Guid[]? addAssigneeIds = null,
+        [Description("People to remove from the assignees: user ids from get_task.")] Guid[]? removeAssigneeIds = null,
+        [Description("true removes all assignees.")] bool unassign = false,
         [Description("New start date (yyyy-MM-dd).")] DateOnly? startDate = null,
         [Description("New due date (yyyy-MM-dd).")] DateOnly? dueDate = null,
-        [Description("New progress in percent (0-100).")] int? progress = null,
         CancellationToken ct = default)
     {
         var current = await tasks.GetAsync(user, taskId, ct);
@@ -148,10 +148,13 @@ public sealed partial class ProjectHubTools
 
         var patch = JsonPatch(
             current.Value!.Version, ("title", title), ("description", description), ("status", status), ("priority", priority),
-            ("startDate", startDate), ("dueDate", dueDate), ("progress", progress), ("assigneeId", assigneeId));
-        if (unassign)
+            ("startDate", startDate), ("dueDate", dueDate));
+        if (unassign || addAssigneeIds is { Length: > 0 } || removeAssigneeIds is { Length: > 0 })
         {
-            patch["assigneeId"] = null;
+            var assignees = unassign ? [] : current.Value.Assignees.Select(a => a.Id).ToList();
+            assignees.AddRange(addAssigneeIds ?? []);
+            assignees.RemoveAll(id => removeAssigneeIds?.Contains(id) == true);
+            patch["assigneeIds"] = new JsonArray(assignees.Distinct().Select(id => (JsonNode)JsonValue.Create(id)).ToArray());
         }
 
         var result = await tasks.UpdateAsync(user, taskId, PatchDocument.From(patch), ct);

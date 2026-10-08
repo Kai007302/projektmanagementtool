@@ -204,7 +204,9 @@ public sealed class WhiteboardTests(InfrastructureFixture infrastructure) : ApiT
         }));
 
         var tasks = await As(Eva).GetFromJsonAsync<List<WhiteboardTask>>($"/api/v1/whiteboards/{board.Id}/tasks?ids={task.Id},{foreign.Id}");
-        Assert.Equal([new WhiteboardTask(task.Id, "Startseite", "todo", Clara.DisplayName, null)], tasks);
+        var card = Assert.Single(tasks!);
+        Assert.Equal((task.Id, "Startseite", "todo", null as DateOnly?), (card.Id, card.Title, card.Status, card.DueDate));
+        Assert.Equal([Clara.DisplayName], card.AssigneeNames);
         Assert.Equal(HttpStatusCode.BadRequest, (await As(Eva).GetAsync($"/api/v1/whiteboards/{board.Id}/tasks?ids=nope")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await As(Felix).GetAsync($"/api/v1/whiteboards/{board.Id}/tasks?ids={task.Id}")).StatusCode);
 

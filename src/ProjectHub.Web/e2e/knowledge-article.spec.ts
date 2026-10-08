@@ -14,7 +14,7 @@ test('an article is written, reviewed and published, and only then visible to th
   const editor = clara.getByRole('form', { name: 'Artikel bearbeiten' })
   await editor.getByLabel('Titel').fill(title)
   await editor.getByRole('combobox', { name: /^Art/ }).selectOption('how_to')
-  await editor.getByRole('combobox', { name: /^Bereich/ }).selectOption({ label: 'Projektmethodik' })
+  await editor.getByRole('combobox', { name: /^Kategorie/ }).selectOption({ label: 'Projektmethodik' })
   await editor.getByLabel('Zusammenfassung').fill('Die ersten Tage im Projektteam.')
   await editor.getByLabel('Neuer Block').selectOption('heading')
   await editor.getByRole('button', { name: 'Block hinzufügen' }).click()

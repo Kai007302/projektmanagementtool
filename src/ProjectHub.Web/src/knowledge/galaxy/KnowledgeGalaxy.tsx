@@ -23,8 +23,6 @@ import { useLayout } from './useLayout'
 
 type Props = { spaces: Space[]; /** Only the knowledge of this department; '' for all I can see. */ departmentId?: string; onOpenArticle: (id: string) => void }
 
-type View = 'galaxy' | 'list'
-
 const HEIGHT = 600
 /** Room around the outermost bubbles when the whole galaxy is shown. */
 const FIT_PADDING = 90
@@ -78,8 +76,9 @@ function useMediaQuery(media: string) {
 /**
  * Knowledge Galaxy: articles as glowing bubbles with their title, relations as threads of light,
  * colored by article type, floating in a violet space.
- * Canvas 2D with a d3-force layout (docs/OPEN_DECISIONS.md, Knowledge Galaxy renderer). The list view
- * shows the same graph for keyboard and screen reader users.
+ * Canvas 2D with a d3-force layout (docs/OPEN_DECISIONS.md, Knowledge Galaxy renderer). Keyboard and screen reader
+ * users choose an article with "Artikel fokussieren" and follow its relations in the details panel; the article list
+ * of the knowledge page lists every article.
  */
 export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Props) {
   const [filter, setFilter] = useState<{ spaceId?: string; type?: string }>({})
@@ -88,7 +87,6 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // The article open in the side panel; always the selected one while open.
   const [readingId, setReadingId] = useState<string | null>(null)
-  const [view, setView] = useState<View>('galaxy')
   const [fullscreen, setFullscreen] = useState(false)
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   // Phones in portrait get a tall galaxy instead of a wide one, so the planets stay readable.
@@ -148,25 +146,10 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
 
   return (
     <section className="galaxy" aria-labelledby="galaxy-heading">
-      <div className="row">
-        <h3 id="galaxy-heading">Wissensgalaxie</h3>
-        <nav className="tabs compact" aria-label="Darstellung">
-          {(['galaxy', 'list'] as View[]).map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={value === view ? 'tab active' : 'tab'}
-              aria-current={value === view ? 'page' : undefined}
-              onClick={() => setView(value)}
-            >
-              {value === 'galaxy' ? 'Galaxie' : 'Liste'}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <h3 id="galaxy-heading">Wissensgalaxie</h3>
       <div className="inline-form">
         <label>
-          Bereich
+          Kategorie
           <select value={filter.spaceId ?? ''} onChange={(event) => setFilter((f) => ({ ...f, spaceId: event.target.value || undefined }))}>
             <option value="">Alle</option>
             {spaces.map((space) => (
@@ -210,32 +193,24 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
       ) : graph.nodes.length === 0 ? (
         <p>Keine Artikel für diese Auswahl.</p>
       ) : (
-        <div className={reader && view === 'list' ? 'galaxy-layout reading' : 'galaxy-layout'}>
-          {view === 'galaxy' ? (
-            <GalaxyCanvas
-              graph={graph}
-              positions={layout.positions}
-              settled={layout.done}
-              selectedId={selectedId}
-              readingId={readingId}
-              reducedMotion={reducedMotion}
-              fullscreen={fullscreen}
-              onFullscreen={setFullscreen}
-              onSelect={select}
-              onRead={read}
-              onDismiss={dismiss}
-              reader={reader}
-            />
-          ) : (
-            <GalaxyList graph={graph} selectedId={selectedId} onSelect={select} />
-          )}
+        <div className="galaxy-layout">
+          <GalaxyCanvas
+            graph={graph}
+            positions={layout.positions}
+            settled={layout.done}
+            selectedId={selectedId}
+            readingId={readingId}
+            reducedMotion={reducedMotion}
+            fullscreen={fullscreen}
+            onFullscreen={setFullscreen}
+            onSelect={select}
+            onRead={read}
+            onDismiss={dismiss}
+            reader={reader}
+          />
           <aside className="project-side">
-            {(view === 'list' && reader) || (
-              <>
-                <GalaxyDetails graph={graph} node={selected} onSelect={select} onRead={read} />
-                <Legend graph={graph} />
-              </>
-            )}
+            <GalaxyDetails graph={graph} node={selected} onSelect={select} onRead={read} />
+            <Legend graph={graph} />
           </aside>
         </div>
       )}
@@ -804,7 +779,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
       <p id="galaxy-help" className="muted">
         Ziehen (auch mit dem mittleren Mausrad) verschiebt, Mausrad oder zwei Finger zoomen. Klick, Tippen oder Hineinzoomen auf einen Planeten öffnet seinen Artikel direkt in der
         Galaxie und hebt seine Verbindungen hervor. Tastatur: Pfeiltasten, + und −, 0 zeigt alles, Enter öffnet den gewählten Artikel, Esc schließt ihn bzw. hebt die Auswahl auf.
-        Die Darstellung „Liste“ zeigt dieselben Inhalte.
+        Alle Artikel stehen im Reiter „Artikelliste“.
       </p>
     </div>
   )
@@ -861,34 +836,6 @@ function GalaxySheet({ children, onClose }: { children: ReactNode; onClose: () =
         <span aria-hidden="true" />
       </button>
       {children}
-    </div>
-  )
-}
-
-function GalaxyList({ graph, selectedId, onSelect }: { graph: KnowledgeGraph; selectedId: string | null; onSelect: (id: string) => void }) {
-  const groups = (Object.keys(articleTypes) as ArticleType[])
-    .map((type) => ({ type, nodes: graph.nodes.filter((n) => n.articleType === type).sort((a, b) => a.title.localeCompare(b.title, 'de')) }))
-    .filter((group) => group.nodes.length > 0)
-
-  return (
-    <div className="galaxy-list">
-      {groups.map((group) => (
-        <section key={group.type} aria-labelledby={`galaxy-group-${group.type}`}>
-          <h4 id={`galaxy-group-${group.type}`}>
-            <span className="legend-dot" style={{ background: typeColors[group.type] }} aria-hidden="true" /> {articleTypes[group.type]} ({group.nodes.length})
-          </h4>
-          <ul className="plain-list">
-            {group.nodes.map((node) => (
-              <li key={node.id}>
-                <button type="button" className="link-button" aria-pressed={node.id === selectedId} onClick={() => onSelect(node.id)}>
-                  {node.title}
-                </button>
-                <small className="muted"> · {node.degree === 1 ? '1 Beziehung' : `${node.degree} Beziehungen`}</small>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
     </div>
   )
 }

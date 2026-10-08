@@ -8,7 +8,7 @@ export type GanttTask = {
   parentTaskId: string | null
   title: string
   status: TaskStatus
-  assigneeName: string | null
+  assigneeNames: string[]
   startDate: string | null
   dueDate: string | null
   progress: number

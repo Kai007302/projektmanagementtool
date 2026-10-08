@@ -27,7 +27,7 @@ vi.mock('../kanban/api', () => {
 vi.mock('../tasks/api', () => ({ createTask: vi.fn(async (_: string, title: string) => void api.tasks.push(title)) }))
 
 function column(id: string, name: string, taskStatus: KanbanColumn['taskStatus']): KanbanColumn {
-  return { id, name, taskStatus, wipLimit: null, version: 1, cards: [] }
+  return { id, name, taskStatus, wipLimit: null, color: null, version: 1, cards: [] }
 }
 
 const template = (id: string) => projectTemplates.find((t) => t.id === id)!

@@ -35,13 +35,13 @@ public sealed class NotificationEndpointTests(InfrastructureFixture infrastructu
     }
 
     [Fact]
-    public async Task Changing_the_assignee_notifies_only_the_new_one()
+    public async Task Adding_an_assignee_notifies_only_the_new_one()
     {
         var project = await CreateTeamProjectAsync();
         var task = await CreateTaskAsync(Ben, project.Id, NewTask("Übergabe", assigneeId: Clara.Id));
 
         var renamed = await PatchAsync(Ben, task.Id, new { version = task.Version, title = "Übergabe neu" });
-        await PatchAsync(Ben, task.Id, new { version = renamed.Version, assigneeId = David.Id });
+        await PatchAsync(Ben, task.Id, new { version = renamed.Version, assigneeIds = new[] { Clara.Id, David.Id } });
 
         Assert.Single(await ForAsync(Clara, task.Id));
         Assert.Equal("Ben Projektleiter hat dir „Übergabe neu“ zugewiesen", Assert.Single(await ForAsync(David, task.Id)).Title);

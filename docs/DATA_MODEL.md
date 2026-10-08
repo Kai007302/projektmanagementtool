@@ -20,6 +20,8 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `014_project_calendar_feed.sql`: `calendar_feed.project_id` (Kalender je Projekt, ADR 0020)
 - `015_project_icon_logo.sql`: `project.icon`, `project.logo_version` und `project_logo` (Projektsymbol und Logo, ADR 0020)
 - `016_departments.sql`: `department` und `department_member` ersetzen `team` und `team_member` (Teams werden zu Abteilungen mit derselben ID), `project.department_id` und `project.visibility`, `department_id` an `knowledge_space` und `knowledge_article`, Sichtbarkeit `department` für Artikel, `app_user.entra_groups_hash` (ADR 0021)
+- `017_task_assignees_progress.sql`: `task_assignee` (mehrere Zuständige je Aufgabe) ersetzt `task.assignee_id`; `task.progress` wird einmal nach der neuen Regel berechnet und ist danach immer berechnet (ADR 0022)
+- `018_kanban_column_color.sql`: `kanban_column.color`, eine Farbe aus fester Palette (`gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`, `pink`) oder leer. In der Oberfläche lassen sich an einer Spalte nur Name und Farbe ändern; Status und WIP-Limit bleiben, wie die Spalte angelegt wurde (die API nimmt sie weiter an)
 
 ## Regeln
 
@@ -27,6 +29,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - Neue Primärschlüssel: UUIDv7.
 - Zeitstempel: UTC / `timestamptz`.
 - Task ist zentrales Domain-Objekt.
+- Zuständige einer Task stehen in `task_assignee` (höchstens 20). `task.progress` wird berechnet, nie gesetzt: ohne Unteraufgaben nach Status (0/50/100), mit Unteraufgaben 100 bei Status erledigt, sonst gerundetes Mittel der Unteraufgaben (ADR 0022).
 - Kanban/Gantt referenzieren Tasks.
 - Whiteboard referenziert Tasks statt Task-Business-State zu duplizieren.
 - AuditLog ist aus Anwendungssicht append-only.

@@ -76,6 +76,7 @@ public sealed class KanbanEndpointTests(InfrastructureFixture infrastructure) : 
         Assert.Equal(task.Id, Assert.Single(moved.Columns[2].Cards).Id);
         var current = await As(Ben).GetFromJsonAsync<TaskResponse>($"/api/v1/tasks/{task.Id}");
         Assert.Equal("done", current!.Status);
+        Assert.Equal(100, current.Progress);
         Assert.Equal(task.Version + 1, current.Version);
         Assert.Equal(1L, await ScalarAsync("select count(*) from activity_log where action = 'TaskMoved' and resource_id = $1", task.Id));
     }
@@ -253,6 +254,22 @@ public sealed class KanbanEndpointTests(InfrastructureFixture infrastructure) : 
         var stale = await As(Clara).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = column.Version, wipLimit = 5 });
 
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_column_gets_a_colour_from_the_palette()
+    {
+        var project = await CreateTeamProjectAsync();
+        var column = (await GetBoardAsync(Ben, project.Id)).Columns[0];
+
+        var invalid = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = column.Version, color = "#ff0000" });
+        var green = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = column.Version, color = "green" });
+        var colored = (await green.Content.ReadFromJsonAsync<KanbanBoardResponse>())!.Columns[0];
+        var cleared = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = colored.Version, color = (string?)null });
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Equal("green", colored.Color);
+        Assert.Null((await cleared.Content.ReadFromJsonAsync<KanbanBoardResponse>())!.Columns[0].Color);
     }
 
     [Fact]

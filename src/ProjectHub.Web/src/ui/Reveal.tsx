@@ -10,6 +10,7 @@ export function Reveal({
   title,
   plus = true,
   primary = false,
+  iconOnly = false,
   className,
   children,
 }: {
@@ -19,6 +20,8 @@ export function Reveal({
   plus?: boolean
   /** The page's main action, e.g. "+ Projekt": filled in the accent colour. */
   primary?: boolean
+  /** Shows only "+"; the button is named by the window's heading (e.g. "Spalte hinzufügen"). */
+  iconOnly?: boolean
   className?: string
   children: (close: () => void) => ReactNode
 }) {
@@ -26,8 +29,15 @@ export function Reveal({
   const heading = title ?? (plus && !label.includes(' ') ? `${label} hinzufügen` : label)
   return (
     <>
-      <button type="button" className={[primary ? 'primary-button' : 'add-button', className].filter(Boolean).join(' ')} aria-haspopup="dialog" onClick={() => setOpen(true)}>
-        {plus ? `+ ${label}` : label}
+      <button
+        type="button"
+        className={[primary ? 'primary-button' : 'add-button', className].filter(Boolean).join(' ')}
+        aria-haspopup="dialog"
+        aria-label={iconOnly ? heading : undefined}
+        title={iconOnly ? heading : undefined}
+        onClick={() => setOpen(true)}
+      >
+        {iconOnly ? '+' : plus ? `+ ${label}` : label}
       </button>
       {open && (
         <Dialog label={heading} title={heading} onClose={() => setOpen(false)}>

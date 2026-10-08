@@ -34,7 +34,7 @@ function task(id: string, title: string, overrides: Partial<GanttTask> = {}): Ga
     parentTaskId: null,
     title,
     status: 'todo',
-    assigneeName: null,
+    assigneeNames: [],
     startDate: null,
     dueDate: null,
     progress: 0,

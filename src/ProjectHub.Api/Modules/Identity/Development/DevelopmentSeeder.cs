@@ -69,13 +69,19 @@ public static class DevelopmentSeeder
         foreach (var task in DevelopmentSeedData.Tasks)
         {
             await ExecuteAsync(connection, """
-                insert into task (id, organization_id, project_id, parent_task_id, title, status, priority, assignee_id, creator_id,
+                insert into task (id, organization_id, project_id, parent_task_id, title, status, priority, creator_id,
                                   start_date, due_date, progress)
-                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                 on conflict do nothing
                 """, ct, task.Id, task.Project.OrganizationId, task.Project.Id, (object?)task.ParentTaskId ?? DBNull.Value,
-                task.Title, task.Status, task.Priority, (object?)task.AssigneeId ?? DBNull.Value, task.CreatorId,
-                Day(task.StartDay), Day(task.DueDay), task.Progress);
+                task.Title, task.Status, task.Priority, task.CreatorId, Day(task.StartDay), Day(task.DueDay), task.Progress);
+            if (task.AssigneeId is { } assigneeId)
+            {
+                await ExecuteAsync(connection, """
+                    insert into task_assignee (organization_id, task_id, user_id) values ($1, $2, $3)
+                    on conflict do nothing
+                    """, ct, task.Project.OrganizationId, task.Id, assigneeId);
+            }
         }
 
         foreach (var (id, source, target, type) in DevelopmentSeedData.Dependencies)

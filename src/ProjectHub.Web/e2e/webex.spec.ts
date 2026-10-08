@@ -55,7 +55,7 @@ test('an editor links a meeting and creates the project space; notifications arr
     expect(space?.messages[0]).toContain('In ProjectHub öffnen')
 
     // Ben assigns a task: Clara gets a direct message from the bot.
-    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: task, assigneeId: clara })
+    await api(request, 'dev-ben', 'POST', `/projects/${project.id}/tasks`, { title: task, assigneeIds: [clara] })
     await expect
       .poll(async () => (await api<FakeWebex>(request, 'dev-clara', 'GET', '/dev/webex')).directMessages.some((m) => m.markdown.includes(task)))
       .toBe(true)

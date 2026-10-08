@@ -13,6 +13,7 @@ import { ProjectMenu } from './ProjectMenu'
 import { ContinueSection } from './ContinueSection'
 import { applyTemplate, projectTemplates, type ProjectTemplate } from './templates'
 import { ProjectView } from './ProjectView'
+import { areaPath, showPath, type ProjectView as View } from '../navigation/location'
 import { useProjectOverview, type ProjectOverview } from './useProjectOverview'
 import { toast } from '../ui/toast'
 import { Skeleton } from '../ui/Skeleton'
@@ -25,17 +26,24 @@ type Props = {
   /** Opens this project (and task) right away, e.g. from a notification. */
   initialProjectId?: string | null
   initialTaskId?: string | null
+  /** The view to open the initial project in, e.g. the list after reloading the browser. */
+  initialView?: View | null
 }
 
-export function ProjectsPage({ me, departmentId = '', onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
+export function ProjectsPage({ me, departmentId = '', onOpenArticle, initialProjectId = null, initialTaskId = null, initialView = null }: Props) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(initialProjectId)
   const [openBoard, setOpenBoard] = useState<string | null>(null)
   const [openTask, setOpenTask] = useState<{ projectId: string; taskId: string } | null>(
     initialProjectId && initialTaskId ? { projectId: initialProjectId, taskId: initialTaskId } : null,
   )
+  const [firstView, setFirstView] = useState(initialView)
   const [error, setError] = useState<string | null>(null)
   const overview = useProjectOverview(projects)
+
+  useEffect(() => {
+    if (!selected) showPath(areaPath('projects'))
+  }, [selected])
 
   const load = useCallback(() => {
     fetchProjects(departmentId).then(
@@ -53,13 +61,14 @@ export function ProjectsPage({ me, departmentId = '', onOpenArticle, initialProj
         projectId={selected}
         me={me}
         initialTaskId={openTask?.projectId === selected ? openTask.taskId : null}
-        initialView={openBoard ? 'whiteboard' : 'board'}
+        initialView={openBoard ? 'whiteboard' : selected === initialProjectId && firstView ? firstView : 'board'}
         initialBoardId={openBoard}
         onOpenArticle={onOpenArticle}
         onBack={() => {
           setSelected(null)
           setOpenTask(null)
           setOpenBoard(null)
+          setFirstView(null)
           load()
         }}
       />
@@ -179,7 +188,7 @@ function ProgressRing({ percent }: { percent: number }) {
 /** Personal start: greeting plus my open and overdue tasks across projects. */
 function Greeting({ me, overview, onOpen }: { me: Me; overview: Map<string, ProjectOverview>; onOpen: (task: Task) => void }) {
   const day = today()
-  const mine = [...overview.values()].flatMap((o) => o.tasks).filter((t) => t.assigneeId === me.id && t.status !== 'done')
+  const mine = [...overview.values()].flatMap((o) => o.tasks).filter((t) => t.assignees.some((a) => a.id === me.id) && t.status !== 'done')
   const overdue = mine.filter((t) => t.dueDate !== null && t.dueDate < day)
   const next = [...mine].sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999')).slice(0, 3)
   const firstName = me.displayName.split(/\s+/)[0]

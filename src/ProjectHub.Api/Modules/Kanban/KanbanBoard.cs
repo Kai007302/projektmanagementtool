@@ -27,9 +27,18 @@ public sealed class KanbanColumn : IVersioned
     public required string TaskStatus { get; set; }
     public decimal Position { get; set; }
     public int? WipLimit { get; set; }
+
+    /// <summary>One of <see cref="KanbanColumnColors.All"/>, or null for the default look (migration 018).</summary>
+    public string? Color { get; set; }
+
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset UpdatedAt { get; set; }
     public long Version { get; set; }
+}
+
+public static class KanbanColumnColors
+{
+    public static readonly IReadOnlyList<string> All = ["gray", "blue", "green", "yellow", "orange", "red", "purple", "pink"];
 }
 
 internal sealed class KanbanBoardConfiguration : IEntityTypeConfiguration<KanbanBoard>

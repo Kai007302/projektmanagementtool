@@ -364,3 +364,20 @@ export function describeArrow(object: BoardObject, objects: BoardObject[], taskT
   }
   return `${objectTypes.arrow}: ${name(object.from)} → ${name(object.to)}`
 }
+
+/** World units between two background dots. */
+export const gridStep = 24
+
+/**
+ * The dotted background moves and scales with the board, so the dots sit at fixed board positions
+ * and objects can be lined up against them. When zoomed far out, every second (fourth, …) dot is
+ * left out so the pattern does not turn into a grey wash.
+ */
+export function gridBackground(view: { x: number; y: number; zoom: number }): { backgroundSize: string; backgroundPosition: string } {
+  let size = gridStep * view.zoom
+  while (size < 12) size *= 2
+  const offset = (value: number) => `${round(value - size / 2)}px`
+  return { backgroundSize: `${round(size)}px ${round(size)}px`, backgroundPosition: `${offset(view.x)} ${offset(view.y)}` }
+}
+
+const round = (value: number) => Math.round(value * 100) / 100

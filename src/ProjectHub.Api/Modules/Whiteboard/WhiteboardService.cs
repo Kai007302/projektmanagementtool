@@ -23,7 +23,7 @@ public sealed record WhiteboardResponse(
 public sealed record CreateWhiteboardRequest(string? Name);
 
 /// <summary>Live data of a task shown as a card on a whiteboard; never stored in the document.</summary>
-public sealed record WhiteboardTask(Guid Id, string Title, string Status, string? AssigneeName, DateOnly? DueDate);
+public sealed record WhiteboardTask(Guid Id, string Title, string Status, IReadOnlyList<string> AssigneeNames, DateOnly? DueDate);
 
 public sealed record TaskWhiteboard(Guid Id, string Name);
 
@@ -195,10 +195,16 @@ public sealed class WhiteboardService(
                 from task in db.Set<ProjectTask>()
                 where parsed.Contains(task.Id) && task.OrganizationId == user.OrganizationId
                       && task.ProjectId == board!.ProjectId && task.DeletedAt == null
-                join assignee in db.Set<AppUser>() on task.AssigneeId equals assignee.Id into assignees
-                from assignee in assignees.DefaultIfEmpty()
                 orderby task.Title, task.Id
-                select new WhiteboardTask(task.Id, task.Title, task.Status, assignee == null ? null : assignee.DisplayName, task.DueDate))
+                select new WhiteboardTask(
+                    task.Id,
+                    task.Title,
+                    task.Status,
+                    db.Set<TaskAssignee>().Where(a => a.TaskId == task.Id)
+                        .Join(db.Set<AppUser>(), a => a.UserId, u => u.Id, (a, u) => u)
+                        .OrderBy(u => u.DisplayName).ThenBy(u => u.Id)
+                        .Select(u => u.DisplayName).ToList(),
+                    task.DueDate))
             .ToListAsync(ct);
         return tasks;
     }

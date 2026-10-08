@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { type APIRequestContext, type Page } from '@playwright/test'
 import { expect, test } from './fixtures'
-import { searchArticles, signInAs, uniqueTitle } from './helpers'
+import { openArea, searchArticles, signInAs, uniqueTitle } from './helpers'
 
 // Phase 10b: the main views have no serious or critical accessibility violations (WCAG 2.1 A and AA rules of axe).
 
@@ -85,7 +85,7 @@ test('whiteboard', async ({ page }) => {
 })
 
 test('knowledge list, galaxy and an article', async ({ page }) => {
-  await signInAs(page, 'dev-ada', 'Wissen')
+  await signInAs(page, 'dev-ada', 'Artikelliste')
   const views = page.getByRole('navigation', { name: 'Wissen anzeigen als' })
   await searchArticles(page, 'Deployment-Prozess')
   const article = page.getByRole('button', { name: /^Deployment-Prozess/ }).first()
@@ -102,7 +102,7 @@ test('knowledge list, galaxy and an article', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Ganze Seite öffnen' })).toBeVisible()
   await expectAccessible(page)
 
-  await views.getByRole('button', { name: 'Artikel' }).click()
+  await views.getByRole('button', { name: 'Artikelliste' }).click()
   await searchArticles(page, 'Deployment-Prozess')
   await article.click()
   await expect(page.getByRole('heading', { name: 'Deployment-Prozess', level: 2 })).toBeVisible()
@@ -125,7 +125,7 @@ test.describe('in dark mode', () => {
     await expect(page.getByText('Analyse').first()).toBeVisible()
     await expectAccessible(page)
 
-    await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Wissen', exact: true }).click()
+    await openArea(page, 'Artikelliste')
     await searchArticles(page, 'Deployment-Prozess')
     await expect(page.getByRole('button', { name: /^Deployment-Prozess/ }).first()).toBeVisible()
     await expectAccessible(page)

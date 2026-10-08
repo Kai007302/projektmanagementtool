@@ -5,6 +5,8 @@ import { afterEach, vi } from 'vitest'
 afterEach(() => {
   cleanup()
   localStorage.clear()
+  // Pages keep the open page in the address; the next test starts on the start page again.
+  window.history.replaceState(null, '', '/')
 })
 
 // Components under test never open a real realtime connection.

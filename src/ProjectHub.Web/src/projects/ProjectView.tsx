@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { projectPath, showPath, type ProjectView as ProjectViewName } from '../navigation/location'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import { GanttChart } from '../gantt/GanttChart'
@@ -23,7 +24,7 @@ import { ProjectSharing } from './ProjectSharing'
 import { Skeleton } from '../ui/Skeleton'
 import { rememberVisit } from '../ui/recent'
 
-export type View = 'board' | 'list' | 'gantt' | 'whiteboard' | 'knowledge' | 'activity' | 'webex'
+export type View = ProjectViewName
 
 type Props = {
   projectId: string
@@ -62,6 +63,8 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   }, [latest, projectId])
 
   useEffect(load, [load])
+
+  useEffect(() => showPath(projectPath(projectId, view)), [projectId, view])
 
   const name = project?.name
   useEffect(() => {

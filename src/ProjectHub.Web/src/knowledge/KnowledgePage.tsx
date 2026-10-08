@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { knowledgePath, showPath } from '../navigation/location'
 import { canManageDepartment } from '../departments/currentDepartment'
 import type { Me } from '../identity/api'
 import { EmptyState } from '../ui/EmptyState'
@@ -25,20 +26,22 @@ import { Skeleton } from '../ui/Skeleton'
 import { CloseIcon } from '../ui/icons'
 
 /** departmentId: only the knowledge of this department; '' for all I can see (ADR 0021). */
-type Props = { me: Me; departmentId?: string; initialArticleId?: string | null }
+type Props = { me: Me; departmentId?: string; initialArticleId?: string | null; initialMode?: Mode }
 
 type Open = { id: string; editing: boolean }
 
 type Mode = 'articles' | 'galaxy'
 
-export function KnowledgePage({ me, departmentId = '', initialArticleId = null }: Props) {
+export function KnowledgePage({ me, departmentId = '', initialArticleId = null, initialMode = 'galaxy' }: Props) {
   const [open, setOpen] = useState<Open | null>(initialArticleId ? { id: initialArticleId, editing: false } : null)
   const [filter, setFilter] = useState<ArticleFilter>({})
   const [articles, setArticles] = useState<ArticleSummary[] | null>(null)
   const [spaces, setSpaces] = useState<Space[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<Mode>('articles')
+  const [mode, setMode] = useState<Mode>(initialMode)
+  const openId = open?.id ?? null
+  useEffect(() => showPath(knowledgePath(openId, mode)), [openId, mode])
 
   const load = useCallback(() => {
     searchArticles({ ...filter, departmentId }).then(
@@ -97,14 +100,14 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null }
   return (
     <section className="knowledge" aria-labelledby="knowledge-heading">
       <header className="page-header">
-        <h2 id="knowledge-heading">Wissen</h2>
+        <h2 id="knowledge-heading">Galaxie</h2>
         <button type="submit" onClick={() => void newArticle()}>
           + Artikel
         </button>
       </header>
       {error && <p role="alert">{error}</p>}
       <nav className="tabs" aria-label="Wissen anzeigen als">
-        {(['articles', 'galaxy'] as Mode[]).map((value) => (
+        {(['galaxy', 'articles'] as Mode[]).map((value) => (
           <button
             key={value}
             type="button"
@@ -112,7 +115,7 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null }
             aria-current={value === mode ? 'page' : undefined}
             onClick={() => setMode(value)}
           >
-            {value === 'articles' ? 'Artikel' : 'Galaxie'}
+            {value === 'articles' ? 'Artikelliste' : 'Galaxie'}
           </button>
         ))}
       </nav>
@@ -170,7 +173,14 @@ export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOp
         {article.departmentName && ` · ${article.departmentName}`}
         {article.spaceName && ` · ${article.spaceName}`}
       </span>
-      {article.summary && <span className="article-card-summary">{article.summary}</span>}
+      {(article.excerpt ?? article.summary) && (
+        <span className="article-card-summary">
+          {article.excerpt ?? article.summary}{' '}
+          <span className="read-more" aria-hidden="true">
+            Weiterlesen →
+          </span>
+        </span>
+      )}
       {article.tags.length > 0 && (
         <span className="tag-list">
           {article.tags.map((tag) => (
@@ -228,7 +238,7 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
   const active: { label: string; value: string; clear: () => void }[] = [
     ...(type ? [{ label: 'Art', value: articleTypes[type as keyof typeof articleTypes] ?? type, clear: () => setType('') }] : []),
     ...(status ? [{ label: 'Status', value: articleStatuses[status as keyof typeof articleStatuses] ?? status, clear: () => setStatus('') }] : []),
-    ...(spaceId ? [{ label: 'Bereich', value: spaceName(spaceId), clear: () => setSpaceId('') }] : []),
+    ...(spaceId ? [{ label: 'Kategorie', value: spaceName(spaceId), clear: () => setSpaceId('') }] : []),
     ...(tag ? [{ label: 'Tag', value: tag, clear: () => setTag('') }] : []),
   ]
 
@@ -258,7 +268,7 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
         <div className="filter-chips">
           {chip('Art', type, setType, Object.entries(articleTypes))}
           {chip('Status', status, setStatus, Object.entries(articleStatuses))}
-          {chip('Bereich', spaceId, setSpaceId, spaces.map((space) => [space.id, space.name]))}
+          {chip('Kategorie', spaceId, setSpaceId, spaces.map((space) => [space.id, space.name]))}
           {chip(
             'Tag',
             tag,
@@ -297,7 +307,7 @@ function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }:
     setError(null)
     try {
       await createSpace(name, '', departmentId)
-      toast(`Bereich „${name}“ angelegt.`)
+      toast(`Kategorie „${name}“ angelegt.`)
       setName('')
       close()
       onCreated()
@@ -308,11 +318,11 @@ function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }:
 
   return (
     <section className="panel" aria-labelledby="spaces-heading">
-      <h3 id="spaces-heading">Bereiche</h3>
+      <h3 id="spaces-heading">Kategorien</h3>
       <ul className="plain-list space-list">
         <li className="row">
           <button type="button" className={current === '' ? 'link-button active' : 'link-button'} aria-pressed={current === ''} onClick={() => onFilter('')}>
-            Alle Bereiche
+            Alle Kategorien
           </button>
         </li>
         {spaces.map((space) => (
@@ -325,10 +335,10 @@ function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }:
         ))}
       </ul>
       {departmentId && canManageDepartment(me, departmentId) && (
-        <Reveal label="Bereich">
+        <Reveal label="Kategorie">
           {(close) => (
             <form className="quick-create" onSubmit={(event) => void submit(event, close)}>
-              <input aria-label="Neuer Bereich" placeholder="Name, Enter zum Anlegen" value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
+              <input aria-label="Neue Kategorie" placeholder="Name, Enter zum Anlegen" value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
               {error && <p role="alert">{error}</p>}
             </form>
           )}

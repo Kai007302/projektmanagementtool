@@ -14,10 +14,10 @@ public sealed class TaskEndpointTests(InfrastructureFixture infrastructure) : Ap
     {
         var project = await CreateTeamProjectAsync();
 
-        var task = await CreateTaskAsync(David, project.Id, NewTask("Texte schreiben", assigneeId: Clara.Id, progress: 10, priority: "high"));
+        var task = await CreateTaskAsync(David, project.Id, NewTask("Texte schreiben", assigneeIds: [David.Id, Clara.Id, Clara.Id], priority: "high"));
 
-        Assert.Equal(Clara.Id, task.AssigneeId);
-        Assert.Equal("Clara Editor", task.AssigneeName);
+        Assert.Equal([(Clara.Id, "Clara Editor"), (David.Id, David.DisplayName)], task.Assignees.Select(a => (a.Id, a.DisplayName)));
+        Assert.Equal(0, task.Progress);
         Assert.Equal(David.Id, task.CreatorId);
         Assert.Equal("todo", task.Status);
         Assert.Equal(1L, await ScalarAsync("select count(*) from activity_log where action = 'TaskCreated' and resource_id = $1", task.Id));
@@ -50,17 +50,14 @@ public sealed class TaskEndpointTests(InfrastructureFixture infrastructure) : Ap
     }
 
     [Theory]
-    [InlineData("", null, null, null, null)]
-    [InlineData("Titel", (short)101, null, null, null)]
-    [InlineData("Titel", (short)-1, null, null, null)]
-    [InlineData("Titel", null, "2026-10-10", "2026-10-01", null)]
-    [InlineData("Titel", null, null, null, "critical")]
-    public async Task Invalid_task_is_rejected(string title, short? progress, string? start, string? due, string? priority)
+    [InlineData("", null, null, null)]
+    [InlineData("Titel", "2026-10-10", "2026-10-01", null)]
+    [InlineData("Titel", null, null, "critical")]
+    public async Task Invalid_task_is_rejected(string title, string? start, string? due, string? priority)
     {
         var project = await CreateTeamProjectAsync();
         var request = NewTask(
             title,
-            progress: progress,
             startDate: start is null ? null : DateOnly.Parse(start),
             dueDate: due is null ? null : DateOnly.Parse(due),
             priority: priority);
@@ -83,6 +80,71 @@ public sealed class TaskEndpointTests(InfrastructureFixture infrastructure) : Ap
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Progress_is_calculated_from_status_and_subtasks_and_cannot_be_set()
+    {
+        var project = await CreateTeamProjectAsync();
+        var parent = await CreateTaskAsync(Ben, project.Id, NewTask("Phase", status: "in_progress"));
+        Assert.Equal(50, parent.Progress);
+
+        var first = await CreateTaskAsync(Ben, project.Id, NewTask("Eins", parentTaskId: parent.Id));
+        var second = await CreateTaskAsync(Ben, project.Id, NewTask("Zwei", parentTaskId: parent.Id));
+        var third = await CreateTaskAsync(Ben, project.Id, NewTask("Drei", parentTaskId: second.Id, status: "done"));
+        Assert.Equal(50, await ProgressAsync(parent.Id)); // mean of 0 and 100 (second takes the progress of its subtask)
+
+        await PatchAsync(first, new { status = "in_progress" });
+        Assert.Equal(75, await ProgressAsync(parent.Id));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await As(Ben).DeleteAsync($"/api/v1/tasks/{third.Id}")).StatusCode);
+        Assert.Equal(25, await ProgressAsync(parent.Id)); // second has no subtask left and is open
+
+        var current = await As(Ben).GetFromJsonAsync<TaskResponse>($"/api/v1/tasks/{parent.Id}");
+        Assert.Equal(parent.Version, current!.Version); // a calculated progress is no edit of the task
+        await PatchAsync(current, new { status = "done" });
+        Assert.Equal(100, await ProgressAsync(parent.Id));
+
+        var manual = await As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{first.Id}", new { version = first.Version + 1, progress = 10 });
+        Assert.Equal(HttpStatusCode.BadRequest, manual.StatusCode);
+        Assert.Equal(50, await ProgressAsync(first.Id));
+    }
+
+    [Fact]
+    public async Task A_task_has_several_assignees_who_can_be_added_and_removed()
+    {
+        var project = await CreateTeamProjectAsync();
+        var task = await CreateTaskAsync(Ben, project.Id, NewTask("Gemeinsam", assigneeIds: [Clara.Id]));
+
+        var both = await PatchAsync(task, new { assigneeIds = new[] { Clara.Id, David.Id } });
+        Assert.Equal([Clara.Id, David.Id], both.Assignees.Select(a => a.Id));
+        Assert.Equal(task.Version + 1, both.Version);
+
+        var mine = await As(David).GetFromJsonAsync<PagedResponse<TaskResponse>>($"/api/v1/projects/{project.Id}/tasks?assigneeId={David.Id}");
+        Assert.Equal(task.Id, Assert.Single(mine!.Items).Id);
+
+        var onlyDavid = await PatchAsync(both, new { assigneeIds = new[] { David.Id } });
+        Assert.Equal([David.Id], onlyDavid.Assignees.Select(a => a.Id));
+
+        var unchanged = await PatchAsync(onlyDavid, new { assigneeIds = new[] { David.Id } });
+        Assert.Equal(onlyDavid.Version, unchanged.Version);
+
+        var guest = await As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{task.Id}", new { version = unchanged.Version, assigneeIds = new[] { David.Id, Gina.Id } });
+        Assert.Equal(HttpStatusCode.BadRequest, guest.StatusCode);
+        var single = await As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{task.Id}", new { version = unchanged.Version, assigneeId = Clara.Id });
+        Assert.Equal(HttpStatusCode.BadRequest, single.StatusCode);
+        Assert.Equal(1, await ScalarAsync("select count(*) from task_assignee where task_id = $1", task.Id));
+    }
+
+    private async Task<TaskResponse> PatchAsync(TaskResponse task, object changes)
+    {
+        var body = System.Text.Json.JsonSerializer.SerializeToNode(changes)!.AsObject();
+        body["version"] = task.Version;
+        var response = await As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{task.Id}", body);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<TaskResponse>())!;
+    }
+
+    private async Task<long> ProgressAsync(Guid taskId) => await ScalarAsync("select progress from task where id = $1", taskId);
 
     [Fact]
     public async Task Subtasks_belong_to_their_parent_and_list_can_filter_them()
@@ -132,13 +194,13 @@ public sealed class TaskEndpointTests(InfrastructureFixture infrastructure) : Ap
         var task = await CreateTaskAsync(Ben, project.Id, NewTask("Aufgabe", assigneeId: David.Id));
 
         var response = await As(David).PatchAsJsonAsync(
-            $"/api/v1/tasks/{task.Id}", new { version = task.Version, status = "in_progress", progress = 40, assigneeId = (Guid?)null });
+            $"/api/v1/tasks/{task.Id}", new { version = task.Version, status = "in_progress", assigneeIds = (Guid[]?)null });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<TaskResponse>();
         Assert.Equal("in_progress", updated!.Status);
-        Assert.Equal(40, updated.Progress);
-        Assert.Null(updated.AssigneeId);
+        Assert.Equal(50, updated.Progress);
+        Assert.Empty(updated.Assignees);
         Assert.Equal("Aufgabe", updated.Title);
         Assert.Equal(task.Version + 1, updated.Version);
     }
@@ -177,7 +239,7 @@ public sealed class TaskEndpointTests(InfrastructureFixture infrastructure) : Ap
         var task = await CreateTaskAsync(Ben, project.Id);
 
         var responses = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
-            As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{task.Id}", new { version = task.Version, progress = i * 10 + 1 })));
+            As(Ben).PatchAsJsonAsync($"/api/v1/tasks/{task.Id}", new { version = task.Version, title = $"Version {i}" })));
 
         Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
         Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.OK), r => Assert.Equal(HttpStatusCode.Conflict, r.StatusCode));

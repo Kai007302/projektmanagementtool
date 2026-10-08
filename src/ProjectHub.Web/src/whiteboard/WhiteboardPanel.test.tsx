@@ -151,7 +151,7 @@ describe('WhiteboardPanel', () => {
   it('opens the options of an object on a right click and shows the object in the right column', async () => {
     fakeApi({
       'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }),
-      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1': () => json([{ id: 't-1', title: 'Startseite', status: 'todo', assigneeName: 'Clara', dueDate: null }]),
+      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1': () => json([{ id: 't-1', title: 'Startseite', status: 'todo', assigneeNames: ['Clara'], dueDate: null }]),
     })
     const { container } = render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)
@@ -317,7 +317,7 @@ describe('WhiteboardPanel', () => {
   it('shows task cards with live task data', async () => {
     fakeApi({
       'GET /api/v1/projects/p-1/whiteboards?limit=100': () => json({ items: [board('b-1', 'Ideen')], nextOffset: null }),
-      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1,t-gone': () => json([{ id: 't-1', title: 'Startseite', status: 'in_progress', assigneeName: 'Clara', dueDate: null }]),
+      'GET /api/v1/whiteboards/b-1/tasks?ids=t-1,t-gone': () => json([{ id: 't-1', title: 'Startseite', status: 'in_progress', assigneeNames: ['Clara'], dueDate: null }]),
     })
     render(<WhiteboardPanel project={project()} me={ben} revision={0} onChanged={() => {}} />)
     await connect(true)

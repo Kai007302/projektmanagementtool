@@ -7,7 +7,7 @@ const task = (id: string, parentTaskId: string | null = null, startDate: string 
   parentTaskId,
   title: id,
   status: 'todo',
-  assigneeName: null,
+  assigneeNames: [],
   startDate,
   dueDate,
   progress: 0,

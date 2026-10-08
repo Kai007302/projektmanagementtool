@@ -4,7 +4,7 @@ import { CalendarActions } from '../calendar/CalendarActions'
 import { downloadMilestoneCalendar } from '../calendar/calendar'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
-import { taskStatuses, updateTask } from '../tasks/api'
+import { assigneeText, taskStatuses, updateTask } from '../tasks/api'
 import { TaskDetails } from '../tasks/TaskDetails'
 import {
   createDependency,
@@ -516,7 +516,7 @@ function TaskSchedule({ project, me, task, gantt, canContribute, onReschedule, o
       </header>
       <p className="muted">
         {taskStatuses[task.status]} · {task.progress} % erledigt
-        {task.assigneeName && ` · ${task.assigneeName}`}
+        {task.assigneeNames.length > 0 && ` · ${assigneeText(task.assigneeNames)}`}
       </p>
       {canContribute ? (
         <form className="inline-form" onSubmit={save} aria-label="Termin">

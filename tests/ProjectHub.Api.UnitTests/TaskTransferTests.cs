@@ -144,13 +144,13 @@ public sealed class TaskSheetTests
     [Fact]
     public void Header_accepts_export_names_english_names_and_ignores_unknown_columns()
     {
-        var (columns, ignored) = TaskSheet.MapHeader(["Title", "Zuständig (E-Mail)", "Fälligkeitsdatum", "Kostenstelle", "Übergeordnete Aufgabe", "ID", "Priority"]);
+        var (columns, ignored) = TaskSheet.MapHeader(["Title", "Zuständig (E-Mail)", "Fälligkeitsdatum", "Kostenstelle", "Übergeordnete Aufgabe", "ID", "Priority", "Fortschritt (%)"]);
 
         Assert.Equal(0, columns[TaskColumn.Title]);
         Assert.Equal(1, columns[TaskColumn.AssigneeEmail]);
         Assert.Equal(2, columns[TaskColumn.DueDate]);
         Assert.Equal(6, columns[TaskColumn.Priority]);
-        Assert.Equal(["Kostenstelle", "Übergeordnete Aufgabe", "ID"], ignored);
+        Assert.Equal(["Kostenstelle", "Übergeordnete Aufgabe", "ID", "Fortschritt (%)"], ignored);
     }
 
     [Fact]
@@ -158,10 +158,13 @@ public sealed class TaskSheetTests
     {
         var (columns, _) = TaskSheet.MapHeader(["Titel", "Status", "Priorität", "Zuständig", "Start", "Fällig", "Fortschritt (%)", "Aufwand (h)"]);
 
-        var (draft, errors) = TaskSheet.ReadRow(2, [" Texte ", "In Arbeit", "dringend", "ben@example.org", "02.11.2026", "2026-11-04", "50 %", "1,5"], columns);
+        var (draft, errors) = TaskSheet.ReadRow(
+            2, [" Texte ", "In Arbeit", "dringend", "ben@example.org; Clara Editor;BEN@example.org", "02.11.2026", "2026-11-04", "kein Wert", "1,5"], columns);
 
         Assert.Empty(errors);
-        Assert.Equal(new TaskDraft(2, "Texte", null, "in_progress", "urgent", "ben@example.org", new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 4), 50, 1.5m), draft);
+        Assert.Equal(
+            new TaskDraft(2, "Texte", null, "in_progress", "urgent", ["ben@example.org", "Clara Editor"], new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 4), 1.5m),
+            draft);
     }
 
     [Fact]
@@ -174,7 +177,7 @@ public sealed class TaskSheetTests
         Assert.Null(draft);
         Assert.Equal(
             [TaskImportErrorCodes.Required, TaskImportErrorCodes.UnknownStatus, TaskImportErrorCodes.UnknownPriority,
-             TaskImportErrorCodes.InvalidDate, TaskImportErrorCodes.InvalidNumber, TaskImportErrorCodes.InvalidNumber],
+             TaskImportErrorCodes.InvalidDate, TaskImportErrorCodes.InvalidNumber],
             errors.Select(e => e.Code));
         Assert.All(errors, e => Assert.Equal(7, e.Row));
         Assert.Equal("Titel", errors[0].Column);

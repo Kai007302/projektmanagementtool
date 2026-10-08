@@ -39,8 +39,7 @@ function task(id: string, title: string, overrides: Record<string, unknown> = {}
     description: null,
     status: 'todo',
     priority: 'normal',
-    assigneeId: null,
-    assigneeName: null,
+    assignees: [] as { id: string; displayName: string }[],
     startDate: null,
     dueDate: null,
     progress: 0,
@@ -110,7 +109,21 @@ describe('ProjectsPage', () => {
     expect(within(parent).getByRole('button', { name: /Mockups/ })).toBeInTheDocument()
   })
 
-  it('creates a task', async () => {
+  it('keeps the open project and view in the address and opens them again', async () => {
+    fakeApi(projectRoutes())
+    const { unmount } = render(<ProjectsPage me={ben} />)
+
+    await openProject()
+    expect(window.location.pathname).toBe('/projekte/p-1/liste')
+    unmount()
+
+    render(<ProjectsPage me={ben} initialProjectId="p-1" initialView="list" />)
+    expect(await screen.findByRole('region', { name: 'Aufgaben' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '← Alle Projekte' }))
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('creates a task in a window with all its fields', async () => {
     let tasks = [design]
     const api = fakeApi({
       ...projectRoutes(all, tasks),
@@ -125,12 +138,24 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(board.getByRole('button', { name: '+ Aufgabe' }))
-    await userEvent.type(board.getByLabelText('Neue Aufgabe'), 'Texte schreiben{Enter}')
+    const dialog = within(screen.getByRole('dialog', { name: 'Neue Aufgabe' }))
+    await userEvent.type(dialog.getByLabelText('Titel'), 'Texte schreiben')
+    await userEvent.type(dialog.getByLabelText('Beschreibung'), 'Für die Startseite')
+    await userEvent.selectOptions(dialog.getByLabelText('Priorität'), 'high')
+    await userEvent.click(dialog.getByRole('checkbox', { name: 'Clara Editor' }))
+    await userEvent.type(dialog.getByLabelText('Fällig am'), '30.11.2026')
+    await userEvent.click(dialog.getByRole('button', { name: 'Aufgabe anlegen' }))
 
     expect(await board.findByRole('button', { name: /Texte schreiben/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Neue Aufgabe' })).not.toBeInTheDocument()
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/projects/p-1/tasks')?.init?.body))).toEqual({
       title: 'Texte schreiben',
       parentTaskId: null,
+      status: 'todo',
+      description: 'Für die Startseite',
+      priority: 'high',
+      assigneeIds: ['u-clara'],
+      dueDate: '2026-11-30',
     })
   })
 
@@ -205,9 +230,38 @@ describe('ProjectsPage', () => {
     await vi.waitFor(() => expect(patches()).toHaveLength(2))
     expect(patches()).toEqual([
       { version: 1, status: 'in_progress' },
-      { version: 2, assigneeId: 'u-clara' },
+      { version: 2, assigneeIds: ['u-clara'] },
     ])
     expect(task.queryByRole('button', { name: 'Aufgabe speichern' })).not.toBeInTheDocument()
+  })
+
+  it('assigns a task to several people and shows the calculated progress without letting anyone change it', async () => {
+    const clara = { id: 'u-clara', displayName: 'Clara Editor' }
+    const assigned = { ...design, assignees: [clara], progress: 50 }
+    const api = fakeApi({
+      ...projectRoutes(all, [assigned, mockups]),
+      'GET /api/v1/tasks/t-1': () => json(assigned),
+      'PATCH /api/v1/tasks/t-1': () => json({ ...assigned, assignees: [clara, { id: 'u-ben', displayName: 'Ben Projektleiter' }], version: 2 }),
+    })
+    render(<ProjectsPage me={ben} />)
+
+    const board = await openProject()
+    await userEvent.click(await board.findByRole('button', { name: /Design abstimmen/ }))
+    const task = within(await screen.findByRole('dialog'))
+    expect(await task.findByRole('progressbar', { name: 'Fortschritt' })).toHaveAttribute('aria-valuenow', '50')
+    expect(task.queryByRole('spinbutton')).not.toBeInTheDocument()
+
+    expect(within(task.getByLabelText('Zuständig')).queryByRole('option', { name: 'Clara Editor' })).not.toBeInTheDocument()
+    await userEvent.selectOptions(task.getByLabelText('Zuständig'), 'u-ben')
+    expect(await task.findByRole('button', { name: 'Ben Projektleiter entfernen' })).toBeInTheDocument()
+    await userEvent.click(task.getByRole('button', { name: 'Clara Editor entfernen' }))
+
+    const patches = () => api.calls.filter((c) => c.key === 'PATCH /api/v1/tasks/t-1').map((c) => JSON.parse(String(c.init?.body)) as unknown)
+    await vi.waitFor(() => expect(patches()).toHaveLength(2))
+    expect(patches()).toEqual([
+      { version: 1, assigneeIds: ['u-clara', 'u-ben'] },
+      { version: 2, assigneeIds: ['u-ben'] },
+    ])
   })
 
   it('reloads the task and explains a conflicting change', async () => {

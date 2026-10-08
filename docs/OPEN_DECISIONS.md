@@ -48,6 +48,7 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-042 | Was der Import von Aufgaben anlegt | offen | immer neue Aufgaben der obersten Ebene, alle Zeilen oder keine. Kein Aktualisieren über die ID, keine Unteraufgaben aus „Übergeordnete Aufgabe“ (ADR 0018) |
 | DEC-043 | Veröffentlichte Images | offen | öffentlich in GHCR (`ghcr.io/kai007302/projecthub-*`), wie das Repository selbst; enthalten keine Secrets und keine Konfiguration. Privat ginge auch, dann braucht der Server Zugangsdaten für GHCR (ADR 0019) |
 | DEC-044 | Projektlogos | offen | PNG, JPEG oder WebP bis 256 KB in PostgreSQL, kein SVG; ändern darf, wer im Projekt Schreibrecht hat (ADR 0020) |
+| DEC-045 | Regel für den berechneten Fortschritt | offen | Kai (2026-10-08): Fortschritt nicht mehr von Hand. Vorschlag: ohne Unteraufgaben Offen 0 %, In Arbeit 50 %, Erledigt 100 %; mit Unteraufgaben gerundetes Mittel der Unteraufgaben, erledigt immer 100 %. Alternative: Anteil erledigter Unteraufgaben, „In Arbeit“ dann 0 % (ADR 0022) |
 
 
 ## Knowledge / AI

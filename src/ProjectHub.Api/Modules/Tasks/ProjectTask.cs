@@ -19,10 +19,11 @@ public sealed class ProjectTask : IVersioned
     public string? Description { get; set; }
     public string Status { get; set; } = TaskStatus.Todo;
     public string Priority { get; set; } = TaskPriority.Normal;
-    public Guid? AssigneeId { get; set; }
     public Guid CreatorId { get; init; }
     public DateOnly? StartDate { get; set; }
     public DateOnly? DueDate { get; set; }
+
+    /// <summary>Calculated from status and subtasks (<see cref="TaskProgress"/>), never set by hand.</summary>
     public short Progress { get; set; }
     public decimal? EstimatedHours { get; set; }
     public decimal? BoardPosition { get; set; }
@@ -32,7 +33,16 @@ public sealed class ProjectTask : IVersioned
     public long Version { get; set; }
 }
 
-/// <summary>Raised after a task was assigned to someone (on creation or by a change of the assignee).</summary>
+/// <summary>Someone a task is assigned to; a task can have several (ADR 0022).</summary>
+public sealed class TaskAssignee
+{
+    public Guid OrganizationId { get; init; }
+    public Guid TaskId { get; init; }
+    public Guid UserId { get; init; }
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>Raised after a task was assigned to someone (on creation or when the person was added to the assignees).</summary>
 public sealed record TaskAssigned(Guid OrganizationId, Guid ProjectId, Guid TaskId, Guid AssigneeId, Guid ActorId) : IDomainEvent;
 
 public static class TaskStatus
@@ -60,5 +70,14 @@ internal sealed class ProjectTaskConfiguration : IEntityTypeConfiguration<Projec
     {
         builder.ToTable("task");
         builder.Property(t => t.Version).IsConcurrencyToken();
+    }
+}
+
+internal sealed class TaskAssigneeConfiguration : IEntityTypeConfiguration<TaskAssignee>
+{
+    public void Configure(EntityTypeBuilder<TaskAssignee> builder)
+    {
+        builder.ToTable("task_assignee");
+        builder.HasKey(a => new { a.TaskId, a.UserId });
     }
 }

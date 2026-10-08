@@ -89,8 +89,9 @@ test('two people draw together, a viewer follows and the board survives a reload
   await evaPage.getByRole('application').locator('[data-object-id]', { hasText: 'Suche nach oben, bitte' }).dblclick({ position: { x: 90, y: 114 } })
   await expect(evaPage.getByLabel('Text', { exact: true })).toHaveCount(0)
 
-  // After a reload everything is still there.
+  // After a reload everything is still there, and the reload stays on the project's whiteboard view.
   await claraPage.reload()
+  await expect(claraPage.getByRole('navigation', { name: 'Ansicht' }).getByRole('button', { name: 'Whiteboard' })).toHaveAttribute('aria-current', 'page')
   await claraPage.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Projekte', exact: true }).click()
   // After the reload the start page also offers the project under „Weiter, wo du warst“; open it from the list.
   await claraPage.getByRole('list', { name: 'Projekte' }).getByRole('button', { name }).click()

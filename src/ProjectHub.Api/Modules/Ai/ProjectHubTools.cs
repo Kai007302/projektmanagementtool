@@ -34,12 +34,14 @@ public sealed record ProjectOverview(
     IReadOnlyList<string> Members, int OpenTasks, int TasksInProgress, int DoneTasks, int OverdueTasks);
 
 public sealed record TaskItem(
-    Guid TaskId, Guid ProjectId, string Title, string Status, string Priority, string? Assignee, DateOnly? StartDate, DateOnly? DueDate,
-    short Progress, int Subtasks);
+    Guid TaskId, Guid ProjectId, string Title, string Status, string Priority, IReadOnlyList<string> Assignees, DateOnly? StartDate,
+    DateOnly? DueDate, short Progress, int Subtasks);
 
 public sealed record TaskDetailsItem(
-    Guid TaskId, Guid ProjectId, string Title, string? Description, string Status, string Priority, string? Assignee,
+    Guid TaskId, Guid ProjectId, string Title, string? Description, string Status, string Priority, IReadOnlyList<PersonRef> Assignees,
     DateOnly? StartDate, DateOnly? DueDate, short Progress, IReadOnlyList<string> RecentComments);
+
+public sealed record PersonRef(Guid UserId, string Name);
 
 public sealed record PersonItem(Guid UserId, string Name, string Email, string? Department);
 
@@ -186,7 +188,8 @@ public sealed partial class ProjectHubTools(
         var result = await tasks.ListAsync(user, projectId, filter, new Paging(0, MaxListSize), ct);
         return result.Succeeded
             ? result.Value!.Take(MaxListSize).Select(t => new TaskItem(
-                t.Id, t.ProjectId, t.Title, t.Status, t.Priority, t.AssigneeName, t.StartDate, t.DueDate, t.Progress, t.SubtaskCount)).ToList()
+                t.Id, t.ProjectId, t.Title, t.Status, t.Priority, t.Assignees.Select(a => a.DisplayName).ToList(), t.StartDate, t.DueDate, t.Progress,
+                t.SubtaskCount)).ToList()
             : Error(result);
     }
 
@@ -203,7 +206,8 @@ public sealed partial class ProjectHubTools(
         var task = result.Value!;
         var recent = await comments.ListAsync(user, taskId, new Paging(0, 10), ct);
         return new TaskDetailsItem(
-            task.Id, task.ProjectId, task.Title, task.Description, task.Status, task.Priority, task.AssigneeName, task.StartDate, task.DueDate,
+            task.Id, task.ProjectId, task.Title, task.Description, task.Status, task.Priority,
+            task.Assignees.Select(a => new PersonRef(a.Id, a.DisplayName)).ToList(), task.StartDate, task.DueDate,
             task.Progress, recent.Succeeded ? recent.Value!.Take(10).Select(c => $"{c.AuthorName}: {c.Content}").ToList() : []);
     }
 
@@ -234,7 +238,7 @@ public sealed partial class ProjectHubTools(
         (await departments.ListAsync(user, new Paging(0, MaxListSize), ct))
         .Select(d => new DepartmentItem(d.Id, d.Name, d.Description, d.MemberCount, d.MyRole)).ToList();
 
-    [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissensbereiche auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissenskategorien auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Lists the knowledge spaces (sections of the knowledge hub) an article can belong to.")]
     public async Task<object> ListKnowledgeSpaces(CancellationToken ct = default) =>
         (await spaces.ListAsync(user, ct)).Select(s => new SpaceItem(s.Id, s.Name, s.Description)).ToList();

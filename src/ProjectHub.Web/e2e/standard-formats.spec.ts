@@ -65,7 +65,7 @@ test('a person subscribes to their dates and the address works without signing i
   const project = await api<{ id: string }>(request, 'POST', '/projects', { name })
   await api(request, 'POST', `/projects/${project.id}/members`, { userId: david, role: 'member' })
   const due = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10)
-  await api(request, 'POST', `/projects/${project.id}/tasks`, { title: 'Abo-Termin', assigneeId: david, dueDate: due })
+  await api(request, 'POST', `/projects/${project.id}/tasks`, { title: 'Abo-Termin', assigneeIds: [david], dueDate: due })
 
   await signInAs(page, 'dev-david', 'Projekte')
   await page.getByRole('button', { name: /^Konto von / }).click()

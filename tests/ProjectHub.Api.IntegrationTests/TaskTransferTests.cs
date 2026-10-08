@@ -17,9 +17,9 @@ public sealed class TaskTransferTests(InfrastructureFixture infrastructure) : Ap
     public async Task Csv_export_lists_every_task_with_labels_and_parents_before_subtasks()
     {
         var project = await CreateTeamProjectAsync();
-        var parent = await CreateTaskAsync(Ben, project.Id, NewTask("=Planung", assigneeId: David.Id, startDate: new DateOnly(2026, 11, 2), dueDate: new DateOnly(2026, 11, 4), status: "in_progress", priority: "high"));
+        var parent = await CreateTaskAsync(Ben, project.Id, NewTask("=Planung", assigneeIds: [David.Id, Clara.Id], startDate: new DateOnly(2026, 11, 2), dueDate: new DateOnly(2026, 11, 4), status: "in_progress", priority: "high"));
         await CreateTaskAsync(Ben, project.Id, NewTask("Später"));
-        await CreateTaskAsync(Ben, project.Id, NewTask("Teil", parentTaskId: parent.Id, progress: 40));
+        await CreateTaskAsync(Ben, project.Id, NewTask("Teil", parentTaskId: parent.Id, status: "in_progress"));
 
         var response = await As(Eva).GetAsync($"/api/v1/projects/{project.Id}/tasks/export?format=csv");
         var bytes = await response.Content.ReadAsByteArrayAsync();
@@ -30,8 +30,11 @@ public sealed class TaskTransferTests(InfrastructureFixture infrastructure) : Ap
         Assert.EndsWith(".csv", response.Content.Headers.ContentDisposition?.FileNameStar, StringComparison.Ordinal);
         Assert.Equal(TaskSheet.Columns.Select(c => c.Header), rows[0]);
         Assert.Equal(["=Planung", "Teil", "Später"], rows.Skip(1).Select(r => r[0]));
-        Assert.Equal(["=Planung", "", "In Arbeit", "Hoch", David.Email, David.DisplayName, "2026-11-02", "2026-11-04", "0", "", "", parent.Id.ToString()], rows[1]);
-        Assert.Equal("40", rows[2][8]);
+        Assert.Equal(
+            ["=Planung", "", "In Arbeit", "Hoch", $"{Clara.Email}; {David.Email}", $"{Clara.DisplayName}; {David.DisplayName}", "2026-11-02", "2026-11-04", "50", "", "",
+             parent.Id.ToString()],
+            rows[1]);
+        Assert.Equal("50", rows[2][8]);
         Assert.Equal("=Planung", rows[2][10]);
         Assert.Contains("'=Planung", Encoding.UTF8.GetString(bytes), StringComparison.Ordinal);
     }
@@ -80,7 +83,7 @@ public sealed class TaskTransferTests(InfrastructureFixture infrastructure) : Ap
 
         var preview = await ReadResultAsync(await ImportAsync(David, project.Id, csv, dryRun: true));
         Assert.Equal((2, 0), (preview.Rows, preview.Created));
-        Assert.Equal(["Kostenstelle"], preview.IgnoredColumns);
+        Assert.Equal(["Fortschritt (%)", "Kostenstelle"], preview.IgnoredColumns);
         Assert.Empty(preview.Errors);
         Assert.Equal(0, await CountTasksAsync(project.Id));
 
@@ -90,9 +93,9 @@ public sealed class TaskTransferTests(InfrastructureFixture infrastructure) : Ap
         var tasks = (await As(David).GetFromJsonAsync<PagedResponse<TaskResponse>>($"/api/v1/projects/{project.Id}/tasks?limit=10"))!.Items;
         var texte = tasks.Single(t => t.Title == "Texte");
         Assert.Equal(("in_progress", "high", David.Id, new DateOnly(2026, 11, 2), new DateOnly(2026, 11, 4), (short)50, 1.5m),
-            (texte.Status, texte.Priority, texte.AssigneeId, texte.StartDate!.Value, texte.DueDate!.Value, texte.Progress, texte.EstimatedHours!.Value));
+            (texte.Status, texte.Priority, texte.Assignees.Single().Id, texte.StartDate!.Value, texte.DueDate!.Value, texte.Progress, texte.EstimatedHours!.Value));
         var bilder = tasks.Single(t => t.Title == "Bilder");
-        Assert.Equal(("todo", "normal", (Guid?)null, (Guid?)null), (bilder.Status, bilder.Priority, bilder.AssigneeId, bilder.ParentTaskId));
+        Assert.Equal(("todo", "normal", 0, (Guid?)null), (bilder.Status, bilder.Priority, bilder.Assignees.Count, bilder.ParentTaskId));
         Assert.Equal(1, await ScalarAsync("select count(*) from activity_log where project_id = $1 and action = 'TasksImported'", project.Id));
     }
 
@@ -134,9 +137,9 @@ public sealed class TaskTransferTests(InfrastructureFixture infrastructure) : Ap
         var result = await ReadResultAsync(await ImportAsync(Ben, target.Id, export, "aufgaben.xlsx"));
 
         Assert.Empty(result.Errors);
-        Assert.Equal(["Übergeordnete Aufgabe", "ID"], result.IgnoredColumns);
+        Assert.Equal(["Fortschritt (%)", "Übergeordnete Aufgabe", "ID"], result.IgnoredColumns);
         var task = (await As(Ben).GetFromJsonAsync<PagedResponse<TaskResponse>>($"/api/v1/projects/{target.Id}/tasks?limit=10"))!.Items.Single();
-        Assert.Equal(("Rundreise", Clara.Id, new DateOnly(2026, 12, 24), "urgent"), (task.Title, task.AssigneeId!.Value, task.DueDate!.Value, task.Priority));
+        Assert.Equal(("Rundreise", Clara.Id, new DateOnly(2026, 12, 24), "urgent"), (task.Title, task.Assignees.Single().Id, task.DueDate!.Value, task.Priority));
     }
 
     [Theory]

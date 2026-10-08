@@ -29,13 +29,13 @@ test('the pages fit the width of a phone', async ({ page }) => {
     await expectNoSidewaysScroll(page)
   }
 
-  await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Wissen', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Wissen', level: 2 })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Bereiche' }).getByRole('button', { name: 'Galaxie', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Galaxie', level: 2 })).toBeVisible()
   await expectNoSidewaysScroll(page)
 })
 
 test('on a phone the article opens as a bottom sheet below the galaxy', async ({ page }) => {
-  await signInAs(page, 'dev-eva')
+  await signInAs(page, 'dev-eva', 'Galaxie')
   await page.getByRole('navigation', { name: 'Wissen anzeigen als' }).getByRole('button', { name: 'Galaxie' }).click()
   const canvas = page.getByRole('img', { name: /^Wissensgalaxie mit/ })
   await expect(canvas).toHaveAttribute('data-layout', 'done')

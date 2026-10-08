@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
-import { createTask, fetchTasks, taskStatuses, type Task } from './api'
+import { assigneeText, createTask, fetchTasks, taskStatuses, type Task } from './api'
 import { PriorityBadge } from './PriorityBadge'
+import { NewTaskDialog } from './NewTaskDialog'
 import { TaskDetails } from './TaskDetails'
 import { TaskTransfer } from './TaskTransfer'
 import { useLatest } from '../api/useLatest'
-import { QuickCreate } from '../ui/QuickCreate'
 import { Skeleton } from '../ui/Skeleton'
 
 type Props = { project: ProjectDetails; me: Me; revision: number; onChanged: () => void }
@@ -15,6 +15,7 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const latest = useLatest()
   const load = useCallback(() => {
@@ -56,7 +57,7 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
               <span className={`task-status status-${task.status}`}>{taskStatuses[task.status]}</span>
               <span className="task-title">{task.title}</span>
               <PriorityBadge priority={task.priority} />
-              <span className="card-meta">{[task.assigneeName, task.progress > 0 ? `${task.progress} %` : null].filter(Boolean).join(' · ')}</span>
+              <span className="card-meta">{[assigneeText(task.assignees.map((a) => a.displayName)), task.progress > 0 ? `${task.progress} %` : null].filter(Boolean).join(' · ')}</span>
             </button>
             {renderTasks(task.id)}
           </li>
@@ -69,15 +70,19 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
     <section className="panel task-board" aria-labelledby="tasks-heading">
       <h3 id="tasks-heading">Aufgaben</h3>
       {error && <p role="alert">{error}</p>}
-      <TaskTransfer project={project} onImported={changed} />
       {project.capabilities.canContribute && (
-        <QuickCreate
-          label="Aufgabe"
-          fieldLabel="Neue Aufgabe"
-          onCreate={async (title) => {
-            await createTask(project.id, title, null)
+        <button type="button" className="add-button" onClick={() => setCreating(true)}>
+          + Aufgabe
+        </button>
+      )}
+      {creating && (
+        <NewTaskDialog
+          project={project}
+          onCreate={async (title, status, details) => {
+            await createTask(project.id, title, null, status, details)
             changed()
           }}
+          onClose={() => setCreating(false)}
         />
       )}
       {tasks === null ? (
@@ -87,6 +92,7 @@ export function TaskBoard({ project, me, revision, onChanged }: Props) {
       ) : (
         renderTasks(null)
       )}
+      <TaskTransfer project={project} onImported={changed} />
       {selected && (
         <TaskDetails
           key={selected}

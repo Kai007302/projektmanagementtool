@@ -75,9 +75,33 @@ async function openArticle() {
 describe('KnowledgePage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
+  it('opens on the galaxy, with the article list as the second tab', async () => {
+    fakeApi({ ...routes(), 'GET /api/v1/knowledge/graph': () => json({ nodes: [], edges: [], truncated: false }) })
+    render(<KnowledgePage me={ben} />)
+
+    const views = screen.getByRole('navigation', { name: 'Wissen anzeigen als' })
+    expect(within(views).getByRole('button', { name: 'Galaxie' })).toHaveAttribute('aria-current', 'page')
+    expect(await screen.findByText('Keine Artikel für diese Auswahl.')).toBeInTheDocument()
+
+    await userEvent.click(within(views).getByRole('button', { name: 'Artikelliste' }))
+    expect(await screen.findByRole('button', { name: /Deployment-Prozess/ })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/galaxie/artikel')
+  })
+
+  it('shows a short excerpt with "Weiterlesen" instead of the whole article', async () => {
+    const excerpt = 'Erst Review, dann Freigabe …'
+    fakeApi({ ...routes(), 'GET /api/v1/knowledge/articles?limit=100': () => json({ items: [{ ...summary, excerpt }], nextOffset: null }) })
+    render(<KnowledgePage me={ben} initialMode="articles" />)
+
+    const card = await screen.findByRole('button', { name: /Deployment-Prozess/ })
+    expect(within(card).getByText(excerpt, { exact: false })).toBeInTheDocument()
+    expect(within(card).getByText('Weiterlesen →')).toBeInTheDocument()
+    expect(within(card).queryByText(summary.summary)).not.toBeInTheDocument()
+  })
+
   it('lists articles and searches while typing, with filters behind a button and removable chips', async () => {
     const api = fakeApi({ ...routes(), 'GET /api/v1/knowledge/articles?limit=100&q=Freigabe&type=process&tag=Betrieb': () => json(empty) })
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
 
     expect(await screen.findByRole('button', { name: /Deployment-Prozess.*Prozess · Veröffentlicht · IT & Plattform/ })).toBeInTheDocument()
 
@@ -100,7 +124,7 @@ describe('KnowledgePage', () => {
 
   it('renders blocks as text and resolves references the reader can see', async () => {
     fakeApi(routes())
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
     await openArticle()
 
     expect(screen.getByRole('heading', { name: 'Ablauf' })).toBeInTheDocument()
@@ -113,7 +137,7 @@ describe('KnowledgePage', () => {
 
   it('offers readers no changes', async () => {
     fakeApi(routes())
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
     await openArticle()
 
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument()
@@ -129,7 +153,7 @@ describe('KnowledgePage', () => {
       ...routes(details({ canEdit: true, canAdmin: false })),
       'PUT /api/v1/knowledge/articles/a-1/content': () => json(details({ canEdit: true, canAdmin: false })),
     })
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
     await openArticle()
 
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
@@ -162,7 +186,7 @@ describe('KnowledgePage', () => {
       ...routes(details({ canEdit: true, canAdmin: false })),
       'PUT /api/v1/knowledge/articles/a-1/content': () => json({ title: 'Conflict' }, 409),
     })
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
     await openArticle()
 
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
@@ -179,7 +203,7 @@ describe('KnowledgePage', () => {
       'POST /api/v1/knowledge/articles/a-1/versions/1/restore': () => json(details({ canEdit: true, canAdmin: true })),
     })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
     await openArticle()
 
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zum Artikel' }))
@@ -195,7 +219,7 @@ describe('KnowledgePage', () => {
   it('creates a draft with one click and opens it in the editor', async () => {
     const created = details({ canEdit: true, canAdmin: true }, { id: 'a-1', title: 'Neuer Artikel', status: 'draft' })
     const api = fakeApi({ ...routes(created), 'POST /api/v1/knowledge/articles': () => json(created, 201) })
-    render(<KnowledgePage me={ben} />)
+    render(<KnowledgePage me={ben} initialMode="articles" />)
 
     await userEvent.click(await screen.findByRole('button', { name: '+ Artikel' }))
 
