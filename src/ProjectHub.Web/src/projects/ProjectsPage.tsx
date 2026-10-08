@@ -19,13 +19,15 @@ import { Skeleton } from '../ui/Skeleton'
 
 type Props = {
   me: Me
+  /** Only the projects of this department; '' for all I can see (ADR 0021). */
+  departmentId?: string
   onOpenArticle?: (id: string) => void
   /** Opens this project (and task) right away, e.g. from a notification. */
   initialProjectId?: string | null
   initialTaskId?: string | null
 }
 
-export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
+export function ProjectsPage({ me, departmentId = '', onOpenArticle, initialProjectId = null, initialTaskId = null }: Props) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [selected, setSelected] = useState<string | null>(initialProjectId)
   const [openBoard, setOpenBoard] = useState<string | null>(null)
@@ -36,11 +38,11 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
   const overview = useProjectOverview(projects)
 
   const load = useCallback(() => {
-    fetchProjects().then(
+    fetchProjects(departmentId).then(
       (page) => setProjects(page.items),
       (e: Error) => setError(e.message),
     )
-  }, [])
+  }, [departmentId])
 
   useEffect(load, [load])
 
@@ -91,6 +93,7 @@ export function ProjectsPage({ me, onOpenArticle, initialProjectId = null, initi
         <Reveal label="Projekt" title="Neues Projekt" primary>
           {() => (
             <CreateProjectForm
+              departmentId={departmentId}
               onCreated={(project) => {
                 load()
                 setSelected(project.id)
@@ -218,7 +221,7 @@ function Greeting({ me, overview, onOpen }: { me: Me; overview: Map<string, Proj
   )
 }
 
-function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary) => void }) {
+function CreateProjectForm({ departmentId, onCreated }: { departmentId: string; onCreated: (project: ProjectSummary) => void }) {
   const [name, setName] = useState('')
   const [template, setTemplate] = useState<ProjectTemplate['id']>('empty')
   const [busy, setBusy] = useState(false)
@@ -230,7 +233,7 @@ function CreateProjectForm({ onCreated }: { onCreated: (project: ProjectSummary)
     setBusy(true)
     let project: ProjectSummary
     try {
-      project = await createProject(name, '')
+      project = await createProject(name, '', departmentId)
     } catch (e) {
       setError((e as Error).message)
       setBusy(false)

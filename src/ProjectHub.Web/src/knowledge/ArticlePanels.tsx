@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import type { Me, User } from '../identity/api'
-import { fetchTeams, fetchUsers, type TeamSummary } from '../teams/api'
+import { fetchUsers, type Me, type User } from '../identity/api'
+import { fetchDepartments, type DepartmentSummary } from '../departments/api'
 import { fetchWhiteboards, type Whiteboard } from '../whiteboard/api'
 import {
   addKnowledgeComment,
@@ -217,7 +217,7 @@ export function ReferencesPanel({ details, onChanged }: PanelProps) {
               </label>
               {type === 'project' && <ProjectPicker label="Projekt" value={resourceId} onChange={setResourceId} />}
               {type === 'task' && <TaskPicker label="Verknüpfung" value={resourceId} onChange={setResourceId} />}
-              {type === 'team' && <TeamPicker value={resourceId} onChange={setResourceId} />}
+              {type === 'department' && <DepartmentPicker value={resourceId} onChange={setResourceId} />}
               {type === 'whiteboard' && <WhiteboardPicker value={resourceId} onChange={setResourceId} />}
               <button type="submit">Verknüpfen</button>
               {error && <p role="alert">{error}</p>}
@@ -255,19 +255,19 @@ function WhiteboardPicker({ value, onChange }: { value: string; onChange: (id: s
   )
 }
 
-function TeamPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const [teams, setTeams] = useState<TeamSummary[]>([])
+function DepartmentPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [departments, setDepartments] = useState<DepartmentSummary[]>([])
   useEffect(() => {
-    fetchTeams().then((page) => setTeams(page.items), () => setTeams([]))
+    fetchDepartments().then((page) => setDepartments(page.items), () => setDepartments([]))
   }, [])
   return (
     <label className="block-fields stacked">
-      Team
+      Abteilung
       <select value={value} onChange={(event) => onChange(event.target.value)} required>
-        <option value="">Team wählen …</option>
-        {teams.map((team) => (
-          <option key={team.id} value={team.id}>
-            {team.name}
+        <option value="">Abteilung wählen …</option>
+        {departments.map((department) => (
+          <option key={department.id} value={department.id}>
+            {department.name}
           </option>
         ))}
       </select>
@@ -333,11 +333,11 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
   useEffect(load, [load])
 
   useEffect(() => {
-    Promise.all([fetchUsers(), fetchTeams()]).then(
-      ([users, teams]) =>
+    Promise.all([fetchUsers(), fetchDepartments()]).then(
+      ([users, departments]) =>
         setPrincipals([
           ...users.items.map((u: User) => ({ key: `user:${u.id}`, type: 'user' as const, id: u.id, name: u.displayName })),
-          ...teams.items.map((t) => ({ key: `team:${t.id}`, type: 'team' as const, id: t.id, name: `Team ${t.name}` })),
+          ...departments.items.map((d) => ({ key: `department:${d.id}`, type: 'department' as const, id: d.id, name: `Abteilung ${d.name}` })),
         ]),
       () => setPrincipals([]),
     )
@@ -366,7 +366,9 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
       <p className="muted">
         {details.article.visibility === 'organization'
           ? 'Veröffentlicht lesen alle in der Organisation. Freigaben geben zusätzliche Rechte, auch für Entwürfe.'
-          : 'Eingeschränkt: Nur die folgenden Personen und Teams sehen den Artikel.'}
+          : details.article.visibility === 'department'
+            ? `Veröffentlicht lesen alle der Abteilung${details.article.departmentName ? ` ${details.article.departmentName}` : ''}. Freigaben geben weiteren Personen und Abteilungen Rechte.`
+            : 'Eingeschränkt: Nur die folgenden Personen und Abteilungen sehen den Artikel.'}
       </p>
       {permissions.length === 0 ? (
         <p className="muted">Keine Freigaben.</p>
@@ -375,7 +377,7 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
           {permissions.map((p) => (
             <li key={`${p.principalType}:${p.principalId}`} className="row">
               <span>
-                {p.principalType === 'team' ? `Team ${p.name}` : p.name} · {grants[p.permission]}
+                {p.principalType === 'department' ? `Abteilung ${p.name}` : p.name} · {grants[p.permission]}
               </span>
               <button
                 type="button"
@@ -393,7 +395,7 @@ export function PermissionsPanel({ details, onChanged }: PanelProps) {
         {(close) => (
           <form className="stacked-form" onSubmit={(event) => void submit(event, close)}>
             <label>
-              Person oder Team
+              Person oder Abteilung
               <select value={principal} onChange={(event) => setPrincipal(event.target.value)} required>
                 <option value="">Wählen …</option>
                 {principals.map((p) => (

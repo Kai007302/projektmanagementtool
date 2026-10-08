@@ -1,8 +1,11 @@
 erDiagram
   ORGANIZATION ||--o{ APP_USER : contains
-  ORGANIZATION ||--o{ TEAM : contains
-  TEAM ||--o{ TEAM_MEMBER : has
-  APP_USER ||--o{ TEAM_MEMBER : joins
+  ORGANIZATION ||--o{ DEPARTMENT : contains
+  DEPARTMENT ||--o{ DEPARTMENT_MEMBER : has
+  APP_USER ||--o{ DEPARTMENT_MEMBER : joins
+  DEPARTMENT ||--o{ PROJECT : owns
+  DEPARTMENT ||--o{ KNOWLEDGE_SPACE : owns
+  DEPARTMENT ||--o{ KNOWLEDGE_ARTICLE : owns
 
   ORGANIZATION ||--o{ PROJECT : contains
   PROJECT ||--o{ PROJECT_MEMBER : has

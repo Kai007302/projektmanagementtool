@@ -20,7 +20,7 @@ import { drawPlanet } from './planets'
 import { createSpace, drawSpace, float, wrapTitle } from './space'
 import { useLayout } from './useLayout'
 
-type Props = { spaces: Space[]; onOpenArticle: (id: string) => void }
+type Props = { spaces: Space[]; /** Only the knowledge of this department; '' for all I can see. */ departmentId?: string; onOpenArticle: (id: string) => void }
 
 type View = 'galaxy' | 'list'
 
@@ -46,7 +46,7 @@ function useMediaQuery(media: string) {
  * Canvas 2D with a d3-force layout (docs/OPEN_DECISIONS.md, Knowledge Galaxy renderer). The list view
  * shows the same graph for keyboard and screen reader users.
  */
-export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
+export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Props) {
   const [filter, setFilter] = useState<{ spaceId?: string; type?: string }>({})
   const [graph, setGraph] = useState<KnowledgeGraph | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +58,7 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
 
   useEffect(() => {
     let current = true
-    fetchGraph(filter).then(
+    fetchGraph({ ...filter, departmentId }).then(
       (value) => {
         if (!current) return
         setGraph(value)
@@ -69,7 +69,7 @@ export function KnowledgeGalaxy({ spaces, onOpenArticle }: Props) {
     return () => {
       current = false
     }
-  }, [filter])
+  }, [filter, departmentId])
 
   const layout = useLayout(graph, !reducedMotion, narrow ? 0.45 : 1)
   const selected = graph?.nodes.find((n) => n.id === selectedId) ?? null

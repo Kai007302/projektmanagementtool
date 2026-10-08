@@ -19,6 +19,7 @@ import { InlineEdit } from '../ui/InlineEdit'
 import { projectLook } from '../ui/personality'
 import { ProjectIcon } from './ProjectIcon'
 import { ProjectMenu } from './ProjectMenu'
+import { ProjectSharing } from './ProjectSharing'
 import { Skeleton } from '../ui/Skeleton'
 import { rememberVisit } from '../ui/recent'
 
@@ -51,6 +52,7 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
   const [revision, setRevision] = useState(0)
   const [view, setView] = useState<View>(initialView)
   const [membersOpen, setMembersOpen] = useState(false)
+  const [sharingOpen, setSharingOpen] = useState(false)
   const webexShown = useWebexShown(projectId, revision)
   const views = (Object.keys(viewText) as View[]).filter((value) => value !== 'webex' || webexShown)
 
@@ -142,11 +144,23 @@ export function ProjectView({ projectId, me, onBack, onOpenArticle, initialTaskI
               <ProjectMenu
                 project={project}
                 canEdit={project.capabilities.canEdit}
-                extraItems={project.capabilities.canManage ? [{ label: 'Projekt löschen', danger: true, onSelect: () => void remove() }] : []}
+                extraItems={
+                  project.capabilities.canManage
+                    ? [
+                        { label: 'Sichtbarkeit und Abteilung', onSelect: () => setSharingOpen(true) },
+                        { label: 'Projekt löschen', danger: true, onSelect: () => void remove() },
+                      ]
+                    : []
+                }
                 onChanged={changed}
               />
             </div>
           </header>
+          {sharingOpen && (
+            <Dialog label="Sichtbarkeit und Abteilung" onClose={() => setSharingOpen(false)}>
+              <ProjectSharing project={project} me={me} onChanged={changed} />
+            </Dialog>
+          )}
           {membersOpen && (
             <Dialog label="Mitglieder" onClose={() => setMembersOpen(false)}>
               <MembersPanel project={project} onChanged={changed} />

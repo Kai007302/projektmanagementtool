@@ -15,4 +15,12 @@ internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcc
     public string? DisplayName => Principal?.FindFirstValue(IdentityClaimTypes.Name);
 
     public string? Email => Principal?.FindFirstValue(IdentityClaimTypes.Email) ?? Principal?.FindFirstValue(IdentityClaimTypes.UserPrincipalName);
+
+    public IReadOnlyList<string>? EntraGroupIds =>
+        Principal is not { } principal
+            ? []
+            : principal.HasClaim(c => c.Type == IdentityClaimTypes.HasGroups)
+              || principal.FindAll(IdentityClaimTypes.ClaimNames).Any(c => c.Value.Contains("\"groups\"", StringComparison.Ordinal))
+                ? null
+                : principal.FindAll(IdentityClaimTypes.Groups).Select(c => c.Value).ToList();
 }

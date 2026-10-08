@@ -1,20 +1,24 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Identity;
 
 namespace ProjectHub.Api.Modules.Users;
 
 public sealed record UserResponse(Guid Id, string DisplayName, string Email, string? Department, string Status);
 
-public sealed record MeResponse(Guid Id, string DisplayName, string Email, Guid OrganizationId, string OrganizationRole);
+/// <summary><c>Departments</c>: the caller's own departments with their role there (ADR 0021).</summary>
+public sealed record MeResponse(
+    Guid Id, string DisplayName, string Email, Guid OrganizationId, string OrganizationRole, IReadOnlyList<MyDepartment> Departments);
 
 public static class UserEndpoints
 {
     public static RouteGroupBuilder MapUserEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/me", (UserContext user) =>
-            Results.Ok(new MeResponse(user.UserId, user.DisplayName, user.Email, user.OrganizationId, user.OrganizationRole)));
+        api.MapGet("/me", async (UserContext user, DepartmentService departments, CancellationToken ct) =>
+            Results.Ok(new MeResponse(
+                user.UserId, user.DisplayName, user.Email, user.OrganizationId, user.OrganizationRole, await departments.MineAsync(user, ct))));
 
         api.MapGet("/users", async (UserContext user, ProjectHubDbContext db, string? search, int? limit, int? offset, CancellationToken ct) =>
         {

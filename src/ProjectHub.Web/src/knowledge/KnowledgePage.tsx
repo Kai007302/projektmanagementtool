@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { canManageDepartment } from '../departments/currentDepartment'
 import type { Me } from '../identity/api'
 import { EmptyState } from '../ui/EmptyState'
 import { Reveal } from '../ui/Reveal'
@@ -23,13 +24,14 @@ import { toast } from '../ui/toast'
 import { Skeleton } from '../ui/Skeleton'
 import { CloseIcon } from '../ui/icons'
 
-type Props = { me: Me; initialArticleId?: string | null }
+/** departmentId: only the knowledge of this department; '' for all I can see (ADR 0021). */
+type Props = { me: Me; departmentId?: string; initialArticleId?: string | null }
 
 type Open = { id: string; editing: boolean }
 
 type Mode = 'articles' | 'galaxy'
 
-export function KnowledgePage({ me, initialArticleId = null }: Props) {
+export function KnowledgePage({ me, departmentId = '', initialArticleId = null }: Props) {
   const [open, setOpen] = useState<Open | null>(initialArticleId ? { id: initialArticleId, editing: false } : null)
   const [filter, setFilter] = useState<ArticleFilter>({})
   const [articles, setArticles] = useState<ArticleSummary[] | null>(null)
@@ -39,16 +41,16 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
   const [mode, setMode] = useState<Mode>('articles')
 
   const load = useCallback(() => {
-    searchArticles(filter).then(
+    searchArticles({ ...filter, departmentId }).then(
       (page) => setArticles(page.items),
       (e: Error) => setError(e.message),
     )
-  }, [filter])
+  }, [filter, departmentId])
 
   const loadFacets = useCallback(() => {
-    fetchSpaces().then(setSpaces, () => setSpaces([]))
+    fetchSpaces(departmentId).then(setSpaces, () => setSpaces([]))
     fetchTags().then(setTags, () => setTags([]))
-  }, [])
+  }, [departmentId])
 
   useEffect(load, [load])
   useEffect(loadFacets, [loadFacets])
@@ -78,7 +80,14 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
   async function newArticle() {
     setError(null)
     try {
-      const created = await createArticle({ title: 'Neuer Artikel', articleType: 'article', summary: '', spaceId: filter.spaceId || null, visibility: 'organization' })
+      const created = await createArticle({
+        title: 'Neuer Artikel',
+        articleType: 'article',
+        summary: '',
+        spaceId: filter.spaceId || null,
+        visibility: 'department',
+        departmentId: departmentId || null,
+      })
       setOpen({ id: created.article.id, editing: true })
     } catch (e) {
       setError((e as Error).message)
@@ -108,7 +117,7 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
         ))}
       </nav>
       {mode === 'galaxy' ? (
-        <KnowledgeGalaxy spaces={spaces} onOpenArticle={openArticle} />
+        <KnowledgeGalaxy spaces={spaces} departmentId={departmentId} onOpenArticle={openArticle} />
       ) : (
         <>
           <SearchBar key={filter.spaceId ?? ''} spaces={spaces} tags={tags} initial={filter} onSearch={setFilter} />
@@ -131,7 +140,7 @@ export function KnowledgePage({ me, initialArticleId = null }: Props) {
               )}
             </div>
             <aside className="project-side">
-              <SpacesPanel me={me} spaces={spaces} current={filter.spaceId ?? ''} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
+              <SpacesPanel me={me} departmentId={departmentId} spaces={spaces} current={filter.spaceId ?? ''} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
               <p className="muted knowledge-note">Neue Artikel sind Entwürfe und nur für dich sichtbar, bis sie veröffentlicht werden.</p>
             </aside>
           </div>
@@ -158,6 +167,7 @@ export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOp
       </span>
       <span className="card-meta">
         {articleTypes[article.articleType]} · <span className={`article-status status-${article.status}`}>{articleStatuses[article.status]}</span>
+        {article.departmentName && ` · ${article.departmentName}`}
         {article.spaceName && ` · ${article.spaceName}`}
       </span>
       {article.summary && <span className="article-card-summary">{article.summary}</span>}
@@ -275,9 +285,10 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
   )
 }
 
-type SpacesProps = { me: Me; spaces: Space[]; current: string; onFilter: (spaceId: string) => void; onCreated: () => void }
+type SpacesProps = { me: Me; departmentId: string; spaces: Space[]; current: string; onFilter: (spaceId: string) => void; onCreated: () => void }
 
-function SpacesPanel({ me, spaces, current, onFilter, onCreated }: SpacesProps) {
+/** Knowledge spaces of the department; its leads and organization admins create new ones (ADR 0021). */
+function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }: SpacesProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -285,7 +296,7 @@ function SpacesPanel({ me, spaces, current, onFilter, onCreated }: SpacesProps) 
     event.preventDefault()
     setError(null)
     try {
-      await createSpace(name, '')
+      await createSpace(name, '', departmentId)
       toast(`Bereich „${name}“ angelegt.`)
       setName('')
       close()
@@ -313,7 +324,7 @@ function SpacesPanel({ me, spaces, current, onFilter, onCreated }: SpacesProps) 
           </li>
         ))}
       </ul>
-      {me.organizationRole === 'admin' && (
+      {departmentId && canManageDepartment(me, departmentId) && (
         <Reveal label="Bereich">
           {(close) => (
             <form className="quick-create" onSubmit={(event) => void submit(event, close)}>

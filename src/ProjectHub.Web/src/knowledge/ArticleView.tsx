@@ -124,6 +124,7 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
           <p className="muted">
             <span aria-hidden="true">{articleTypeEmoji[article.articleType]}</span> {articleTypes[article.articleType]} · <span className={`article-status status-${article.status}`}>{articleStatuses[article.status]}</span>
             {article.visibility === 'restricted' && ' · 🔒 eingeschränkt'}
+            {article.departmentName && ` · ${article.departmentName}`}
             {article.spaceName && ` · ${article.spaceName}`}
             {article.ownerName && ` · verantwortlich: ${article.ownerName}`}
             {` · Version ${details.versionNumber}, ${dateFormat.format(new Date(article.updatedAt))}`}
@@ -203,8 +204,8 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    fetchSpaces().then(setSpaces, () => setSpaces([]))
-  }, [])
+    fetchSpaces(article.departmentId ?? '').then(setSpaces, () => setSpaces([]))
+  }, [article.departmentId])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -265,7 +266,9 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
           <label>
             Sichtbarkeit
             <select value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
-              {Object.entries(visibilities).map(([value, label]) => (
+              {Object.entries(visibilities)
+                .filter(([value]) => value !== 'organization' || details.capabilities.canShareWithOrganization || article.visibility === 'organization')
+                .map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>

@@ -1,9 +1,10 @@
 using ProjectHub.Api.Modules.Identity.Authorization;
+using ProjectHub.Api.Modules.Projects;
 
 namespace ProjectHub.Api.Modules.Identity.Development;
 
 /// <summary>
-/// Synthetic organizations, users, teams and projects for local development and tests.
+/// Synthetic organizations, users, departments and projects for local development and tests.
 /// Never real people or company data. Two organizations exist so cross-organization
 /// isolation can be exercised.
 /// </summary>
@@ -13,22 +14,28 @@ public static class DevelopmentSeedData
 
     public sealed record SeedUser(Guid Id, Guid OrganizationId, string ObjectId, string DisplayName, string Email, string OrganizationRole, string? Department);
 
-    public sealed record SeedTeam(Guid Id, Guid OrganizationId, string Name, string Description, IReadOnlyList<(Guid UserId, string Role)> Members);
+    /// <summary>
+    /// Departments are matched by name when seeding, because the migration to departments (016) may already have
+    /// created "Allgemein" or turned an old team into a department in an existing development database.
+    /// </summary>
+    public sealed record SeedDepartment(Guid Id, Guid OrganizationId, string Name, string Description, IReadOnlyList<(Guid UserId, string Role)> Members);
 
     /// <summary>A task; <see cref="StartDay"/> and <see cref="DueDay"/> count days from the day of seeding.</summary>
     public sealed record SeedTask(
         Guid Id, SeedProject Project, Guid? ParentTaskId, string Title, string Status, string Priority, Guid? AssigneeId, Guid CreatorId,
         int? StartDay = null, int? DueDay = null, short Progress = 0);
 
-    public sealed record SeedSpace(Guid Id, Guid OrganizationId, string Name, string Description);
+    public sealed record SeedSpace(Guid Id, Guid OrganizationId, string Name, string Description, SeedDepartment Department);
 
     public sealed record SeedArticle(
         Guid Id, Guid OrganizationId, Guid? SpaceId, string Title, string Slug, string ArticleType, string Summary,
-        string Status, string Visibility, Guid OwnerId, IReadOnlyList<string> Tags, string ContentJson);
+        string Status, string Visibility, Guid OwnerId, IReadOnlyList<string> Tags, string ContentJson, SeedDepartment Department);
 
     public sealed record SeedRelation(Guid SourceId, Guid TargetId, string RelationType);
 
-    public sealed record SeedProject(Guid Id, Guid OrganizationId, string Name, Guid OwnerId, IReadOnlyList<(Guid UserId, string Role)> Members);
+    public sealed record SeedProject(
+        Guid Id, Guid OrganizationId, string Name, Guid OwnerId, IReadOnlyList<(Guid UserId, string Role)> Members,
+        SeedDepartment Department, string Visibility);
 
     public static readonly SeedOrganization Contoso = new(Guid.Parse("01920000-0000-7000-8000-000000000001"), "Contoso (Dev)", "contoso-dev", "dev-tenant-contoso");
     public static readonly SeedOrganization Fabrikam = new(Guid.Parse("01920000-0000-7000-8000-000000000002"), "Fabrikam (Dev)", "fabrikam-dev", "dev-tenant-fabrikam");
@@ -46,19 +53,35 @@ public static class DevelopmentSeedData
 
     public static readonly IReadOnlyList<SeedUser> Users = [Ada, Ben, Clara, David, Eva, Gina, Felix, Fritz];
 
-    public static readonly SeedTeam PlatformTeam = new(
+    /// <summary>
+    /// Everyone of Contoso except Felix works here (Gina as guest), so it is everyone's first department. Its projects are
+    /// private, as projects from before the departments are after the migration.
+    /// </summary>
+    public static readonly SeedDepartment GeneralDepartment = new(
+        Guid.Parse("01920000-0000-7000-8000-000000000300"), Contoso.Id, "Allgemein", "Alles, was es vor den Abteilungen schon gab",
+        [(Ada.Id, DepartmentRole.Member), (Ben.Id, DepartmentRole.Member), (Clara.Id, DepartmentRole.Member),
+         (David.Id, DepartmentRole.Member), (Eva.Id, DepartmentRole.Member), (Gina.Id, DepartmentRole.Guest)]);
+
+    public static readonly SeedDepartment PlatformDepartment = new(
         Guid.Parse("01920000-0000-7000-8000-000000000301"), Contoso.Id, "Plattform", "Betrieb und Weiterentwicklung der Plattform",
-        [(Ben.Id, TeamRole.Owner), (Clara.Id, TeamRole.Member)]);
+        [(Ben.Id, DepartmentRole.Lead), (Clara.Id, DepartmentRole.Member)]);
 
-    public static readonly SeedTeam SalesTeam = new(
+    public static readonly SeedDepartment SalesDepartment = new(
         Guid.Parse("01920000-0000-7000-8000-000000000302"), Contoso.Id, "Vertrieb", "Vertrieb und Kundenbetreuung",
-        [(David.Id, TeamRole.Member)]);
+        [(David.Id, DepartmentRole.Member)]);
 
-    public static readonly SeedTeam FabrikamTeam = new(
-        Guid.Parse("01920000-0000-7000-8000-000000000303"), Fabrikam.Id, "Fabrikam Intern", "Team der zweiten Organisation",
-        [(Fritz.Id, TeamRole.Owner)]);
+    public static readonly SeedDepartment FabrikamDepartment = new(
+        Guid.Parse("01920000-0000-7000-8000-000000000303"), Fabrikam.Id, "Fabrikam Intern", "Abteilung der zweiten Organisation",
+        [(Fritz.Id, DepartmentRole.Lead)]);
 
-    public static readonly IReadOnlyList<SeedTeam> Teams = [PlatformTeam, SalesTeam, FabrikamTeam];
+    /// <summary>Felix's only department: he sees nothing of the others.</summary>
+    public static readonly SeedDepartment PurchasingDepartment = new(
+        Guid.Parse("01920000-0000-7000-8000-000000000304"), Contoso.Id, "Einkauf", "Einkauf und Lieferanten",
+        [(Felix.Id, DepartmentRole.Member)]);
+
+    /// <summary>In this order: the general department first, so it is the first department of its members.</summary>
+    public static readonly IReadOnlyList<SeedDepartment> Departments =
+        [GeneralDepartment, PlatformDepartment, SalesDepartment, FabrikamDepartment, PurchasingDepartment];
 
     public static readonly SeedProject IntranetProject = new(
         Guid.Parse("01920000-0000-7000-8000-000000000401"), Contoso.Id, "Intranet-Relaunch", Ben.Id,
@@ -68,11 +91,15 @@ public static class DevelopmentSeedData
             (David.Id, ProjectRole.Member),
             (Eva.Id, ProjectRole.Viewer),
             (Gina.Id, ProjectRole.Guest),
-        ]);
+        ],
+        GeneralDepartment,
+        ProjectVisibility.Private);
 
     public static readonly SeedProject FabrikamProject = new(
         Guid.Parse("01920000-0000-7000-8000-000000000402"), Fabrikam.Id, "Fabrikam Portal", Fritz.Id,
-        [(Fritz.Id, ProjectRole.Admin)]);
+        [(Fritz.Id, ProjectRole.Admin)],
+        FabrikamDepartment,
+        ProjectVisibility.Private);
 
     public static readonly IReadOnlyList<SeedProject> Projects = [IntranetProject, FabrikamProject];
 
@@ -113,13 +140,13 @@ public static class DevelopmentSeedData
     ];
 
     public static readonly SeedSpace PlatformSpace = new(
-        Guid.Parse("01920000-0000-7000-8000-000000000601"), Contoso.Id, "IT & Plattform", "Betrieb, Werkzeuge und Richtlinien der Plattform");
+        Guid.Parse("01920000-0000-7000-8000-000000000601"), Contoso.Id, "IT & Plattform", "Betrieb, Werkzeuge und Richtlinien der Plattform", PlatformDepartment);
 
     public static readonly SeedSpace MethodsSpace = new(
-        Guid.Parse("01920000-0000-7000-8000-000000000602"), Contoso.Id, "Projektmethodik", "Wie wir Projekte planen und durchführen");
+        Guid.Parse("01920000-0000-7000-8000-000000000602"), Contoso.Id, "Projektmethodik", "Wie wir Projekte planen und durchführen", GeneralDepartment);
 
     public static readonly SeedSpace FabrikamSpace = new(
-        Guid.Parse("01920000-0000-7000-8000-000000000603"), Fabrikam.Id, "Fabrikam Wissen", "Wissen der Fabrikam-Organisation");
+        Guid.Parse("01920000-0000-7000-8000-000000000603"), Fabrikam.Id, "Fabrikam Wissen", "Wissen der Fabrikam-Organisation", FabrikamDepartment);
 
     public static readonly IReadOnlyList<SeedSpace> Spaces = [PlatformSpace, MethodsSpace, FabrikamSpace];
 
@@ -151,7 +178,8 @@ public static class DevelopmentSeedData
     public static readonly SeedArticle PricingArticle = Article(
         6, Contoso, null, "Preisliste Vertrieb 2027", "policy", "Interne Preise und Rabattregeln.",
         "published", "restricted", Ada, ["Vertrieb"],
-        """{"blocks":[{"type":"paragraph","text":"Vertrauliche Rabattstaffeln für das Vertriebsteam."}]}""");
+        """{"blocks":[{"type":"paragraph","text":"Vertrauliche Rabattstaffeln für das Vertriebsteam."}]}""",
+        SalesDepartment);
 
     public static readonly SeedArticle StyleGuideDraft = Article(
         7, Contoso, MethodsSpace, "Styleguide Intranet", "best_practice", "Entwurf für Gestaltungsregeln im Intranet.",
@@ -174,26 +202,27 @@ public static class DevelopmentSeedData
         new(StyleGuideDraft.Id, KickoffArticle.Id, "REQUIRES"),
     ];
 
-    /// <summary>The restricted price list is shared with the sales team only.</summary>
-    public static readonly IReadOnlyList<(Guid ArticleId, string PrincipalType, Guid PrincipalId, string Permission)> KnowledgeGrants =
+    /// <summary>The restricted price list is shared with the sales department only.</summary>
+    public static readonly IReadOnlyList<(Guid ArticleId, string PrincipalType, SeedDepartment Principal, string Permission)> KnowledgeGrants =
     [
-        (PricingArticle.Id, "team", SalesTeam.Id, "view"),
+        (PricingArticle.Id, "department", SalesDepartment, "view"),
     ];
 
     public static readonly IReadOnlyList<(Guid ArticleId, string ResourceType, Guid ResourceId, Guid CreatedBy)> KnowledgeReferences =
     [
         (KickoffArticle.Id, "project", IntranetProject.Id, Ben.Id),
-        (DeploymentArticle.Id, "team", PlatformTeam.Id, Ada.Id),
+        (DeploymentArticle.Id, "department", PlatformDepartment.Id, Ada.Id),
     ];
 
     public static SeedOrganization OrganizationOf(SeedUser user) => Organizations.Single(o => o.Id == user.OrganizationId);
 
     private static SeedArticle Article(
         int number, SeedOrganization organization, SeedSpace? space, string title, string type, string summary,
-        string status, string visibility, SeedUser owner, IReadOnlyList<string> tags, string contentJson) =>
+        string status, string visibility, SeedUser owner, IReadOnlyList<string> tags, string contentJson, SeedDepartment? department = null) =>
         new(
             Guid.Parse($"01920000-0000-7000-8000-{700 + number:D12}"), organization.Id, space?.Id, title,
-            Knowledge.KnowledgeArticleService.Slugify(title), type, summary, status, visibility, owner.Id, tags, contentJson);
+            Knowledge.KnowledgeArticleService.Slugify(title), type, summary, status, visibility, owner.Id, tags, contentJson,
+            department ?? space?.Department ?? throw new ArgumentException("An article without a space needs a department.", nameof(department)));
 
     private static SeedTask Task(int number, SeedProject project, Guid? parentTaskId, string title, string status, string priority, Guid? assigneeId, Guid creatorId) =>
         new(Guid.Parse($"01920000-0000-7000-8000-{500 + number:D12}"), project, parentTaskId, title, status, priority, assigneeId, creatorId);

@@ -32,5 +32,8 @@ public sealed class ProjectAccess(IProjectHubAuthorization authorization)
             await authorization.HasProjectPermissionAsync(user, projectId, ProjectPermission.Manage, ct));
 }
 
-/// <summary>What the caller may do in a project, so the UI only offers allowed actions.</summary>
-public sealed record ProjectCapabilities(bool CanContribute, bool CanEdit, bool CanManage);
+/// <summary>
+/// What the caller may do in a project, so the UI only offers allowed actions. <c>CanShareWithOrganization</c>: may make
+/// the project visible to the whole organization (organization admins and leads of its department, ADR 0021).
+/// </summary>
+public sealed record ProjectCapabilities(bool CanContribute, bool CanEdit, bool CanManage, bool CanShareWithOrganization = false);

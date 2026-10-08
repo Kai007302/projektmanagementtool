@@ -10,7 +10,7 @@ using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Organizations;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Users;
 using ProjectHub.Api.Modules.Whiteboard;
 
@@ -26,7 +26,7 @@ public sealed record PersonalDataExport(
     string Notice,
     ExportProfile Profile,
     IReadOnlyList<ExportMembership> ProjectMemberships,
-    IReadOnlyList<ExportMembership> TeamMemberships,
+    IReadOnlyList<ExportMembership> DepartmentMemberships,
     ExportNotificationPreferences NotificationPreferences,
     IReadOnlyList<ExportNotification> Notifications,
     IReadOnlyList<ExportMail> QueuedMessages,
@@ -102,12 +102,12 @@ public sealed class PersonalDataExportService(ProjectHubDbContext db, IAuditLog 
                 select new ExportMembership(p.Id, p.Name, m.Role, m.CreatedAt))
             .ToListAsync(ct);
 
-        var teams = await (
-                from m in db.Set<TeamMember>().AsNoTracking()
-                join t in db.Set<Team>().AsNoTracking() on m.TeamId equals t.Id
+        var departments = await (
+                from m in db.Set<DepartmentMember>().AsNoTracking()
+                join d in db.Set<Department>().AsNoTracking() on m.DepartmentId equals d.Id
                 where m.OrganizationId == org && m.UserId == me
                 orderby m.CreatedAt
-                select new ExportMembership(t.Id, t.Name, m.Role, m.CreatedAt))
+                select new ExportMembership(d.Id, d.Name, m.Role, m.CreatedAt))
             .ToListAsync(ct);
 
         var preferences = await db.Set<NotificationPreference>().AsNoTracking()
@@ -195,7 +195,7 @@ public sealed class PersonalDataExportService(ProjectHubDbContext db, IAuditLog 
         await db.SaveChangesAsync(ct);
 
         return new PersonalDataExport(
-            clock.GetUtcNow(), Notice, profile, projects, teams, preferences, notifications, mails, assigned, created,
+            clock.GetUtcNow(), Notice, profile, projects, departments, preferences, notifications, mails, assigned, created,
             taskComments, knowledgeComments, articles, versions, attachments, whiteboardEdits, activity, auditEntries, calendarFeed, projectCalendarFeeds);
     }
 

@@ -10,7 +10,10 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Identity;
+using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.IntegrationTests;
@@ -28,7 +31,7 @@ public sealed class EntraSignInTests(InfrastructureFixture infrastructure)
     // Every test gets its own tenant, so the first person of each is a fresh first sign-in.
     private readonly string tenantId = Guid.NewGuid().ToString();
 
-    private ProjectHubApiFactory Production(bool provisioning, string? organizationName = null) =>
+    private ProjectHubApiFactory Production(bool provisioning, string? organizationName = null, bool departmentsFromGroups = false) =>
         new(infrastructure.Postgres.GetConnectionString(), infrastructure.Redis.GetConnectionString(), configure: builder =>
         {
             builder.UseEnvironment("Production");
@@ -37,6 +40,11 @@ public sealed class EntraSignInTests(InfrastructureFixture infrastructure)
             if (provisioning)
             {
                 builder.UseSetting(UserProvisioningOptions.ModeKey, UserProvisioningOptions.FirstSignIn);
+            }
+
+            if (departmentsFromGroups)
+            {
+                builder.UseSetting(EntraDepartmentOptions.EnabledKey, "true");
             }
 
             if (organizationName is not null)
@@ -51,11 +59,22 @@ public sealed class EntraSignInTests(InfrastructureFixture infrastructure)
             }));
         });
 
-    private string Token(string objectId, string name, string email, string? tenant = null, bool v1 = false)
+    private string Token(
+        string objectId, string name, string email, string? tenant = null, bool v1 = false, string[]? groups = null, bool groupOverage = false)
     {
         var tid = tenant ?? tenantId;
         var claims = new Dictionary<string, object> { ["oid"] = objectId, ["tid"] = tid, ["name"] = name };
         claims[v1 ? "upn" : "preferred_username"] = email;
+        if (groups is not null)
+        {
+            claims["groups"] = groups;
+        }
+
+        if (groupOverage)
+        {
+            claims["_claim_names"] = new Dictionary<string, object> { ["groups"] = "src1" };
+        }
+
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = v1 ? $"https://sts.windows.net/{tid}/" : $"https://login.microsoftonline.com/{tid}/v2.0",
@@ -166,5 +185,67 @@ public sealed class EntraSignInTests(InfrastructureFixture infrastructure)
         Assert.Equal(first!.Id, renamed!.Id);
         Assert.Equal(("Anna Neu", "anna.neu@example.com"), (renamed.DisplayName, renamed.Email));
         Assert.Equal(("Anna Neu", "anna.neu@example.com"), (taken!.DisplayName, taken.Email));
+    }
+
+    [Fact]
+    public async Task The_first_person_leads_the_general_department_and_newcomers_without_one_are_announced()
+    {
+        await using var factory = Production(provisioning: true);
+        var kai = Client(factory, Token(Guid.NewGuid().ToString(), "Kai", "kai@example.com"));
+
+        var first = await kai.GetFromJsonAsync<MeResponse>("/api/v1/me");
+        var newcomer = await Client(factory, Token(Guid.NewGuid().ToString(), "Neu", "neu@example.com")).GetFromJsonAsync<MeResponse>("/api/v1/me");
+
+        Assert.Equal(("Allgemein", "lead"), (Assert.Single(first!.Departments).Name, first.Departments[0].Role));
+        Assert.Empty(newcomer!.Departments);
+        var notifications = await kai.GetFromJsonAsync<PagedResponse<NotificationResponse>>("/api/v1/me/notifications");
+        var notice = Assert.Single(notifications!.Items, n => n.Type == NotificationTypes.PersonWithoutDepartment);
+        Assert.Equal(("user", newcomer.Id), (notice.ResourceType, notice.ResourceId));
+        var unassigned = await kai.GetFromJsonAsync<List<UserResponse>>("/api/v1/departments/unassigned");
+        Assert.Contains(unassigned!, u => u.Id == newcomer.Id);
+    }
+
+    [Fact]
+    public async Task Departments_follow_the_Entra_groups_but_keep_memberships_added_by_hand()
+    {
+        await using var factory = Production(provisioning: true, departmentsFromGroups: true);
+        var kai = Client(factory, Token(Guid.NewGuid().ToString(), "Kai", "kai@example.com"));
+        await kai.GetFromJsonAsync<MeResponse>("/api/v1/me");
+        var group = Guid.NewGuid().ToString();
+        var purchasing = await (await kai.PostAsJsonAsync("/api/v1/departments", new CreateDepartmentRequest("Einkauf", null, group)))
+            .Content.ReadFromJsonAsync<DepartmentSummary>();
+        var sales = await (await kai.PostAsJsonAsync("/api/v1/departments", new CreateDepartmentRequest("Vertrieb", null)))
+            .Content.ReadFromJsonAsync<DepartmentSummary>();
+        var objectId = Guid.NewGuid().ToString();
+
+        var joined = await Client(factory, Token(objectId, "Eva", "eva@example.com", groups: [Guid.NewGuid().ToString(), group.ToUpperInvariant()]))
+            .GetFromJsonAsync<MeResponse>("/api/v1/me");
+        Assert.Equal(HttpStatusCode.NoContent, (await kai.PostAsJsonAsync(
+            $"/api/v1/departments/{sales!.Id}/members", new AddDepartmentMemberRequest(joined!.Id, "member"))).StatusCode);
+        var overage = await Client(factory, Token(objectId, "Eva", "eva@example.com", groupOverage: true)).GetFromJsonAsync<MeResponse>("/api/v1/me");
+        var left = await Client(factory, Token(objectId, "Eva", "eva@example.com", groups: [])).GetFromJsonAsync<MeResponse>("/api/v1/me");
+
+        Assert.Equal(purchasing!.Id, Assert.Single(joined.Departments).Id);
+        Assert.Equal(2, overage!.Departments.Count);
+        Assert.Equal(sales.Id, Assert.Single(left!.Departments).Id);
+        var details = await kai.GetFromJsonAsync<DepartmentDetails>($"/api/v1/departments/{sales.Id}");
+        Assert.Equal("manual", Assert.Single(details!.Members, m => m.UserId == joined.Id).Source);
+        // Someone the group put into a department is not announced as waiting for one.
+        var notifications = await kai.GetFromJsonAsync<PagedResponse<NotificationResponse>>("/api/v1/me/notifications");
+        Assert.DoesNotContain(notifications!.Items, n => n.ResourceId == joined.Id);
+    }
+
+    [Fact]
+    public async Task Without_the_setting_Entra_groups_change_nothing()
+    {
+        await using var factory = Production(provisioning: true);
+        var kai = Client(factory, Token(Guid.NewGuid().ToString(), "Kai", "kai@example.com"));
+        await kai.GetFromJsonAsync<MeResponse>("/api/v1/me");
+        var group = Guid.NewGuid().ToString();
+        await kai.PostAsJsonAsync("/api/v1/departments", new CreateDepartmentRequest("Einkauf", null, group));
+
+        var person = await Client(factory, Token(Guid.NewGuid().ToString(), "Eva", "eva@example.com", groups: [group])).GetFromJsonAsync<MeResponse>("/api/v1/me");
+
+        Assert.Empty(person!.Departments);
     }
 }

@@ -5,7 +5,7 @@ import { fakeApi, json } from '../test/fakeApi'
 import type { Me } from './api'
 import { AccountMenu } from './AccountMenu'
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 
 describe('AccountMenu', () => {
   afterEach(() => vi.unstubAllGlobals())

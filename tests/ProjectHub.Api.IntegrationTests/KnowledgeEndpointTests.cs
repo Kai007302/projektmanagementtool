@@ -87,7 +87,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     public async Task Team_grants_give_edit_rights()
     {
         var article = await CreateAsync(Ada, "Plattform-Runbook");
-        await SetPermissionsAsync(Ada, article.Article.Id, new PermissionEntry("team", PlatformTeam.Id, "edit"));
+        await SetPermissionsAsync(Ada, article.Article.Id, new PermissionEntry("department", PlatformDepartment.Id, "edit"));
 
         var details = await GetAsync(Clara, article.Article.Id);
         var saved = await As(Clara).PutAsJsonAsync(
@@ -115,7 +115,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     [Fact]
     public async Task Content_references_must_point_to_visible_resources()
     {
-        var hidden = await CreateProjectAsync(Ben);
+        var hidden = await CreateProjectAsync(Ben, "private");
         var reference = new JsonObject { ["type"] = "project_reference", ["projectId"] = hidden.Id.ToString() };
 
         var forClara = await As(Clara).PostAsJsonAsync("/api/v1/knowledge/articles", NewArticle("Verweis", Blocks(reference)));
@@ -173,7 +173,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     [Fact]
     public async Task Status_changes_follow_the_lifecycle_and_need_the_right_permission()
     {
-        var article = await CreateAsync(Ada, "Lebenszyklus");
+        var article = await CreateAsync(Ada, "Lebenszyklus", visibility: "organization");
         await SetPermissionsAsync(Ada, article.Article.Id, new PermissionEntry("user", Clara.Id, "edit"));
 
         var review = await ChangeStatusAsync(Clara, article.Article.Id, article.Article.Version, "review");
@@ -227,8 +227,8 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
         var byOther = await As(Clara).PutAsJsonAsync(
             $"/api/v1/knowledge/articles/{article.Article.Id}/permissions", new SetPermissionsRequest([new PermissionEntry("user", Clara.Id, "admin")]));
         var foreignTeam = await As(Ben).PutAsJsonAsync(
-            $"/api/v1/knowledge/articles/{article.Article.Id}/permissions", new SetPermissionsRequest([new PermissionEntry("team", FabrikamTeam.Id, "view")]));
-        var granted = await SetPermissionsAsync(Ben, article.Article.Id, new PermissionEntry("team", SalesTeam.Id, "view"), new PermissionEntry("user", Eva.Id, "edit"));
+            $"/api/v1/knowledge/articles/{article.Article.Id}/permissions", new SetPermissionsRequest([new PermissionEntry("department", FabrikamDepartment.Id, "view")]));
+        var granted = await SetPermissionsAsync(Ben, article.Article.Id, new PermissionEntry("department", SalesDepartment.Id, "view"), new PermissionEntry("user", Eva.Id, "edit"));
 
         Assert.Equal(HttpStatusCode.NotFound, byOther.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, foreignTeam.StatusCode);
@@ -317,7 +317,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     [Fact]
     public async Task Relations_hide_articles_the_reader_cannot_see()
     {
-        var article = await CreateAsync(Ada, "Öffentlich mit Geheimnis");
+        var article = await CreateAsync(Ada, "Öffentlich mit Geheimnis", visibility: "organization");
         await As(Ada).PostAsJsonAsync($"/api/v1/knowledge/articles/{article.Article.Id}/relations", new CreateRelationRequest(PricingArticle.Id, "REFERENCES"));
         var published = await ChangeStatusAsync(Ada, article.Article.Id, article.Article.Version, "published");
         Assert.Equal(HttpStatusCode.OK, published.StatusCode);
@@ -336,7 +336,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
 
         var toProject = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("project", project.Id));
         var toTask = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("task", task.Id));
-        var toTeam = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("team", SalesTeam.Id));
+        var toTeam = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("department", SalesDepartment.Id));
         var toForeign = await As(Ben).PostAsJsonAsync(url, new CreateReferenceRequest("project", FabrikamProject.Id));
         var board = (await (await As(Ben).PostAsJsonAsync($"/api/v1/projects/{project.Id}/whiteboards", new CreateWhiteboardRequest("Skizze")))
             .Content.ReadFromJsonAsync<WhiteboardResponse>())!;
@@ -354,7 +354,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
         Assert.Equal(HttpStatusCode.NotFound, (await As(Felix).GetAsync($"/api/v1/whiteboards/{board.Id}/knowledge")).StatusCode);
         Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/projects/{project.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
         Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/tasks/{task.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
-        Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/teams/{SalesTeam.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
+        Assert.Contains(await As(Ben).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/departments/{SalesDepartment.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
 
         // The draft stays Ben's; project members see the project but not the article.
         Assert.DoesNotContain(await As(Eva).GetFromJsonAsync<List<ArticleSummary>>($"/api/v1/projects/{project.Id}/knowledge") ?? [], a => a.Id == article.Article.Id);
@@ -408,10 +408,10 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
     }
 
     [Fact]
-    public async Task Spaces_are_managed_by_organization_admins_and_count_visible_articles()
+    public async Task Spaces_are_managed_by_organization_admins_and_department_leads_and_count_visible_articles()
     {
-        var byMember = await As(Ben).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest("Vertrieb", null));
-        var byAdmin = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest($"Bereich {Guid.NewGuid():N}", "Neu"));
+        var byMember = await As(Eva).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest("Vertrieb", null));
+        var byAdmin = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest($"Bereich {Guid.NewGuid():N}", "Neu", GeneralDepartment.Id));
         var spaces = await As(Eva).GetFromJsonAsync<List<SpaceResponse>>("/api/v1/knowledge/spaces");
 
         Assert.Equal(HttpStatusCode.Forbidden, byMember.StatusCode);
@@ -419,7 +419,7 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
         Assert.DoesNotContain(spaces!, s => s.Id == FabrikamSpace.Id);
         var methods = Assert.Single(spaces!, s => s.Id == MethodsSpace.Id);
         Assert.Equal(
-            await ScalarAsync("select count(*) from knowledge_article where knowledge_space_id = $1 and status = 'published' and deleted_at is null and visibility = 'organization'", MethodsSpace.Id),
+            await ScalarAsync("select count(*) from knowledge_article where knowledge_space_id = $1 and status = 'published' and deleted_at is null and visibility in ('organization', 'department')", MethodsSpace.Id),
             methods.ArticleCount);
     }
 

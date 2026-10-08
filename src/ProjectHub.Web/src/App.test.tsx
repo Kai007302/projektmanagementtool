@@ -1,33 +1,40 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { fakeApi, json } from './test/fakeApi'
 
 const org = { id: 'org-1', name: 'Contoso (Dev)', slug: 'contoso-dev' }
-const ada = { id: 'u-ada', displayName: 'Ada Admin', email: 'ada@x', organizationId: 'org-1', organizationRole: 'admin' }
-const eva = { id: 'u-eva', displayName: 'Eva Viewer', email: 'eva@x', organizationId: 'org-1', organizationRole: 'member' }
+const general = { id: 'd-1', name: 'Allgemein', role: 'member' }
+const ada = { id: 'u-ada', displayName: 'Ada Admin', email: 'ada@x', organizationId: 'org-1', organizationRole: 'admin', departments: [general] }
+const eva = { id: 'u-eva', displayName: 'Eva Viewer', email: 'eva@x', organizationId: 'org-1', organizationRole: 'member', departments: [general] }
+const ben = { ...eva, id: 'u-ben', displayName: 'Ben Leitung', departments: [{ id: 'd-2', name: 'Plattform', role: 'lead' }, general] }
+const newcomer = { ...eva, id: 'u-neu', displayName: 'Neu Ohne Abteilung', departments: [] }
 const devUsers = [
   { objectId: 'dev-ada', displayName: 'Ada Admin', organization: 'Contoso (Dev)', organizationRole: 'admin' },
   { objectId: 'dev-eva', displayName: 'Eva Viewer', organization: 'Contoso (Dev)', organizationRole: 'member' },
 ]
-const platform = { id: 't-1', name: 'Plattform', description: null, memberCount: 1 }
+const platform = { id: 'd-2', name: 'Plattform', description: null, memberCount: 1, myRole: 'lead', canManage: true, entraGroupId: null as string | null, version: 1 }
+const sales = { id: 'd-3', name: 'Vertrieb', description: null, memberCount: 2, myRole: null, canManage: false, entraGroupId: null, version: 1 }
 
-function baseRoutes(me = ada) {
+function baseRoutes(me: typeof ada = ada) {
   return {
     'GET /health/ready': () => new Response('Healthy'),
     'GET /api/dev/users': () => json(devUsers),
     'GET /api/v1/me': (_: RequestInit | undefined, headers: Headers) =>
       json(headers.get('X-Dev-User') === 'dev-eva' ? eva : me),
     'GET /api/v1/organization': () => json(org),
-    'GET /api/v1/teams?limit=100': () => json({ items: [platform], nextOffset: null }),
+    'GET /api/v1/departments?limit=100': () => json({ items: [platform, sales], nextOffset: null }),
+    'GET /api/v1/departments/unassigned': () => json([]),
     'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }),
+    'GET /api/v1/projects?limit=100&departmentId=d-1': () => json({ items: [], nextOffset: null }),
+    'GET /api/v1/projects?limit=100&departmentId=d-2': () => json({ items: [], nextOffset: null }),
     'GET /api/v1/me/notifications/unread-count': () => json({ count: 0 }),
   }
 }
 
-async function openTeams() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Teams' }))
+async function openAdministration() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Verwaltung' }))
 }
 
 describe('App', () => {
@@ -51,110 +58,134 @@ describe('App', () => {
     expect(await screen.findByText('Backend nicht erreichbar')).toBeInTheDocument()
   })
 
-  it('lists the teams of the organization', async () => {
-    fakeApi(baseRoutes())
-    render(<App />)
-    await openTeams()
+  it('starts with all departments and remembers the chosen one', async () => {
+    const api = fakeApi(baseRoutes(ben))
+    const { unmount } = render(<App />)
 
-    expect(await screen.findByRole('button', { name: /Plattform/ })).toBeInTheDocument()
+    const switcher = await screen.findByLabelText('Abteilung')
+    expect(switcher).toHaveValue('')
+    await userEvent.selectOptions(switcher, 'd-2')
+
+    await waitFor(() => expect(api.calls.some((c) => c.key === 'GET /api/v1/projects?limit=100&departmentId=d-2')).toBe(true))
+    expect(localStorage.getItem('projecthub.department.u-ben')).toBe('d-2')
+    unmount()
+    render(<App />)
+    expect(await screen.findByLabelText('Abteilung')).toHaveValue('d-2')
   })
 
-  it('offers team creation to organization admins only', async () => {
+  it('offers the administration to admins and leads only', async () => {
     fakeApi(baseRoutes(eva))
     render(<App />)
-    await openTeams()
 
-    await screen.findByRole('button', { name: /Plattform/ })
-    expect(screen.queryByRole('button', { name: '+ Team' })).not.toBeInTheDocument()
+    await screen.findByRole('button', { name: 'Projekte' })
+    expect(screen.queryByRole('button', { name: 'Verwaltung' })).not.toBeInTheDocument()
   })
 
-  it('creates a team and reloads the list', async () => {
-    let teams = [platform]
+  it('shows leads only the departments they manage, without creating new ones', async () => {
+    fakeApi({ ...baseRoutes(ben), 'GET /api/v1/departments/d-2': () => json({ ...platform, members: [] }) })
+    render(<App />)
+    await openAdministration()
+
+    const list = await screen.findByRole('list', { name: 'Abteilungen' })
+    expect(within(list).getByRole('button', { name: /Plattform/ })).toBeInTheDocument()
+    expect(within(list).queryByRole('button', { name: /Vertrieb/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Abteilung' })).not.toBeInTheDocument()
+  })
+
+  it('creates a department with its Entra group', async () => {
+    let departments = [platform]
     const api = fakeApi({
       ...baseRoutes(),
-      'GET /api/v1/teams?limit=100': () => json({ items: teams, nextOffset: null }),
-      'POST /api/v1/teams': (init) => {
-        const body = JSON.parse(String(init?.body)) as { name: string }
-        const team = { id: 't-2', name: body.name, description: null, memberCount: 0 }
-        teams = [...teams, team]
-        return json(team, 201)
+      'GET /api/v1/departments?limit=100': () => json({ items: departments, nextOffset: null }),
+      'GET /api/v1/departments/d-2': () => json({ ...platform, members: [] }),
+      'GET /api/v1/departments/d-9': () => json({ ...platform, id: 'd-9', name: 'Einkauf', members: [] }),
+      'POST /api/v1/departments': (init) => {
+        const body = JSON.parse(String(init?.body)) as { name: string; entraGroupId: string }
+        const department = { ...platform, id: 'd-9', name: body.name, entraGroupId: body.entraGroupId, memberCount: 0 }
+        departments = [...departments, department]
+        return json(department, 201)
       },
     })
     render(<App />)
-    await openTeams()
+    await openAdministration()
 
-    await userEvent.click(await screen.findByRole('button', { name: '+ Team' }))
-    await userEvent.type(screen.getByLabelText('Teamname'), 'Vertrieb')
-    await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
+    await userEvent.click(await screen.findByRole('button', { name: '+ Abteilung' }))
+    await userEvent.type(screen.getByLabelText('Name der Abteilung'), 'Einkauf')
+    await userEvent.type(screen.getByLabelText('Entra-Gruppe (Objekt-ID, optional)'), 'group-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Abteilung anlegen' }))
 
-    expect(await screen.findByRole('button', { name: /Vertrieb/ })).toBeInTheDocument()
-    expect(api.calls.some((c) => c.key === 'POST /api/v1/teams')).toBe(true)
+    const list = await screen.findByRole('list', { name: 'Abteilungen' })
+    expect(await within(list).findByRole('button', { name: /Einkauf/ })).toBeInTheDocument()
+    const post = api.calls.find((c) => c.key === 'POST /api/v1/departments')
+    expect(JSON.parse(String(post?.init?.body))).toEqual({ name: 'Einkauf', description: null, entraGroupId: 'group-1' })
   })
 
-  it('shows the error message when team creation is rejected', async () => {
+  it('shows department members and lets managers add someone', async () => {
+    let members = [{ userId: 'u-ben', displayName: 'Ben Leitung', email: 'ben@x', role: 'lead', source: 'manual' }]
     fakeApi({
       ...baseRoutes(),
-      'POST /api/v1/teams': () => json({ title: 'Conflict', detail: 'A team with this name already exists.' }, 409),
-    })
-    render(<App />)
-    await openTeams()
-
-    await userEvent.click(await screen.findByRole('button', { name: '+ Team' }))
-    await userEvent.type(screen.getByLabelText('Teamname'), 'Plattform')
-    await userEvent.click(screen.getByRole('button', { name: 'Team anlegen' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('A team with this name already exists.')
-  })
-
-  it('shows team members and lets managers add someone', async () => {
-    let members = [{ userId: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', role: 'owner' }]
-    fakeApi({
-      ...baseRoutes(),
-      'GET /api/v1/teams/t-1': () => json({ ...platform, canManage: true, members }),
+      'GET /api/v1/departments/d-2': () => json({ ...platform, members }),
       'GET /api/v1/users?limit=100': () =>
         json({
           items: [
-            { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', department: null, status: 'active' },
+            { id: 'u-ben', displayName: 'Ben Leitung', email: 'ben@x', department: null, status: 'active' },
             { id: 'u-eva', displayName: 'Eva Viewer', email: 'eva@x', department: null, status: 'active' },
           ],
           nextOffset: null,
         }),
-      'POST /api/v1/teams/t-1/members': (init) => {
+      'POST /api/v1/departments/d-2/members': (init) => {
         const body = JSON.parse(String(init?.body)) as { userId: string; role: string }
-        members = [...members, { userId: body.userId, displayName: 'Eva Viewer', email: 'eva@x', role: body.role }]
+        members = [...members, { userId: body.userId, displayName: 'Eva Viewer', email: 'eva@x', role: body.role, source: 'manual' }]
         return new Response(null, { status: 204 })
       },
     })
     render(<App />)
-    await openTeams()
+    await openAdministration()
 
-    await userEvent.click(await screen.findByRole('button', { name: /Plattform/ }))
-    const details = await screen.findByRole('heading', { name: 'Plattform' }).then((h) => h.parentElement!)
-    expect(within(details).getByText('Ben Projektleiter')).toBeInTheDocument()
+    const details = await screen.findByRole('region', { name: 'Plattform' })
+    expect(within(details).getByText('Ben Leitung')).toBeInTheDocument()
+    await userEvent.click(within(details).getByRole('button', { name: '+ Person hinzufügen' }))
 
-    const person = within(details).getByLabelText('Person')
+    const person = await screen.findByLabelText('Person')
     await within(person).findByRole('option', { name: 'Eva Viewer' })
-    expect(within(person).queryByRole('option', { name: 'Ben Projektleiter' })).not.toBeInTheDocument()
+    expect(within(person).queryByRole('option', { name: 'Ben Leitung' })).not.toBeInTheDocument()
     await userEvent.selectOptions(person, 'u-eva')
-    await userEvent.click(within(details).getByRole('button', { name: 'Hinzufügen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }))
 
     expect(await within(details).findByText('Eva Viewer')).toBeInTheDocument()
   })
 
-  it('hides member management from people who cannot manage the team', async () => {
-    fakeApi({
-      ...baseRoutes(eva),
-      'GET /api/v1/teams/t-1': () =>
-        json({ ...platform, canManage: false, members: [{ userId: 'u-ben', displayName: 'Ben', email: 'b', role: 'owner' }] }),
+  it('lets admins and leads take in people without a department', async () => {
+    const waiting = { id: 'u-neu', displayName: 'Neu Ohne Abteilung', email: 'neu@x', department: null, status: 'active' }
+    let unassigned = [waiting]
+    const api = fakeApi({
+      ...baseRoutes(),
+      'GET /api/v1/departments/unassigned': () => json(unassigned),
+      'GET /api/v1/departments/d-2': () => json({ ...platform, members: [] }),
+      'POST /api/v1/departments/d-2/members': () => {
+        unassigned = []
+        return new Response(null, { status: 204 })
+      },
     })
     render(<App />)
-    await openTeams()
+    await openAdministration()
 
-    await userEvent.click(await screen.findByRole('button', { name: /Plattform/ }))
-    await screen.findByRole('heading', { name: 'Plattform' })
+    const panel = await screen.findByRole('region', { name: 'Ohne Abteilung' })
+    await userEvent.click(within(panel).getByRole('button', { name: 'Aufnehmen' }))
 
-    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Person')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Ohne Abteilung' })).not.toBeInTheDocument())
+    expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/departments/d-2/members')?.init?.body))).toEqual({
+      userId: 'u-neu',
+      role: 'member',
+    })
+  })
+
+  it('tells people without a department that someone will take them in', async () => {
+    fakeApi(baseRoutes(newcomer))
+    render(<App />)
+
+    expect(await screen.findByText('Du bist noch keiner Abteilung zugeordnet.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Abteilung')).not.toBeInTheDocument()
   })
 
   it('switches the development user and sends it to the API', async () => {

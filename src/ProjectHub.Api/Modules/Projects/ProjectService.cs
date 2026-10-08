@@ -5,6 +5,7 @@ using ProjectHub.Api.Infrastructure.Events;
 using ProjectHub.Api.Infrastructure.Http;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Audit;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Identity.Authorization;
 using ProjectHub.Api.Modules.Users;
@@ -21,7 +22,9 @@ public sealed record ProjectSummary(
     string? MyRole,
     long Version,
     string? Icon = null,
-    long? LogoVersion = null);
+    long? LogoVersion = null,
+    Guid? DepartmentId = null,
+    string? Visibility = null);
 
 public sealed record ProjectMemberResponse(Guid UserId, string DisplayName, string Email, string Role);
 
@@ -37,9 +40,18 @@ public sealed record ProjectDetails(
     ProjectCapabilities Capabilities,
     IReadOnlyList<ProjectMemberResponse> Members,
     string? Icon = null,
-    long? LogoVersion = null);
+    long? LogoVersion = null,
+    Guid? DepartmentId = null,
+    string? DepartmentName = null,
+    string? Visibility = null);
 
-public sealed record CreateProjectRequest(string? Name, string? Description, string? Status, DateOnly? StartDate, DateOnly? EndDate);
+/// <summary>
+/// Without <c>DepartmentId</c> the project goes to the caller's first department they can work in (ADR 0021);
+/// without <c>Visibility</c> it is visible to its department.
+/// </summary>
+public sealed record CreateProjectRequest(
+    string? Name, string? Description, string? Status, DateOnly? StartDate, DateOnly? EndDate,
+    Guid? DepartmentId = null, string? Visibility = null);
 
 public sealed class ProjectService(
     ProjectHubDbContext db,
@@ -54,21 +66,25 @@ public sealed class ProjectService(
     public const int MaxDescriptionLength = 10_000;
     public const int MaxIconLength = 16;
 
-    public async Task<IReadOnlyList<ProjectSummary>> ListAsync(UserContext user, Paging paging, CancellationToken ct)
+    /// <summary>The projects the caller may see, optionally only those of one department.</summary>
+    public async Task<IReadOnlyList<ProjectSummary>> ListAsync(UserContext user, Paging paging, CancellationToken ct, Guid? departmentId = null)
     {
-        var projects = db.Set<Project>().AsNoTracking()
-            .Where(p => p.OrganizationId == user.OrganizationId && p.DeletedAt == null);
+        var projects = authorization.VisibleProjects(user).AsNoTracking();
+        if (departmentId is { } department)
+        {
+            projects = projects.Where(p => p.DepartmentId == department);
+        }
 
         var rows =
             from project in projects
             join member in db.Set<ProjectMember>().Where(m => m.UserId == user.UserId)
                 on project.Id equals member.ProjectId into memberships
             from membership in memberships.DefaultIfEmpty()
-            where user.IsOrganizationAdmin || membership != null
             orderby project.Name, project.Id
             select new ProjectSummary(
                 project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate,
-                membership == null ? null : membership.Role, project.Version, project.Icon, project.LogoVersion);
+                membership == null ? null : membership.Role, project.Version, project.Icon, project.LogoVersion,
+                project.DepartmentId, project.Visibility);
 
         return await rows.Skip(paging.Skip).Take(paging.Take + 1).ToListAsync(ct);
     }
@@ -81,6 +97,13 @@ public sealed class ProjectService(
         }
 
         var project = await db.Set<Project>().AsNoTracking().SingleAsync(p => p.Id == projectId, ct);
+        if (await authorization.SeesProjectOnlyAsOrganizationAdminAsync(user, projectId, ct))
+        {
+            audit.Record(user, AuditActions.OrganizationAdminAccess, "project", projectId);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var departmentName = await db.Set<Department>().Where(d => d.Id == project.DepartmentId).Select(d => d.Name).SingleOrDefaultAsync(ct);
         var members = await (
                 from member in db.Set<ProjectMember>().AsNoTracking()
                 join appUser in db.Set<AppUser>().AsNoTracking() on member.UserId equals appUser.Id
@@ -89,16 +112,35 @@ public sealed class ProjectService(
                 select new ProjectMemberResponse(appUser.Id, appUser.DisplayName, appUser.Email, member.Role))
             .ToListAsync(ct);
 
+        var capabilities = await access.CapabilitiesAsync(user, projectId, ct);
+        capabilities = capabilities with
+        {
+            CanShareWithOrganization = capabilities.CanManage && await CanShareWithOrganizationAsync(user, project.DepartmentId, ct),
+        };
         return new ProjectDetails(
             project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, project.OwnerId,
-            project.Version, await access.CapabilitiesAsync(user, projectId, ct), members, project.Icon, project.LogoVersion);
+            project.Version, capabilities, members, project.Icon, project.LogoVersion,
+            project.DepartmentId, departmentName, project.Visibility);
     }
 
     public async Task<ServiceResult<Project>> CreateAsync(UserContext user, CreateProjectRequest request, CancellationToken ct)
     {
-        if (!authorization.CanCreateProject(user))
+        var departmentId = request.DepartmentId ?? await DefaultDepartmentAsync(user, ct);
+        if (departmentId is null)
         {
-            return ServiceFailure.Forbidden("Not allowed to create projects.");
+            return ServiceFailure.Invalid("departmentId", "Required: you belong to no department you can create projects in.");
+        }
+
+        if (!await authorization.CanCreateInDepartmentAsync(user, departmentId.Value, ct))
+        {
+            return request.DepartmentId is not null && !await db.Set<Department>().AnyAsync(d => d.Id == departmentId && d.OrganizationId == user.OrganizationId, ct)
+                ? ServiceFailure.Invalid("departmentId", "Must be a department of the organization.")
+                : ServiceFailure.Forbidden("Only leads and members of the department create projects in it.");
+        }
+
+        if (request.Visibility == ProjectVisibility.Organization && !await CanShareWithOrganizationAsync(user, departmentId.Value, ct))
+        {
+            return ServiceFailure.Forbidden("Only organization admins and the department's leads share projects with the whole organization.");
         }
 
         var now = clock.GetUtcNow();
@@ -110,6 +152,8 @@ public sealed class ProjectService(
             Description = Normalize(request.Description),
             Status = request.Status ?? ProjectStatus.Active,
             OwnerId = user.UserId,
+            DepartmentId = departmentId.Value,
+            Visibility = request.Visibility ?? ProjectVisibility.Department,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             CreatedAt = now,
@@ -161,9 +205,30 @@ public sealed class ProjectService(
             || !patch.TryApply<string>("status", value => project.Status = value ?? string.Empty, changed, out error)
             || !patch.TryApply<string>("icon", value => project.Icon = Normalize(value), changed, out error)
             || !patch.TryApply<DateOnly?>("startDate", value => project.StartDate = value, changed, out error)
-            || !patch.TryApply<DateOnly?>("endDate", value => project.EndDate = value, changed, out error))
+            || !patch.TryApply<DateOnly?>("endDate", value => project.EndDate = value, changed, out error)
+            || !patch.TryApply<string>("visibility", value => project.Visibility = value ?? string.Empty, changed, out error)
+            || !patch.TryApply<Guid?>("departmentId", value => project.DepartmentId = value ?? Guid.Empty, changed, out error))
         {
             return error!;
+        }
+
+        if ((changed.Contains("visibility") || changed.Contains("departmentId"))
+            && !await authorization.HasProjectPermissionAsync(user, projectId, ProjectPermission.Manage, ct))
+        {
+            return ServiceFailure.Forbidden("Only those who manage the project change its visibility or department.");
+        }
+
+        if (changed.Contains("visibility") && project.Visibility == ProjectVisibility.Organization
+            && !await CanShareWithOrganizationAsync(user, project.DepartmentId, ct))
+        {
+            return ServiceFailure.Forbidden("Only organization admins and the department's leads share projects with the whole organization.");
+        }
+
+        if (changed.Contains("departmentId") && !await authorization.CanCreateInDepartmentAsync(user, project.DepartmentId, ct))
+        {
+            return await db.Set<Department>().AnyAsync(d => d.Id == project.DepartmentId && d.OrganizationId == user.OrganizationId, ct)
+                ? ServiceFailure.Forbidden("Projects can only be moved to departments you work in.")
+                : ServiceFailure.Invalid("departmentId", "Must be a department of the organization.");
         }
 
         if (Validate(project) is { } invalid)
@@ -175,6 +240,16 @@ public sealed class ProjectService(
         {
             db.Touch(project, expectedVersion, clock.GetUtcNow());
             activity.Record(user, project.Id, ActivityActions.ProjectUpdated, "project", project.Id, new { Fields = changed });
+            if (changed.Contains("visibility"))
+            {
+                audit.Record(user, AuditActions.ProjectVisibilityChanged, "project", project.Id, new { project.Visibility });
+            }
+
+            if (changed.Contains("departmentId"))
+            {
+                audit.Record(user, AuditActions.ProjectMoved, "project", project.Id, new { project.DepartmentId });
+            }
+
             if (await db.SaveVersionedAsync(project, ct) is { } conflict)
             {
                 return conflict;
@@ -182,7 +257,8 @@ public sealed class ProjectService(
         }
 
         return new ProjectSummary(
-            project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, null, project.Version, project.Icon, project.LogoVersion);
+            project.Id, project.Name, project.Description, project.Status, project.StartDate, project.EndDate, null, project.Version, project.Icon, project.LogoVersion,
+            project.DepartmentId, project.Visibility);
     }
 
     public async Task<ServiceResult<Done>> DeleteAsync(UserContext user, Guid projectId, CancellationToken ct)
@@ -312,6 +388,17 @@ public sealed class ProjectService(
     private async Task<bool> IsLastAdminAsync(Guid projectId, CancellationToken ct) =>
         await db.Set<ProjectMember>().CountAsync(m => m.ProjectId == projectId && m.Role == ProjectRole.Admin, ct) <= 1;
 
+    /// <summary>The caller's first department they can create in: the one they joined first.</summary>
+    private async Task<bool> CanShareWithOrganizationAsync(UserContext user, Guid departmentId, CancellationToken ct) =>
+        user.IsOrganizationAdmin || await authorization.DepartmentRoleAsync(user, departmentId, ct) == DepartmentRole.Lead;
+
+    private Task<Guid?> DefaultDepartmentAsync(UserContext user, CancellationToken ct) =>
+        db.Set<DepartmentMember>()
+            .Where(m => m.OrganizationId == user.OrganizationId && m.UserId == user.UserId && DepartmentRole.Working.Contains(m.Role))
+            .OrderBy(m => m.CreatedAt).ThenBy(m => m.DepartmentId)
+            .Select(m => (Guid?)m.DepartmentId)
+            .FirstOrDefaultAsync(ct);
+
     private static ServiceFailure? Validate(Project project)
     {
         if (project.Name.Length is 0 or > MaxNameLength)
@@ -328,6 +415,11 @@ public sealed class ProjectService(
         if (project.Icon is { } icon && (icon.Length > MaxIconLength || icon.Any(char.IsLetterOrDigit) || icon.Any(char.IsWhiteSpace)))
         {
             return ServiceFailure.Invalid("icon", $"One emoji, at most {MaxIconLength} characters.");
+        }
+
+        if (!ProjectVisibility.All.Contains(project.Visibility))
+        {
+            return ServiceFailure.Invalid("visibility", $"Must be one of: {string.Join(", ", ProjectVisibility.All)}.");
         }
 
         if (!ProjectStatus.All.Contains(project.Status))

@@ -2,6 +2,7 @@ import { apiFetch, jsonBody, type Paged } from '../api/client'
 
 export type ProjectRole = 'admin' | 'editor' | 'member' | 'viewer' | 'guest'
 export type ProjectStatus = 'planned' | 'active' | 'on_hold' | 'completed' | 'archived'
+export type ProjectVisibility = 'private' | 'department' | 'organization'
 
 export type ProjectSummary = {
   id: string
@@ -16,16 +17,21 @@ export type ProjectSummary = {
   icon?: string | null
   /** Set while the project has a logo; changes with every new logo. */
   logoVersion?: number | null
+  /** The department the project belongs to (ADR 0021). */
+  departmentId?: string | null
+  visibility?: ProjectVisibility | null
 }
 
 export type ProjectMember = { userId: string; displayName: string; email: string; role: ProjectRole }
 
-export type Capabilities = { canContribute: boolean; canEdit: boolean; canManage: boolean }
+/** canShareWithOrganization: organization admins and leads of the project's department (ADR 0021). */
+export type Capabilities = { canContribute: boolean; canEdit: boolean; canManage: boolean; canShareWithOrganization?: boolean }
 
 export type ProjectDetails = Omit<ProjectSummary, 'myRole'> & {
   ownerId: string
   capabilities: Capabilities
   members: ProjectMember[]
+  departmentName?: string | null
 }
 
 export type Activity = {
@@ -54,14 +60,27 @@ export const projectStatuses: Record<ProjectStatus, string> = {
   archived: 'Archiviert',
 }
 
-export const fetchProjects = () => apiFetch<Paged<ProjectSummary>>('/api/v1/projects?limit=100')
+export const projectVisibilities: Record<ProjectVisibility, { label: string; hint: string }> = {
+  private: { label: 'Privat', hint: 'Nur die Mitglieder des Projekts' },
+  department: { label: 'Abteilung', hint: 'Alle der Abteilung lesen mit' },
+  organization: { label: 'Organisation', hint: 'Alle in der Organisation lesen mit' },
+}
+
+/** The projects I can see; with a department only those of that department. */
+export const fetchProjects = (departmentId = '') =>
+  apiFetch<Paged<ProjectSummary>>(`/api/v1/projects?limit=100${departmentId ? `&departmentId=${departmentId}` : ''}`)
 
 export const fetchProject = (id: string) => apiFetch<ProjectDetails>(`/api/v1/projects/${id}`)
 
-export const createProject = (name: string, description: string) =>
-  apiFetch<ProjectSummary>('/api/v1/projects', { method: 'POST', body: jsonBody({ name, description }) })
+/** Without a department the project goes to my first department. */
+export const createProject = (name: string, description: string, departmentId = '') =>
+  apiFetch<ProjectSummary>('/api/v1/projects', { method: 'POST', body: jsonBody({ name, description, departmentId: departmentId || null }) })
 
-export const updateProject = (id: string, version: number, changes: Partial<Pick<ProjectSummary, 'name' | 'description' | 'status' | 'icon'>>) =>
+export const updateProject = (
+  id: string,
+  version: number,
+  changes: Partial<Pick<ProjectSummary, 'name' | 'description' | 'status' | 'icon' | 'departmentId' | 'visibility'>>,
+) =>
   apiFetch<ProjectSummary>(`/api/v1/projects/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })
 
 export function uploadProjectLogo(id: string, file: File) {

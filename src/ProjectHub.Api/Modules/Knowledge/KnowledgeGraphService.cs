@@ -20,9 +20,15 @@ public sealed class KnowledgeGraphService(ProjectHubDbContext db, KnowledgeAcces
 {
     public const int MaxNodes = 2000;
 
-    public async Task<KnowledgeGraph> GetAsync(UserContext user, Guid? spaceId, string? articleType, CancellationToken ct)
+    /// <summary><paramref name="departmentId"/>: only the articles of one department, its own galaxy (ADR 0021).</summary>
+    public async Task<KnowledgeGraph> GetAsync(UserContext user, Guid? spaceId, string? articleType, CancellationToken ct, Guid? departmentId = null)
     {
         var articles = access.Visible(await access.ReaderAsync(user, ct));
+        if (departmentId is { } department)
+        {
+            articles = articles.Where(a => a.DepartmentId == department);
+        }
+
         if (spaceId is { } space)
         {
             articles = articles.Where(a => a.KnowledgeSpaceId == space);

@@ -20,8 +20,8 @@ public static class KnowledgeEndpoints
     {
         var knowledge = api.MapGroup("/knowledge");
 
-        knowledge.MapGet("/spaces", async (UserContext user, KnowledgeSpaceService service, CancellationToken ct) =>
-            Results.Ok(await service.ListAsync(user, ct)));
+        knowledge.MapGet("/spaces", async (UserContext user, KnowledgeSpaceService service, Guid? departmentId, CancellationToken ct) =>
+            Results.Ok(await service.ListAsync(user, ct, departmentId)));
 
         knowledge.MapPost("/spaces", async (CreateSpaceRequest request, UserContext user, KnowledgeSpaceService service, CancellationToken ct) =>
             ApiResults.From(await service.CreateAsync(user, request, ct), space => Results.Created($"/api/v1/knowledge/spaces/{space.Id}", space)));
@@ -31,7 +31,7 @@ public static class KnowledgeEndpoints
 
         knowledge.MapGet("/articles", async (
             UserContext user, KnowledgeAccess access, IKnowledgeSearch search,
-            string? q, string? type, string? status, Guid? spaceId, string? tag, int? limit, int? offset, CancellationToken ct) =>
+            string? q, string? type, string? status, Guid? spaceId, string? tag, Guid? departmentId, int? limit, int? offset, CancellationToken ct) =>
         {
             if (!Paging.TryCreate(limit, offset, out var paging, out var error))
             {
@@ -39,12 +39,12 @@ public static class KnowledgeEndpoints
             }
 
             var reader = await access.ReaderAsync(user, ct);
-            var rows = await search.SearchAsync(reader, new KnowledgeQuery(q, type, status, spaceId, tag), paging, ct);
+            var rows = await search.SearchAsync(reader, new KnowledgeQuery(q, type, status, spaceId, tag, departmentId), paging, ct);
             return Results.Ok(paging.ToPage(rows));
         });
 
-        knowledge.MapGet("/graph", async (UserContext user, KnowledgeGraphService service, Guid? spaceId, string? type, CancellationToken ct) =>
-            Results.Ok(await service.GetAsync(user, spaceId, type, ct)));
+        knowledge.MapGet("/graph", async (UserContext user, KnowledgeGraphService service, Guid? spaceId, string? type, Guid? departmentId, CancellationToken ct) =>
+            Results.Ok(await service.GetAsync(user, spaceId, type, ct, departmentId)));
 
         knowledge.MapPost("/articles", async (CreateArticleRequest request, UserContext user, KnowledgeArticleService service, CancellationToken ct) =>
             ApiResults.From(await service.CreateAsync(user, request, ct), article => Results.Created($"/api/v1/knowledge/articles/{article.Article.Id}", article)));
@@ -114,15 +114,15 @@ public static class KnowledgeEndpoints
         knowledge.MapDelete("/comments/{id:guid}", async (Guid id, UserContext user, KnowledgeCommentService service, CancellationToken ct) =>
             ApiResults.NoContent(await service.DeleteAsync(user, id, ct)));
 
-        // The other direction of references: knowledge linked to a project, task, team or whiteboard.
+        // The other direction of references: knowledge linked to a project, task, department or whiteboard.
         api.MapGet("/projects/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
             ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Project, id, ct)));
 
         api.MapGet("/tasks/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
             ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Task, id, ct)));
 
-        api.MapGet("/teams/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
-            ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Team, id, ct)));
+        api.MapGet("/departments/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
+            ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Department, id, ct)));
 
         api.MapGet("/whiteboards/{id:guid}/knowledge", async (Guid id, UserContext user, KnowledgeLinkService service, CancellationToken ct) =>
             ApiResults.Ok(await service.ArticlesReferencingAsync(user, KnowledgeResourceType.Whiteboard, id, ct)));

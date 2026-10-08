@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Organizations;
 using ProjectHub.Api.Modules.Users;
 
@@ -15,7 +16,13 @@ internal sealed class UserContextMiddleware(RequestDelegate next)
 {
     private const string ItemKey = "ProjectHub.UserContext";
 
-    public async Task InvokeAsync(HttpContext httpContext, ICurrentUser currentUser, ProjectHubDbContext db, UserProvisioning provisioning)
+    public async Task InvokeAsync(
+        HttpContext httpContext,
+        ICurrentUser currentUser,
+        ProjectHubDbContext db,
+        UserProvisioning provisioning,
+        EntraDepartmentSync departmentSync,
+        DepartmentOnboarding onboarding)
     {
         if (!currentUser.IsAuthenticated || currentUser.TenantId is null || currentUser.EntraObjectId is null)
         {
@@ -24,9 +31,10 @@ internal sealed class UserContextMiddleware(RequestDelegate next)
         }
 
         var userContext = await FindAsync(db, currentUser, httpContext.RequestAborted);
+        var provisioned = false;
         if (userContext is null)
         {
-            await provisioning.TryProvisionAsync(currentUser, httpContext.RequestAborted);
+            provisioned = await provisioning.TryProvisionAsync(currentUser, httpContext.RequestAborted);
             userContext = await FindAsync(db, currentUser, httpContext.RequestAborted);
         }
 
@@ -37,6 +45,12 @@ internal sealed class UserContextMiddleware(RequestDelegate next)
         }
 
         userContext = await provisioning.RefreshProfileAsync(userContext, currentUser, httpContext.RequestAborted);
+        await departmentSync.SyncAsync(userContext, currentUser, httpContext.RequestAborted);
+        if (provisioned)
+        {
+            await onboarding.NotifyIfUnassignedAsync(userContext, httpContext.RequestAborted);
+        }
+
         httpContext.Items[ItemKey] = userContext;
         await next(httpContext);
     }

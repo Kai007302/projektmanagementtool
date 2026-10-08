@@ -284,7 +284,8 @@ public sealed class AiSettingsTests(InfrastructureFixture infrastructure) : IAsy
         var updated = await ben.GetFromJsonAsync<JsonElement>($"/api/v1/tasks/{taskId}");
         Assert.Equal("in_progress", updated.GetProperty("status").GetString());
         Assert.Equal("2026-12-01", updated.GetProperty("dueDate").GetString());
-        Assert.Contains("not found or not visible", byEva);
+        // Eva reads the project as a member of its department, but may not change its tasks.
+        Assert.Contains("not allowed", byEva);
         Assert.False(status!.Actions);
     }
 

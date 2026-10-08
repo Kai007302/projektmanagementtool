@@ -92,6 +92,18 @@ docker compose -f docker-compose.prod.yml exec postgres \
 
 Gesperrte Personen bleiben gesperrt, auch wenn sie sich erneut anmelden.
 
+### Abteilungen
+
+Jede Abteilung arbeitet in ProjectHub für sich: eigene Projekte, eigenes Wissen, eigene Galaxie (ADR 0021). Nach der Installation gibt es die Abteilung „Allgemein“, die erste Person leitet sie. Weitere Abteilungen legen Organisations-Admins unter **Verwaltung** an, dort nehmen Admins und Abteilungsleitungen auch Personen auf. Wer sich anmeldet und in keine Abteilung kommt, sieht einen Hinweis; Admins und Leitungen bekommen eine Benachrichtigung und finden die Person unter **Verwaltung → Ohne Abteilung**.
+
+**Abteilungen aus Entra-Gruppen übernehmen** (optional):
+
+1. In der App-Registrierung unter **Tokenkonfiguration → Gruppenanspruch hinzufügen**: **Sicherheitsgruppen** wählen, für den Tokentyp **Zugriff** die **Gruppen-ID** ausgeben. Bei vielen Gruppen besser **Gruppen, die der Anwendung zugewiesen sind** wählen und die Gruppen unter **Unternehmensanwendungen → ProjectHub → Benutzer und Gruppen** zuweisen.
+2. In `.env` `PROJECTHUB_DEPARTMENTS_FROM_ENTRA_GROUPS=true` setzen und den Stack neu starten.
+3. In ProjectHub unter **Verwaltung** bei jeder Abteilung die **Objekt-ID** der passenden Gruppe eintragen (Entra Admin Center → Gruppen → Gruppe → Übersicht).
+
+Sobald eine Person ein neues Token bekommt (bei der Anmeldung, sonst spätestens nach etwa einer Stunde), kommt sie als Gruppenmitglied in die Abteilung und verlässt sie wieder, wenn sie die Gruppe verlässt. Von Hand hinzugefügte Personen und von Hand geänderte Rollen bleiben, wie sie sind. Hat jemand zu viele Gruppen für das Token, ändert ProjectHub seine Abteilungen nicht und schreibt eine Warnung ins API-Log; dann hilft Schritt 1 mit zugewiesenen Gruppen. Microsoft Graph wird dafür nicht gebraucht.
+
 ## 4. Optionale Integrationen
 
 - **Benachrichtigungsmails:** Ohne Einrichtung verschickt ProjectHub keine Mails (`PROJECTHUB_MAIL_TRANSPORT=fake`); Benachrichtigungen erscheinen trotzdem in der App. Für Mails über ein Microsoft-365-Postfach: `docs/integrations/microsoft-365-setup.md`, dann `PROJECTHUB_MAIL_TRANSPORT=graph` und die `MICROSOFT_GRAPH_*`-Werte in `.env`.
@@ -106,7 +118,7 @@ Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
 
 Ohne Einstellung ist KI aus (`PROJECTHUB_AI_PROVIDER=off`); der Reiter „Assistent“ erscheint dann nicht. Mit einem externen Anbieter verlassen Fragen und gefundene Inhalte den Server; das ist eine Freigabeentscheidung.
 
-Der Assistent kann alles anlegen und ändern, was die angemeldete Person darf (Aufgaben, Wissensartikel, Projekte, Teams …). Jede Änderung zeigt er vorher als Karte; erst mit „Ausführen“ passiert sie. `PROJECTHUB_AI_WRITE_TOOLS=false` macht ihn wieder rein lesend.
+Der Assistent kann alles anlegen und ändern, was die angemeldete Person darf (Aufgaben, Wissensartikel, Projekte, Abteilungen …). Jede Änderung zeigt er vorher als Karte; erst mit „Ausführen“ passiert sie. `PROJECTHUB_AI_WRITE_TOOLS=false` macht ihn wieder rein lesend.
 
 **Claude (Standard):** API-Schlüssel in der [Claude Console](https://platform.claude.com) anlegen, dann in `.env`:
 
@@ -141,7 +153,7 @@ PROJECTHUB_AI_MODEL=qwen3:32b
 
 Das Modell muss Werkzeugaufrufe (Tool Calling) können. Die Antwortqualität hängt stark vom Modell und von der Hardware ab.
 
-**MCP-Server für Agenten:** `PROJECTHUB_MCP=on` stellt `https://<Domain>/api/v1/mcp` bereit (Streamable HTTP). Agenten wie Claude oder VS Code arbeiten damit als die angemeldete Person: Wissen durchsuchen und lesen, Projekte und Aufgaben ansehen. Mit `PROJECTHUB_MCP_WRITE_TOOLS=true` dürfen sie zusätzlich ändern: Projekte, Aufgaben, Wissensartikel und Teams, immer mit den Rechten der Person; der MCP-Client fragt vor jedem Aufruf nach (ADR 0016).
+**MCP-Server für Agenten:** `PROJECTHUB_MCP=on` stellt `https://<Domain>/api/v1/mcp` bereit (Streamable HTTP). Agenten wie Claude oder VS Code arbeiten damit als die angemeldete Person: Wissen durchsuchen und lesen, Projekte und Aufgaben ansehen. Mit `PROJECTHUB_MCP_WRITE_TOOLS=true` dürfen sie zusätzlich ändern: Projekte, Aufgaben, Wissensartikel und Abteilungen, immer mit den Rechten der Person; der MCP-Client fragt vor jedem Aufruf nach (ADR 0016).
 
 Anmeldung: Der Server verlangt ein Entra-ID-Token für den Bereich `api://<Client-ID>/access_as_user` und nennt das MCP-Clients selbst (401 mit `resource_metadata`, Dokument unter `/.well-known/oauth-protected-resource/api/v1/mcp`). Entra kennt keine dynamische Client-Registrierung, deshalb:
 
@@ -162,7 +174,7 @@ nano legal/datenschutz.html                         # alle [eckigen Klammern] au
 
 Caddy zeigt die Datei unter `https://<Domain>/rechtliches/datenschutz.html`, die App verlinkt sie unten auf jeder Seite (`PROJECTHUB_PRIVACY_NOTICE_URL`). Ein Impressum kommt genauso nach `legal/impressum.html` und wird über `PROJECTHUB_IMPRINT_URL=/rechtliches/impressum.html` eingeblendet. Nach Änderungen an `.env`: `docker compose -f docker-compose.prod.yml up -d`.
 
-ProjectHub löscht Benachrichtigungen, Projektaktivität und Audit-Einträge nach 3 Jahren (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Teams → Person anonymisieren**.
+ProjectHub löscht Benachrichtigungen, Projektaktivität und Audit-Einträge nach 3 Jahren (`PROJECTHUB_RETENTION_*` in `.env`, `0` = nie). Jede Person lädt ihre Daten unten in der App über „Meine Daten herunterladen“ herunter; Organisations-Admins anonymisieren Personen unter **Verwaltung → Person anonymisieren**.
 
 ## 5. Updates
 

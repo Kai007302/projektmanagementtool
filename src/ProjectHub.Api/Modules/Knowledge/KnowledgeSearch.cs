@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using ProjectHub.Api.Infrastructure.Database;
 using ProjectHub.Api.Infrastructure.Http;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.Modules.Knowledge;
@@ -21,9 +22,12 @@ public sealed record ArticleSummary(
     IReadOnlyList<string> Tags,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? PublishedAt,
-    long Version);
+    long Version,
+    Guid? DepartmentId = null,
+    string? DepartmentName = null);
 
-public sealed record KnowledgeQuery(string? Text, string? ArticleType, string? Status, Guid? SpaceId, string? Tag);
+/// <summary><c>DepartmentId</c> narrows the result to the articles of one department (ADR 0021).</summary>
+public sealed record KnowledgeQuery(string? Text, string? ArticleType, string? Status, Guid? SpaceId, string? Tag, Guid? DepartmentId = null);
 
 /// <summary>
 /// Finds knowledge the reader may see. Implementations must apply <see cref="KnowledgeReader"/>
@@ -69,6 +73,11 @@ internal sealed class PostgresKnowledgeSearch(ProjectHubDbContext db, KnowledgeA
         if (query.SpaceId is { } spaceId)
         {
             articles = articles.Where(a => a.KnowledgeSpaceId == spaceId);
+        }
+
+        if (query.DepartmentId is { } departmentId)
+        {
+            articles = articles.Where(a => a.DepartmentId == departmentId);
         }
 
         if (query.Tag is { Length: > 0 } tag)
@@ -175,7 +184,14 @@ internal static class KnowledgeSummaries
                 from owner in owners.DefaultIfEmpty()
                 join space in db.Set<KnowledgeSpace>() on article.KnowledgeSpaceId equals space.Id into spaces
                 from space in spaces.DefaultIfEmpty()
-                select new { article, OwnerName = owner == null ? null : owner.DisplayName, SpaceName = space == null ? null : space.Name })
+                join department in db.Set<Department>() on article.DepartmentId equals department.Id
+                select new
+                {
+                    article,
+                    OwnerName = owner == null ? null : owner.DisplayName,
+                    SpaceName = space == null ? null : space.Name,
+                    DepartmentName = department.Name,
+                })
             .ToListAsync(ct);
 
         var tags = await (
@@ -193,7 +209,8 @@ internal static class KnowledgeSummaries
             var a = row.article;
             return new ArticleSummary(
                 a.Id, a.Title, a.Slug, a.ArticleType, a.Summary, a.Status, a.Visibility, a.KnowledgeSpaceId, row.SpaceName,
-                a.OwnerId, row.OwnerName, tagsByArticle.GetValueOrDefault(a.Id, []), a.UpdatedAt, a.PublishedAt, a.Version);
+                a.OwnerId, row.OwnerName, tagsByArticle.GetValueOrDefault(a.Id, []), a.UpdatedAt, a.PublishedAt, a.Version,
+                a.DepartmentId, row.DepartmentName);
         }).ToList();
     }
 }

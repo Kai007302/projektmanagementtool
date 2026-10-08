@@ -5,8 +5,8 @@ import type { Me } from '../identity/api'
 import { fakeApi, json } from '../test/fakeApi'
 import { ProjectsPage } from './ProjectsPage'
 
-const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member' }
-const eva: Me = { id: 'u-eva', displayName: 'Eva Viewer', email: 'eva@x', organizationId: 'org-1', organizationRole: 'member' }
+const ben: Me = { id: 'u-ben', displayName: 'Ben Projektleiter', email: 'ben@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
+const eva: Me = { id: 'u-eva', displayName: 'Eva Viewer', email: 'eva@x', organizationId: 'org-1', organizationRole: 'member', departments: [] }
 
 const summary = {
   id: 'p-1',

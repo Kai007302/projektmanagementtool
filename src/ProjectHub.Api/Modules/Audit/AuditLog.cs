@@ -7,14 +7,22 @@ namespace ProjectHub.Api.Modules.Audit;
 
 public static class AuditActions
 {
-    public const string TeamCreated = "TeamCreated";
-    public const string TeamMemberAdded = "TeamMemberAdded";
-    public const string TeamMemberRemoved = "TeamMemberRemoved";
+    public const string DepartmentCreated = "DepartmentCreated";
+    public const string DepartmentUpdated = "DepartmentUpdated";
+    public const string DepartmentDeleted = "DepartmentDeleted";
+    public const string DepartmentMemberAdded = "DepartmentMemberAdded";
+    public const string DepartmentMemberRoleChanged = "DepartmentMemberRoleChanged";
+    public const string DepartmentMemberRemoved = "DepartmentMemberRemoved";
+
+    /// <summary>An organization admin opened a project or article only their admin role lets them see (ADR 0021).</summary>
+    public const string OrganizationAdminAccess = "OrganizationAdminAccess";
     public const string ProjectCreated = "ProjectCreated";
     public const string ProjectDeleted = "ProjectDeleted";
     public const string ProjectMemberAdded = "ProjectMemberAdded";
     public const string ProjectMemberRoleChanged = "ProjectMemberRoleChanged";
     public const string ProjectMemberRemoved = "ProjectMemberRemoved";
+    public const string ProjectMoved = "ProjectMoved";
+    public const string ProjectVisibilityChanged = "ProjectVisibilityChanged";
     public const string TaskDeleted = "TaskDeleted";
     public const string BoardColumnDeleted = "BoardColumnDeleted";
     public const string MilestoneDeleted = "MilestoneDeleted";

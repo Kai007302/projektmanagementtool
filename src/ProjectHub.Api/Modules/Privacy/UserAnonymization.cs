@@ -9,7 +9,7 @@ using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Notifications;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Users;
 
 namespace ProjectHub.Api.Modules.Privacy;
@@ -68,7 +68,7 @@ public sealed class UserAnonymizationService(ProjectHubDbContext db, IAuditLog a
         await db.Set<NotificationPreference>().Where(p => p.OrganizationId == org && p.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<MailOutboxEntry>().Where(m => m.OrganizationId == org && m.RecipientId == userId).ExecuteDeleteAsync(ct);
         await db.Set<CalendarFeed>().Where(f => f.OrganizationId == org && f.UserId == userId).ExecuteDeleteAsync(ct);
-        await db.Set<TeamMember>().Where(m => m.OrganizationId == org && m.UserId == userId).ExecuteDeleteAsync(ct);
+        await db.Set<DepartmentMember>().Where(m => m.OrganizationId == org && m.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<ProjectMember>().Where(m => m.OrganizationId == org && m.UserId == userId).ExecuteDeleteAsync(ct);
         await db.Set<KnowledgePermission>()
             .Where(p => p.OrganizationId == org && p.PrincipalType == "user" && p.PrincipalId == userId)

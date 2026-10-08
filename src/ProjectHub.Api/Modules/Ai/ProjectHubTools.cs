@@ -14,7 +14,7 @@ using ProjectHub.Api.Modules.Identity;
 using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Projects;
 using ProjectHub.Api.Modules.Tasks;
-using ProjectHub.Api.Modules.Teams;
+using ProjectHub.Api.Modules.Departments;
 using ProjectHub.Api.Modules.Users;
 using ProjectHub.Api.Modules.Whiteboard;
 
@@ -43,7 +43,7 @@ public sealed record TaskDetailsItem(
 
 public sealed record PersonItem(Guid UserId, string Name, string Email, string? Department);
 
-public sealed record TeamItem(Guid TeamId, string Name, string? Description, int Members);
+public sealed record DepartmentItem(Guid DepartmentId, string Name, string? Description, int Members, string? MyRole);
 
 public sealed record SpaceItem(Guid SpaceId, string Name, string? Description);
 
@@ -83,7 +83,7 @@ public sealed partial class ProjectHubTools(
     KnowledgeLinkService links,
     KnowledgeSpaceService spaces,
     GanttService gantt,
-    TeamService teams,
+    DepartmentService departments,
     WhiteboardService whiteboards,
     AssistantSources sources,
     TimeProvider clock)
@@ -228,10 +228,11 @@ public sealed partial class ProjectHubTools(
             .ToListAsync(ct);
     }
 
-    [McpServerTool(Name = "list_teams", Title = "Teams auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Lists the teams of the organization.")]
-    public async Task<object> ListTeams(CancellationToken ct = default) =>
-        (await teams.ListAsync(user, 0, MaxListSize, ct)).Select(t => new TeamItem(t.Id, t.Name, t.Description, t.MemberCount)).ToList();
+    [McpServerTool(Name = "list_departments", Title = "Abteilungen auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Lists the departments of the organization, with the user's role in each (lead, member, guest or none).")]
+    public async Task<object> ListDepartments(CancellationToken ct = default) =>
+        (await departments.ListAsync(user, new Paging(0, MaxListSize), ct))
+        .Select(d => new DepartmentItem(d.Id, d.Name, d.Description, d.MemberCount, d.MyRole)).ToList();
 
     [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissensbereiche auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Lists the knowledge spaces (sections of the knowledge hub) an article can belong to.")]

@@ -29,28 +29,31 @@ public static class DevelopmentSeeder
                 """, ct, user.Id, user.OrganizationId, user.ObjectId, user.Email, user.DisplayName, (object?)user.Department ?? DBNull.Value, user.OrganizationRole);
         }
 
-        foreach (var team in DevelopmentSeedData.Teams)
+        // Departments are looked up by name (see SeedDepartment): an existing database may already have them.
+        foreach (var department in DevelopmentSeedData.Departments)
         {
             await ExecuteAsync(connection, """
-                insert into team (id, organization_id, name, description) values ($1, $2, $3, $4)
+                insert into department (id, organization_id, name, description) values ($1, $2, $3, $4)
                 on conflict do nothing
-                """, ct, team.Id, team.OrganizationId, team.Name, team.Description);
+                """, ct, department.Id, department.OrganizationId, department.Name, department.Description);
 
-            foreach (var (userId, role) in team.Members)
+            foreach (var (userId, role) in department.Members)
             {
                 await ExecuteAsync(connection, """
-                    insert into team_member (organization_id, team_id, user_id, role) values ($1, $2, $3, $4)
+                    insert into department_member (organization_id, department_id, user_id, role)
+                    select $1, d.id, $3, $4 from department d where d.organization_id = $1 and lower(d.name) = lower($2)
                     on conflict do nothing
-                    """, ct, team.OrganizationId, team.Id, userId, role);
+                    """, ct, department.OrganizationId, department.Name, userId, role);
             }
         }
 
         foreach (var project in DevelopmentSeedData.Projects)
         {
             await ExecuteAsync(connection, """
-                insert into project (id, organization_id, name, owner_id) values ($1, $2, $3, $4)
+                insert into project (id, organization_id, name, owner_id, department_id, visibility)
+                select $1, $2, $3, $4, d.id, $6 from department d where d.organization_id = $2 and lower(d.name) = lower($5)
                 on conflict do nothing
-                """, ct, project.Id, project.OrganizationId, project.Name, project.OwnerId);
+                """, ct, project.Id, project.OrganizationId, project.Name, project.OwnerId, project.Department.Name, project.Visibility);
 
             foreach (var (userId, role) in project.Members)
             {
@@ -117,9 +120,10 @@ public static class DevelopmentSeeder
         foreach (var space in DevelopmentSeedData.Spaces)
         {
             await ExecuteAsync(connection, """
-                insert into knowledge_space (id, organization_id, name, description) values ($1, $2, $3, $4)
+                insert into knowledge_space (id, organization_id, name, description, department_id)
+                select $1, $2, $3, $4, d.id from department d where d.organization_id = $2 and lower(d.name) = lower($5)
                 on conflict do nothing
-                """, ct, space.Id, space.OrganizationId, space.Name, space.Description);
+                """, ct, space.Id, space.OrganizationId, space.Name, space.Description, space.Department.Name);
         }
 
         foreach (var article in DevelopmentSeedData.Articles)
@@ -131,12 +135,13 @@ public static class DevelopmentSeeder
                           ?? throw new InvalidOperationException($"Seed article '{article.Title}': {contentError}");
             await ExecuteAsync(connection, """
                 insert into knowledge_article (id, organization_id, knowledge_space_id, title, slug, article_type, summary, owner_id,
-                                               status, visibility, published_at, search_text)
-                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, case when $9 = 'published' then now() end, $11)
+                                               status, visibility, published_at, search_text, department_id)
+                select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, case when $9 = 'published' then now() end, $11, d.id
+                from department d where d.organization_id = $2 and lower(d.name) = lower($12)
                 on conflict do nothing
                 """, ct, article.Id, article.OrganizationId, (object?)article.SpaceId ?? DBNull.Value, article.Title, article.Slug,
                 article.ArticleType, article.Summary, article.OwnerId, article.Status, article.Visibility,
-                content.PlainText);
+                content.PlainText, article.Department.Name);
             await ExecuteAsync(connection, """
                 insert into knowledge_version (id, organization_id, article_id, version_number, content_json, created_by, change_note)
                 values ($1, $2, $3, 1, $4::jsonb, $5, 'Testdaten')
@@ -169,14 +174,14 @@ public static class DevelopmentSeeder
                 """, ct, source.OrganizationId, relation.SourceId, relation.TargetId, relation.RelationType, source.OwnerId);
         }
 
-        foreach (var (articleId, principalType, principalId, permission) in DevelopmentSeedData.KnowledgeGrants)
+        foreach (var (articleId, principalType, principal, permission) in DevelopmentSeedData.KnowledgeGrants)
         {
             var article = DevelopmentSeedData.Articles.Single(a => a.Id == articleId);
             await ExecuteAsync(connection, """
                 insert into knowledge_permission (organization_id, article_id, principal_type, principal_id, permission)
-                values ($1, $2, $3, $4, $5)
+                select $1, $2, $3, d.id, $5 from department d where d.organization_id = $1 and lower(d.name) = lower($4)
                 on conflict do nothing
-                """, ct, article.OrganizationId, articleId, principalType, principalId, permission);
+                """, ct, article.OrganizationId, articleId, principalType, principal.Name, permission);
         }
 
         foreach (var (articleId, resourceType, resourceId, createdBy) in DevelopmentSeedData.KnowledgeReferences)
