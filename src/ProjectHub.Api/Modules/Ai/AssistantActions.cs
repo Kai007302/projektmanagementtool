@@ -51,7 +51,7 @@ public sealed class AssistantActions(
         ["removeAssigneeIds"] = "Zuständig entfernen", ["unassign"] = "Alle Zuständigen entfernen",
         ["parentTaskId"] = "Übergeordnete Aufgabe", ["startDate"] = "Start", ["endDate"] = "Ende", ["dueDate"] = "Fällig",
         ["date"] = "Datum", ["text"] = "Text", ["userId"] = "Person", ["role"] = "Rolle",
-        ["articleType"] = "Art", ["spaceId"] = "Wissensbereich", ["tags"] = "Schlagwörter", ["changeNote"] = "Änderungsnotiz",
+        ["articleType"] = "Art", ["spaceId"] = "Kategorie", ["tags"] = "Schlagwörter", ["changeNote"] = "Änderungsnotiz",
         ["resourceType"] = "Verknüpfen mit", ["resourceId"] = "Ziel", ["sourceTaskId"] = "Zuerst", ["targetTaskId"] = "Danach",
         ["dependencyType"] = "Art",
     };

@@ -32,14 +32,10 @@
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 2rem;
   height: 2rem;
-  border-radius: var(--radius);
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 700;
+  object-fit: contain;
 }
 
 .app-header h1 {
@@ -651,6 +647,12 @@ button.danger:hover:not(:disabled) {
   color: var(--muted);
 }
 
+.article-card-summary .read-more {
+  color: var(--accent-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -965,10 +967,6 @@ fieldset.block-fields {
   color: #ffffff;
   font-size: 0.875rem;
   pointer-events: none;
-}
-
-.galaxy-list section h4 {
-  margin: 1rem 0 0.25rem;
 }
 
 .legend-dot {
@@ -3016,11 +3014,37 @@ fieldset.block-fields {
   }
 }
 
-.column-settings {
+.column-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
   margin: 0.5rem 0;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+
+.swatch[aria-pressed='true'] {
+  border-color: var(--text);
+}
+
+.swatch-none {
+  background: linear-gradient(135deg, var(--surface) 45%, var(--danger) 45% 55%, var(--surface) 55%);
+  border-color: var(--border);
+}
+
+.kanban-column.has-color {
+  border-top: 4px solid var(--column-color);
+  background: color-mix(in srgb, var(--column-color) 8%, var(--surface-muted));
 }
 
 .task-window {
@@ -3802,4 +3826,42 @@ kbd {
 .kanban-card-menu {
   position: relative;
   z-index: 1;
+}
+
+/* "Neue Aufgabe": everything a task needs in one window. */
+.new-task-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.new-task-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.new-task-people legend {
+  margin-bottom: 0.25rem;
+  padding: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.stacked-form .new-task-people label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--text);
+  font-weight: 400;
+}
+
+@media (max-width: 30rem) {
+  .new-task-row {
+    grid-template-columns: 1fr;
+  }
 }

@@ -7,6 +7,7 @@ import {
   addObjects,
   isColor,
   localOrigin,
+  gridBackground,
   stickyGrid,
   describe as describeObject,
   describeArrow,
@@ -211,5 +212,11 @@ describe('whiteboard templates', () => {
       objects.slice(0, index).forEach((other) => expect(inside(other, frame), `${describeObject(other)} in ${describeObject(frame)}`).toBe(false))
     })
   })
-})
 
+  it('moves and scales the background dots with the view', () => {
+    expect(gridBackground({ x: 0, y: 0, zoom: 1 })).toEqual({ backgroundSize: '24px 24px', backgroundPosition: '-12px -12px' })
+    expect(gridBackground({ x: 100, y: -40, zoom: 2 })).toEqual({ backgroundSize: '48px 48px', backgroundPosition: '76px -64px' })
+    expect(gridBackground({ x: 0, y: 0, zoom: 0.25 }).backgroundSize).toBe('12px 12px')
+    expect(gridBackground({ x: 0, y: 0, zoom: 0.2 }).backgroundSize).toBe('19.2px 19.2px')
+  })
+})

@@ -10,13 +10,16 @@ import { DevUserSwitcher } from './identity/DevUserSwitcher'
 import { devIdentityEnabled, getDevUser, setDevUser } from './identity/devUser'
 import { AccountMenu } from './identity/AccountMenu'
 import { signedInWithEntra, signOut } from './identity/signIn'
+import { createArticle } from './knowledge/api'
 import { KnowledgePage } from './knowledge/KnowledgePage'
 import { areaPath, currentPlace, showPath, type Area, type KnowledgeMode, type ProjectView } from './navigation/location'
 import type { Notification } from './notifications/api'
 import { NotificationBell } from './notifications/NotificationBell'
 import { LegalFooter } from './privacy/LegalFooter'
+import { createProject } from './projects/api'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { CommandPalette } from './ui/CommandPalette'
+import { toast } from './ui/toast'
 import { Toaster } from './ui/Toaster'
 import './App.css'
 import { SearchIcon } from './ui/icons'
@@ -36,7 +39,7 @@ type Session = { me: Me; organization: Organization; ai: AiStatus | null }
 
 type Tab = Area
 
-const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Wissen', admin: 'Verwaltung', assistant: 'Assistent' }
+const tabText: Record<Tab, string> = { projects: 'Projekte', knowledge: 'Galaxie', admin: 'Verwaltung', assistant: 'Assistent' }
 
 function App() {
   const [status, setStatus] = useState<ApiStatus>('checking')
@@ -52,6 +55,8 @@ function App() {
   const [openProject, setOpenProject] = useState<{ projectId: string; taskId: string | null; view: ProjectView | null; jump: number } | null>(
     start.projectId ? { projectId: start.projectId, taskId: null, view: start.view, jump: 0 } : null,
   )
+  // Counts clicks on the areas in the header: each one starts the area afresh, also when a project from the address is open.
+  const [visit, setVisit] = useState(0)
   const [paletteOpen, setPaletteOpen] = useState(false)
   // The department whose projects and knowledge are shown; '' for all (ADR 0021).
   const [department, setDepartment] = useState('')
@@ -112,6 +117,7 @@ function App() {
 
   function goTo(value: Tab) {
     setTab(value)
+    setVisit((v) => v + 1)
     setOpenArticle(null)
     setKnowledgeMode(null)
     setOpenProject(null)
@@ -120,6 +126,16 @@ function App() {
   function showProject(projectId: string, taskId: string | null = null) {
     setOpenProject((current) => ({ projectId, taskId, view: null, jump: (current?.jump ?? 0) + 1 }))
     setTab('projects')
+  }
+
+  /** "Projekt … anlegen" and "Artikel … anlegen" from the search: create, then open what was created. */
+  async function createFromSearch<T>(create: () => Promise<T>, open: (created: T) => void, done: string) {
+    try {
+      open(await create())
+      toast(done)
+    } catch (e) {
+      toast((e as Error).message)
+    }
   }
 
   function showArticle(articleId: string) {
@@ -161,9 +177,7 @@ function App() {
       <header className="app-header">
         <div className="app-header-inner">
           <div className="brand">
-            <span className="brand-mark" aria-hidden="true">
-              P
-            </span>
+            <img className="brand-mark" src="/favicon.svg" alt="" width={32} height={32} />
             <div>
               <h1>ProjectHub</h1>
               {session && <p className="organization">{session.organization.name}</p>}
@@ -221,7 +235,7 @@ function App() {
           <>
             {shown === 'projects' && (
               <ProjectsPage
-                key={`${session.me.id}:${department}:${openProject?.jump ?? 0}`}
+                key={`${session.me.id}:${department}:${openProject?.jump ?? 0}:${visit}`}
                 me={session.me}
                 departmentId={department}
                 initialProjectId={openProject?.projectId ?? null}
@@ -236,7 +250,7 @@ function App() {
                 me={session.me}
                 departmentId={department}
                 initialArticleId={openArticle}
-                initialMode={knowledgeMode ?? 'articles'}
+                initialMode={knowledgeMode ?? 'galaxy'}
               />
             )}
             {shown === 'admin' && managesAnything(session.me) && (
@@ -257,6 +271,14 @@ function App() {
           destinations={tabs.map((value) => ({ label: tabText[value], go: () => goTo(value) }))}
           onOpenProject={(id) => showProject(id)}
           onOpenArticle={showArticle}
+          onCreateProject={(name) => void createFromSearch(() => createProject(name, '', department), (project) => showProject(project.id), `Projekt „${name}“ angelegt.`)}
+          onCreateArticle={(title) =>
+            void createFromSearch(
+              () => createArticle({ title, articleType: 'article', summary: '', spaceId: null, visibility: 'department', departmentId: department || null }),
+              (created) => showArticle(created.article.id),
+              `Artikel „${title}“ als Entwurf angelegt.`,
+            )
+          }
           onClose={() => setPaletteOpen(false)}
         />
       )}

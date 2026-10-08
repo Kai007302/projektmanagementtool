@@ -257,6 +257,22 @@ public sealed class KanbanEndpointTests(InfrastructureFixture infrastructure) : 
     }
 
     [Fact]
+    public async Task A_column_gets_a_colour_from_the_palette()
+    {
+        var project = await CreateTeamProjectAsync();
+        var column = (await GetBoardAsync(Ben, project.Id)).Columns[0];
+
+        var invalid = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = column.Version, color = "#ff0000" });
+        var green = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = column.Version, color = "green" });
+        var colored = (await green.Content.ReadFromJsonAsync<KanbanBoardResponse>())!.Columns[0];
+        var cleared = await As(Ben).PatchAsJsonAsync($"/api/v1/board-columns/{column.Id}", new { version = colored.Version, color = (string?)null });
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Equal("green", colored.Color);
+        Assert.Null((await cleared.Content.ReadFromJsonAsync<KanbanBoardResponse>())!.Columns[0].Color);
+    }
+
+    [Fact]
     public async Task Every_status_keeps_at_least_one_column()
     {
         var project = await CreateTeamProjectAsync();

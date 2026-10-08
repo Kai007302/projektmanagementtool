@@ -24,7 +24,7 @@ public sealed record KanbanCard(
     int SubtaskCount,
     long Version);
 
-public sealed record KanbanColumnResponse(Guid Id, string Name, string TaskStatus, int? WipLimit, long Version, IReadOnlyList<KanbanCard> Cards);
+public sealed record KanbanColumnResponse(Guid Id, string Name, string TaskStatus, int? WipLimit, string? Color, long Version, IReadOnlyList<KanbanCard> Cards);
 
 public sealed record KanbanBoardResponse(Guid Id, Guid ProjectId, string Name, IReadOnlyList<KanbanColumnResponse> Columns);
 
@@ -213,7 +213,8 @@ public sealed class KanbanService(
         var changed = new List<string>();
         if (!patch.TryApply<string>("name", v => column.Name = v?.Trim() ?? string.Empty, changed, out var error)
             || !patch.TryApply<string>("taskStatus", v => column.TaskStatus = v ?? string.Empty, changed, out error)
-            || !patch.TryApply<int?>("wipLimit", v => column.WipLimit = v, changed, out error))
+            || !patch.TryApply<int?>("wipLimit", v => column.WipLimit = v, changed, out error)
+            || !patch.TryApply<string>("color", v => column.Color = v, changed, out error))
         {
             return error!;
         }
@@ -399,7 +400,7 @@ public sealed class KanbanService(
             board.ProjectId,
             board.Name,
             columns.Select(c => new KanbanColumnResponse(
-                c.Id, c.Name, c.TaskStatus, c.WipLimit, c.Version, layout[c.Id].Select(p => byId[p.TaskId]).ToList())).ToList());
+                c.Id, c.Name, c.TaskStatus, c.WipLimit, c.Color, c.Version, layout[c.Id].Select(p => byId[p.TaskId]).ToList())).ToList());
     }
 
     private async Task<KanbanBoardResponse> BoardChangedAsync(UserContext user, Guid projectId, Guid boardId, CancellationToken ct)
@@ -438,6 +439,11 @@ public sealed class KanbanService(
         if (!TaskStatuses.All.Contains(column.TaskStatus))
         {
             return ServiceFailure.Invalid("taskStatus", $"Must be one of: {string.Join(", ", TaskStatuses.All)}.");
+        }
+
+        if (column.Color is { } color && !KanbanColumnColors.All.Contains(color))
+        {
+            return ServiceFailure.Invalid("color", $"Must be one of: {string.Join(", ", KanbanColumnColors.All)}.");
         }
 
         return column.WipLimit is <= 0 ? ServiceFailure.Invalid("wipLimit", "Must be greater than 0.") : null;

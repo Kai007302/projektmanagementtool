@@ -252,9 +252,9 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
           </select>
         </label>
         <label>
-          Bereich
+          Kategorie
           <select value={spaceId} onChange={(event) => setSpaceId(event.target.value)}>
-            <option value="">Kein Bereich</option>
+            <option value="">Keine Kategorie</option>
             {spaces.map((space) => (
               <option key={space.id} value={space.id}>
                 {space.name}

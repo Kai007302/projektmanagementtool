@@ -36,6 +36,38 @@ describe('CommandPalette', () => {
     expect(onOpenProject).not.toHaveBeenCalled()
   })
 
+  it('offers to create a project or an article when nothing is found', async () => {
+    fakeApi({
+      'GET /api/v1/projects?limit=100': () => json({ items: [project('p-1', 'Website-Relaunch')], nextOffset: null }),
+      'GET /api/v1/knowledge/articles?limit=100&q=Messe': () => json({ items: [], nextOffset: null }),
+    })
+    const onCreateProject = vi.fn()
+    const onCreateArticle = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <CommandPalette
+        destinations={[]}
+        onOpenProject={() => {}}
+        onOpenArticle={() => {}}
+        onCreateProject={onCreateProject}
+        onCreateArticle={onCreateArticle}
+        onClose={onClose}
+      />,
+    )
+
+    await userEvent.type(screen.getByRole('combobox', { name: 'Suchen oder springen' }), 'Web')
+    expect(screen.queryByRole('option', { name: /anlegen/ })).not.toBeInTheDocument()
+
+    await userEvent.clear(screen.getByRole('combobox', { name: 'Suchen oder springen' }))
+    await userEvent.type(screen.getByRole('combobox', { name: 'Suchen oder springen' }), 'Messe')
+    expect(screen.getByRole('option', { name: /Projekt „Messe“ anlegen/ })).toHaveAttribute('aria-selected', 'true')
+    await userEvent.click(screen.getByRole('option', { name: /Artikel „Messe“ anlegen/ }))
+
+    expect(onCreateArticle).toHaveBeenCalledWith('Messe')
+    expect(onCreateProject).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('closes on Escape', async () => {
     fakeApi({ 'GET /api/v1/projects?limit=100': () => json({ items: [], nextOffset: null }) })
     const onClose = vi.fn()

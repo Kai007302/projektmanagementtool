@@ -18,7 +18,7 @@ export type Place = {
   knowledgeMode: KnowledgeMode | null
 }
 
-const areaPaths: Record<Area, string> = { projects: '', knowledge: 'wissen', admin: 'verwaltung', assistant: 'assistent' }
+const areaPaths: Record<Area, string> = { projects: '', knowledge: 'galaxie', admin: 'verwaltung', assistant: 'assistent' }
 
 const viewPaths: Record<ProjectView, string> = {
   board: 'board',
@@ -43,9 +43,11 @@ export function parsePlace(path: string): Place {
     return { ...place, projectId: second, view: findKey(viewPaths, third) }
   }
 
-  if (first === 'wissen') {
-    if (second === 'galaxie') return { ...place, area: 'knowledge', knowledgeMode: 'galaxy' }
-    return { ...place, area: 'knowledge', articleId: second && id.test(second) ? second : null }
+  if (first === 'galaxie' || first === 'wissen') {
+    if (second && id.test(second)) return { ...place, area: 'knowledge', articleId: second }
+    // /galaxie is the galaxy, /galaxie/artikel the article list; the older /wissen addresses still open.
+    const galaxy = first === 'galaxie' ? second !== 'artikel' : second === 'galaxie'
+    return { ...place, area: 'knowledge', knowledgeMode: galaxy ? 'galaxy' : 'articles' }
   }
 
   const area = findKey(areaPaths, first)
@@ -57,8 +59,8 @@ export const areaPath = (area: Area) => `/${areaPaths[area]}`
 export const projectPath = (projectId: string, view: ProjectView) =>
   `/projekte/${projectId}${view === 'board' ? '' : `/${viewPaths[view]}`}`
 
-export const knowledgePath = (articleId: string | null, mode: KnowledgeMode = 'articles') =>
-  articleId ? `/wissen/${articleId}` : mode === 'galaxy' ? '/wissen/galaxie' : '/wissen'
+export const knowledgePath = (articleId: string | null, mode: KnowledgeMode = 'galaxy') =>
+  articleId ? `/galaxie/${articleId}` : mode === 'galaxy' ? '/galaxie' : '/galaxie/artikel'
 
 /** The page in the address right now; read on start to open the page the browser was on. */
 export const currentPlace = () => parsePlace(window.location.pathname)

@@ -10,10 +10,17 @@ describe('location', () => {
   })
 
   it('reads the knowledge pages and the other areas', () => {
-    expect(parsePlace(`/wissen/${project}`)).toMatchObject({ area: 'knowledge', articleId: project })
-    expect(parsePlace('/wissen/galaxie')).toMatchObject({ area: 'knowledge', articleId: null, knowledgeMode: 'galaxy' })
+    expect(parsePlace(`/galaxie/${project}`)).toMatchObject({ area: 'knowledge', articleId: project })
+    expect(parsePlace('/galaxie')).toMatchObject({ area: 'knowledge', articleId: null, knowledgeMode: 'galaxy' })
+    expect(parsePlace('/galaxie/artikel')).toMatchObject({ area: 'knowledge', articleId: null, knowledgeMode: 'articles' })
     expect(parsePlace('/verwaltung').area).toBe('admin')
     expect(parsePlace('/assistent').area).toBe('assistant')
+  })
+
+  it('still opens the older knowledge addresses', () => {
+    expect(parsePlace(`/wissen/${project}`)).toMatchObject({ area: 'knowledge', articleId: project })
+    expect(parsePlace('/wissen/galaxie').knowledgeMode).toBe('galaxy')
+    expect(parsePlace('/wissen').knowledgeMode).toBe('articles')
   })
 
   it('opens the start page for anything it does not know', () => {
@@ -26,6 +33,7 @@ describe('location', () => {
     expect(parsePlace(projectPath(project, 'gantt'))).toMatchObject({ projectId: project, view: 'gantt' })
     expect(projectPath(project, 'board')).toBe(`/projekte/${project}`)
     expect(parsePlace(knowledgePath(null, 'galaxy')).knowledgeMode).toBe('galaxy')
-    expect(knowledgePath(project)).toBe(`/wissen/${project}`)
+    expect(parsePlace(knowledgePath(null, 'articles')).knowledgeMode).toBe('articles')
+    expect(knowledgePath(project)).toBe(`/galaxie/${project}`)
   })
 })

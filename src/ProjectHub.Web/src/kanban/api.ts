@@ -18,13 +18,28 @@ export type KanbanColumn = {
   name: string
   taskStatus: TaskStatus
   wipLimit: number | null
+  color: ColumnColor | null
   version: number
   cards: KanbanCard[]
 }
 
 export type KanbanBoard = { id: string; projectId: string; name: string; columns: KanbanColumn[] }
 
-export type ColumnChanges = Partial<Pick<KanbanColumn, 'name' | 'taskStatus' | 'wipLimit'>>
+/** The palette the API accepts for a column (migration 018). */
+export const columnColors = {
+  gray: { label: 'Grau', value: '#94a3b8' },
+  blue: { label: 'Blau', value: '#3b82f6' },
+  green: { label: 'Grün', value: '#22c55e' },
+  yellow: { label: 'Gelb', value: '#eab308' },
+  orange: { label: 'Orange', value: '#f97316' },
+  red: { label: 'Rot', value: '#ef4444' },
+  purple: { label: 'Lila', value: '#a855f7' },
+  pink: { label: 'Pink', value: '#ec4899' },
+} as const
+
+export type ColumnColor = keyof typeof columnColors
+
+export type ColumnChanges = Partial<Pick<KanbanColumn, 'name' | 'color'>>
 
 export const fetchBoard = (projectId: string) => apiFetch<KanbanBoard>(`/api/v1/projects/${projectId}/board`)
 

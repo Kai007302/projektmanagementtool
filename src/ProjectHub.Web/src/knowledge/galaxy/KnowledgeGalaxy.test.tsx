@@ -41,14 +41,13 @@ describe('KnowledgeGalaxy', () => {
     expect(legend.queryByText('Glossar')).not.toBeInTheDocument()
   })
 
-  it('offers the same graph as a list and navigates along relations', async () => {
+  it('navigates along relations without a mouse and has no separate list view', async () => {
     const open = vi.fn()
     fakeApi({ 'GET /api/v1/knowledge/graph': () => json(graph) })
     render(<KnowledgeGalaxy spaces={spaces} onOpenArticle={open} />)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Liste' }))
-    expect(screen.getByRole('heading', { name: /FAQ \(1\)/ })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Störungen melden' }))
+    await userEvent.selectOptions(await screen.findByLabelText('Artikel fokussieren'), 'a-2')
+    expect(screen.queryByRole('button', { name: 'Liste' })).not.toBeInTheDocument()
 
     const details = within(screen.getByRole('region', { name: 'Störungen melden' }))
     expect(details.getByText('Verwandt mit')).toBeInTheDocument()
@@ -71,7 +70,7 @@ describe('KnowledgeGalaxy', () => {
     await userEvent.selectOptions(await screen.findByLabelText('Artikel fokussieren'), 'a-3')
     expect(screen.getByRole('region', { name: 'Release-Checkliste' })).toBeInTheDocument()
 
-    await userEvent.selectOptions(screen.getByLabelText('Bereich'), 's-1')
+    await userEvent.selectOptions(screen.getByLabelText('Kategorie'), 's-1')
     await userEvent.selectOptions(screen.getByLabelText('Art'), 'faq')
 
     expect(await screen.findByRole('img', { name: 'Wissensgalaxie mit 1 Artikel und 0 Beziehungen' })).toBeInTheDocument()

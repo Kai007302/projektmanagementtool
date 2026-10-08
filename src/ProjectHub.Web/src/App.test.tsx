@@ -61,6 +61,16 @@ describe('App', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/'))
   })
 
+  it('goes back to the project list from a project opened from the address', async () => {
+    fakeApi(baseRoutes())
+    window.history.replaceState(null, '', '/projekte/0192a000-0000-7000-8000-000000000001/whiteboard')
+    render(<App />)
+
+    await screen.findByRole('button', { name: 'Projekte', current: 'page' })
+    await userEvent.click(screen.getByRole('button', { name: 'Projekte' }))
+    await waitFor(() => expect(window.location.pathname).toBe('/'))
+  })
+
   it('opens the projects instead of an area the person cannot use', async () => {
     fakeApi(baseRoutes(eva))
     window.history.replaceState(null, '', '/verwaltung')

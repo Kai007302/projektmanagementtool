@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import type { Me } from '../identity/api'
 import type { ProjectDetails } from '../projects/api'
 import { initials } from '../identity/initials'
-import { assigneeText, createTask, taskStatuses, type TaskStatus } from '../tasks/api'
+import { assigneeText, createTask, taskStatuses, type NewTaskDetails, type TaskStatus } from '../tasks/api'
 import { DueDate } from '../tasks/DueDate'
 import { celebrate } from '../ui/confetti'
 import { PriorityBadge } from '../tasks/PriorityBadge'
+import { NewTaskDialog } from '../tasks/NewTaskDialog'
 import { TaskDetails } from '../tasks/TaskDetails'
 import {
   createColumn,
@@ -14,7 +15,9 @@ import {
   fetchBoard,
   moveCard,
   moveColumn,
+  columnColors,
   updateColumn,
+  type ColumnColor,
   type KanbanBoard as Board,
   type KanbanCard,
   type KanbanColumn,
@@ -22,7 +25,6 @@ import {
 import { useLatest } from '../api/useLatest'
 import { InlineEdit } from '../ui/InlineEdit'
 import { Menu } from '../ui/Menu'
-import { QuickCreate } from '../ui/QuickCreate'
 import { Reveal } from '../ui/Reveal'
 import { Skeleton } from '../ui/Skeleton'
 
@@ -59,7 +61,8 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
   const lastPointer = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 3 })
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
   const [selected, setSelected] = useState<string | null>(initialTaskId)
-  const [settingsOf, setSettingsOf] = useState<string | null>(null)
+  const [colorOf, setColorOf] = useState<string | null>(null)
+  const [creatingIn, setCreatingIn] = useState<KanbanColumn | null>(null)
   const { canContribute, canEdit } = project.capabilities
 
   const latest = useLatest()
@@ -96,9 +99,14 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
     void apply(() => moveCard(card, target.columnId, index))
   }
 
-  /** A new card goes to the end of the column it was typed into, like in Trello. */
-  async function createIn(column: KanbanColumn, title: string) {
-    const task = await createTask(project.id, title, null, column.taskStatus)
+  /** A new card goes to the end of the column it was added in, like in Trello; another status puts it in that status's first column. */
+  async function createIn(column: KanbanColumn, title: string, status: TaskStatus, details: NewTaskDetails) {
+    const task = await createTask(project.id, title, null, status, details)
+    if (status !== column.taskStatus) {
+      setBoard(await fetchBoard(project.id))
+      onChanged()
+      return
+    }
     const fresh = await fetchBoard(project.id)
     const card = fresh.columns.flatMap((c) => c.cards).find((c) => c.id === task.id)
     const target = fresh.columns.find((c) => c.id === column.id)
@@ -147,7 +155,8 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
           return (
             <section
               key={column.id}
-              className={`kanban-column${dropTarget?.columnId === column.id ? ' drop-active' : ''}`}
+              className={`kanban-column${column.color ? ' has-color' : ''}${dropTarget?.columnId === column.id ? ' drop-active' : ''}`}
+              style={column.color ? ({ '--column-color': columnColors[column.color].value } as CSSProperties) : undefined}
               aria-label={column.name}
               onDragOver={(event) => overColumn(event, column)}
               onDrop={drop}
@@ -172,7 +181,7 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                   <Menu
                     label={`Spalte „${column.name}“`}
                     items={[
-                      { label: 'Status und WIP-Limit', onSelect: () => setSettingsOf(column.id) },
+                      { label: 'Farbe', onSelect: () => setColorOf(column.id) },
                       { label: 'Nach links', disabled: columnIndex === 0, onSelect: () => void apply(() => moveColumn(column, columnIndex - 1)) },
                       { label: 'Nach rechts', disabled: columnIndex === board.columns.length - 1, onSelect: () => void apply(() => moveColumn(column, columnIndex + 1)) },
                       {
@@ -189,12 +198,14 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
               {column.name !== taskStatuses[column.taskStatus] && (
                 <p className="muted kanban-status">Status: {taskStatuses[column.taskStatus]}</p>
               )}
-              {canEdit && settingsOf === column.id && (
-                <ColumnSettings
-                  key={`${column.id}-${column.version}`}
+              {canEdit && colorOf === column.id && (
+                <ColumnColorPicker
                   column={column}
-                  onSave={(changes) => apply(() => updateColumn(column, changes))}
-                  onClose={() => setSettingsOf(null)}
+                  onPick={(color) => {
+                    setColorOf(null)
+                    if (color !== column.color) void apply(() => updateColumn(column, { color }))
+                  }}
+                  onClose={() => setColorOf(null)}
                 />
               )}
               <ol className="kanban-cards">
@@ -283,7 +294,11 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
                 )}
               </ol>
               {column.cards.length === 0 && dropTarget?.columnId !== column.id && <p className="kanban-empty">Noch keine Karten. Zieh eine hierher ✨</p>}
-              {canContribute && <QuickCreate label="Aufgabe" fieldLabel={`Neue Aufgabe in ${column.name}`} onCreate={(title) => createIn(column, title)} />}
+              {canContribute && (
+                <button type="button" className="add-button" onClick={() => setCreatingIn(column)}>
+                  + Aufgabe
+                </button>
+              )}
             </section>
           )
         })}
@@ -293,6 +308,15 @@ export function KanbanBoard({ project, me, revision, onChanged, initialTaskId = 
           </div>
         )}
       </div>
+      {creatingIn && (
+        <NewTaskDialog
+          project={project}
+          status={creatingIn.taskStatus}
+          where={creatingIn.name}
+          onCreate={(title, status, details) => createIn(creatingIn, title, status, details)}
+          onClose={() => setCreatingIn(null)}
+        />
+      )}
       {selected && (
         <TaskDetails
           key={selected}
@@ -319,58 +343,31 @@ function conflictMessage(error: ApiError): string {
   return error.message.includes('at least one column') ? 'Jeder Status braucht mindestens eine Spalte.' : conflictText
 }
 
-type SettingsProps = {
-  column: KanbanColumn
-  onSave: (changes: { taskStatus?: TaskStatus; wipLimit?: number | null }) => void
-  onClose: () => void
-}
-
-/** The rarely needed column settings, opened from the column menu. */
-function ColumnSettings({ column, onSave, onClose }: SettingsProps) {
-  const [status, setStatus] = useState<TaskStatus>(column.taskStatus)
-  const [wipLimit, setWipLimit] = useState(column.wipLimit?.toString() ?? '')
-
-  function submit(event: FormEvent) {
-    event.preventDefault()
-    const limit = wipLimit === '' ? null : Number(wipLimit)
-    const changes = {
-      ...(status !== column.taskStatus && { taskStatus: status }),
-      ...(limit !== column.wipLimit && { wipLimit: limit }),
-    }
-    if (Object.keys(changes).length > 0) onSave(changes)
-    onClose()
-  }
-
+/** Name and colour are all a column offers; its status and WIP limit stay as they were created. */
+function ColumnColorPicker({ column, onPick, onClose }: { column: KanbanColumn; onPick: (color: ColumnColor | null) => void; onClose: () => void }) {
   return (
-    <form
-      className="stacked-form column-settings"
-      aria-label={`Spalte „${column.name}“ einstellen`}
-      onSubmit={submit}
+    <div
+      className="column-colors"
+      role="group"
+      aria-label={`Farbe der Spalte „${column.name}“`}
       onKeyDown={(event) => {
         if (event.key === 'Escape') onClose()
       }}
     >
-      <label>
-        Status der Karten
-        <select value={status} onChange={(event) => setStatus(event.target.value as TaskStatus)} autoFocus>
-          {Object.entries(taskStatuses).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        WIP-Limit
-        <input type="number" min={1} value={wipLimit} onChange={(event) => setWipLimit(event.target.value)} />
-      </label>
-      <div className="row">
-        <button type="submit">Übernehmen</button>
-        <button type="button" onClick={onClose}>
-          Abbrechen
-        </button>
-      </div>
-    </form>
+      <button type="button" className="swatch swatch-none" aria-pressed={column.color === null} title="Keine Farbe" aria-label="Keine Farbe" onClick={() => onPick(null)} autoFocus />
+      {(Object.keys(columnColors) as ColumnColor[]).map((color) => (
+        <button
+          key={color}
+          type="button"
+          className="swatch"
+          style={{ background: columnColors[color].value }}
+          aria-pressed={column.color === color}
+          title={columnColors[color].label}
+          aria-label={columnColors[color].label}
+          onClick={() => onPick(color)}
+        />
+      ))}
+    </div>
   )
 }
 

@@ -238,7 +238,7 @@ public sealed partial class ProjectHubTools(
         (await departments.ListAsync(user, new Paging(0, MaxListSize), ct))
         .Select(d => new DepartmentItem(d.Id, d.Name, d.Description, d.MemberCount, d.MyRole)).ToList();
 
-    [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissensbereiche auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "list_knowledge_spaces", Title = "Wissenskategorien auflisten", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Lists the knowledge spaces (sections of the knowledge hub) an article can belong to.")]
     public async Task<object> ListKnowledgeSpaces(CancellationToken ct = default) =>
         (await spaces.ListAsync(user, ct)).Select(s => new SpaceItem(s.Id, s.Name, s.Description)).ToList();

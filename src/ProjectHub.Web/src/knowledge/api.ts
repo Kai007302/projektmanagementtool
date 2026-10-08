@@ -77,6 +77,8 @@ export type ArticleSummary = {
   version: number
   departmentId?: string | null
   departmentName?: string | null
+  /** The first 25 words of the summary or the text, for overview cards. */
+  excerpt?: string | null
 }
 
 export type Relation = { id: string; relationType: RelationType; direction: 'outgoing' | 'incoming'; articleId: string; title: string; articleType: ArticleType }

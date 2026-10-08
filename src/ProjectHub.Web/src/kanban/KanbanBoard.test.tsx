@@ -54,9 +54,9 @@ function board(): Board {
     projectId: 'p-1',
     name: 'Board',
     columns: [
-      { id: 'c-todo', name: 'Offen', taskStatus: 'todo', wipLimit: null, version: 1, cards: [design, texts] },
-      { id: 'c-doing', name: 'In Arbeit', taskStatus: 'in_progress', wipLimit: 1, version: 1, cards: [deploy] },
-      { id: 'c-done', name: 'Erledigt', taskStatus: 'done', wipLimit: null, version: 1, cards: [] },
+      { id: 'c-todo', name: 'Offen', taskStatus: 'todo', wipLimit: null, color: null, version: 1, cards: [design, texts] },
+      { id: 'c-doing', name: 'In Arbeit', taskStatus: 'in_progress', wipLimit: 1, color: null, version: 1, cards: [deploy] },
+      { id: 'c-done', name: 'Erledigt', taskStatus: 'done', wipLimit: null, color: null, version: 1, cards: [] },
     ],
   }
 }
@@ -196,7 +196,7 @@ describe('KanbanBoard', () => {
       'GET /api/v1/projects/p-1/board': () => json(board()),
       'POST /api/v1/projects/p-1/board/columns': () => {
         const updated = board()
-        updated.columns.push({ id: 'c-review', name: 'Review', taskStatus: 'in_progress', wipLimit: null, version: 1, cards: [] })
+        updated.columns.push({ id: 'c-review', name: 'Review', taskStatus: 'in_progress', wipLimit: null, color: null, version: 1, cards: [] })
         return json(updated, 201)
       },
     })
@@ -207,6 +207,26 @@ describe('KanbanBoard', () => {
 
     expect(await screen.findByRole('region', { name: 'Review' })).toBeInTheDocument()
     expect(bodyOf(api, 'POST /api/v1/projects/p-1/board/columns')).toEqual({ name: 'Review', taskStatus: 'in_progress' })
+  })
+
+  it('lets editors colour a column but not change its status or WIP limit', async () => {
+    const api = fakeApi({
+      'GET /api/v1/projects/p-1/board': () => json(board()),
+      'PATCH /api/v1/board-columns/c-todo': () => {
+        const updated = board()
+        updated.columns[0] = { ...updated.columns[0], color: 'green', version: 2 }
+        return json(updated)
+      },
+    })
+    renderBoard()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Spalte „Offen“' }))
+    expect(screen.queryByRole('menuitem', { name: /Status|WIP/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Farbe' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Grün' }))
+
+    await vi.waitFor(() => expect(screen.getByRole('region', { name: 'Offen' })).toHaveClass('has-color'))
+    expect(bodyOf(api, 'PATCH /api/v1/board-columns/c-todo')).toEqual({ version: 1, color: 'green' })
   })
 
   it('creates a task right in a column', async () => {
@@ -225,11 +245,13 @@ describe('KanbanBoard', () => {
 
     await screen.findByRole('region', { name: 'In Arbeit' })
     await userEvent.click(column('In Arbeit').getByRole('button', { name: '+ Aufgabe' }))
-    await userEvent.type(column('In Arbeit').getByLabelText('Neue Aufgabe in In Arbeit'), 'Review vorbereiten{Enter}')
+    const dialog = within(screen.getByRole('dialog', { name: 'Neue Aufgabe in In Arbeit' }))
+    expect(dialog.getByLabelText('Status')).toHaveValue('in_progress')
+    await userEvent.type(dialog.getByLabelText('Titel'), 'Review vorbereiten{Enter}')
 
     expect(await column('In Arbeit').findByRole('button', { name: 'Review vorbereiten' })).toBeInTheDocument()
-    expect(bodyOf(api, 'POST /api/v1/projects/p-1/tasks')).toEqual({ title: 'Review vorbereiten', parentTaskId: null, status: 'in_progress' })
-    expect(column('In Arbeit').getByLabelText('Neue Aufgabe in In Arbeit')).toHaveValue('')
+    expect(bodyOf(api, 'POST /api/v1/projects/p-1/tasks')).toEqual({ title: 'Review vorbereiten', parentTaskId: null, status: 'in_progress', priority: 'normal' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('renames a column and sends only what changed', async () => {

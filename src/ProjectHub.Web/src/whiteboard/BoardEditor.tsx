@@ -20,6 +20,7 @@ import {
   objectTypes,
   readObjects,
   removeObject,
+  gridBackground,
   stickyGrid,
   updateObject,
   type BoardObject,
@@ -515,6 +516,7 @@ export function BoardEditor({ board, project, me, revision, onRename, onDelete }
           <svg
             ref={svgRef}
             className={drag?.kind === 'pan' ? 'board-canvas panning' : 'board-canvas'}
+            style={gridBackground(view)}
             role="application"
             aria-roledescription="Whiteboard"
             aria-label={`Whiteboard ${board.name}. Objekt mit Klick wählen und ziehen, Rechtsklick öffnet die Optionen, Doppelklick oder Enter bearbeitet den Text. Von den Punkten am gewählten Objekt zieht man einen Pfeil zu einem anderen Objekt. Pfeiltasten verschieben, Alt+Pfeiltasten ändern die Größe, Entf löscht, N legt eine Notiz an, Strg+Z macht rückgängig. Gesperrte Objekte bleiben, wo sie sind. Die Objektliste rechts wählt Objekte per Tastatur.`}

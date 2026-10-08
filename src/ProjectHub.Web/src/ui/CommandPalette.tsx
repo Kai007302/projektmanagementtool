@@ -9,6 +9,9 @@ type Props = {
   destinations: Destination[]
   onOpenProject: (id: string) => void
   onOpenArticle: (id: string) => void
+  /** Offered when nothing matches: creates a project or an article with the search term as its name. */
+  onCreateProject?: (name: string) => void
+  onCreateArticle?: (title: string) => void
   onClose: () => void
 }
 
@@ -18,9 +21,9 @@ const normalize = (text: string) => text.toLocaleLowerCase('de-DE')
 
 /**
  * Linear's Ctrl+K: one field that finds areas, projects and knowledge articles and jumps there. Arrow keys choose,
- * Enter opens, Escape closes.
+ * Enter opens, Escape closes. When no project or article matches, it offers to create one with that name.
  */
-export function CommandPalette({ destinations, onOpenProject, onOpenArticle, onClose }: Props) {
+export function CommandPalette({ destinations, onOpenProject, onOpenArticle, onCreateProject, onCreateArticle, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [articles, setArticles] = useState<ArticleSummary[]>([])
@@ -55,8 +58,7 @@ export function CommandPalette({ destinations, onOpenProject, onOpenArticle, onC
       onClose()
       action()
     }
-    return [
-      ...destinations.filter((d) => matches(d.label)).map((d) => ({ id: `nav-${d.label}`, group: 'Bereiche', label: d.label, run: close(d.go) })),
+    const found = [
       ...projects
         .filter((p) => matches(p.name))
         .slice(0, 8)
@@ -65,7 +67,19 @@ export function CommandPalette({ destinations, onOpenProject, onOpenArticle, onC
         ? []
         : articles.map((a) => ({ id: `article-${a.id}`, group: 'Wissen', label: a.title, hint: a.summary ?? undefined, run: close(() => onOpenArticle(a.id)) }))),
     ]
-  }, [term, destinations, projects, articles, onClose, onOpenProject, onOpenArticle])
+    const create =
+      term.length < 2 || found.length > 0
+        ? []
+        : [
+            ...(onCreateProject ? [{ id: 'create-project', group: 'Anlegen', label: `Projekt „${term}“ anlegen`, run: close(() => onCreateProject(term)) }] : []),
+            ...(onCreateArticle ? [{ id: 'create-article', group: 'Anlegen', label: `Artikel „${term}“ anlegen`, run: close(() => onCreateArticle(term)) }] : []),
+          ]
+    return [
+      ...destinations.filter((d) => matches(d.label)).map((d) => ({ id: `nav-${d.label}`, group: 'Bereiche', label: d.label, run: close(d.go) })),
+      ...found,
+      ...create,
+    ]
+  }, [term, destinations, projects, articles, onClose, onOpenProject, onOpenArticle, onCreateProject, onCreateArticle])
 
   const selected = Math.min(active, Math.max(items.length - 1, 0))
 

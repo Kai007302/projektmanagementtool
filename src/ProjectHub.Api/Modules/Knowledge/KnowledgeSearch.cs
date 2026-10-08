@@ -24,7 +24,8 @@ public sealed record ArticleSummary(
     DateTimeOffset? PublishedAt,
     long Version,
     Guid? DepartmentId = null,
-    string? DepartmentName = null);
+    string? DepartmentName = null,
+    string? Excerpt = null);
 
 /// <summary><c>DepartmentId</c> narrows the result to the articles of one department (ADR 0021).</summary>
 public sealed record KnowledgeQuery(string? Text, string? ArticleType, string? Status, Guid? SpaceId, string? Tag, Guid? DepartmentId = null);
@@ -210,7 +211,27 @@ internal static class KnowledgeSummaries
             return new ArticleSummary(
                 a.Id, a.Title, a.Slug, a.ArticleType, a.Summary, a.Status, a.Visibility, a.KnowledgeSpaceId, row.SpaceName,
                 a.OwnerId, row.OwnerName, tagsByArticle.GetValueOrDefault(a.Id, []), a.UpdatedAt, a.PublishedAt, a.Version,
-                a.DepartmentId, row.DepartmentName);
+                a.DepartmentId, row.DepartmentName, ArticleExcerpt.Of(string.IsNullOrWhiteSpace(a.Summary) ? a.SearchText : a.Summary));
         }).ToList();
+    }
+}
+
+public static class ArticleExcerpt
+{
+    /// <summary>Words an overview card shows before "Weiterlesen".</summary>
+    public const int ExcerptWords = 25;
+
+    /// <summary>The first <see cref="ExcerptWords"/> words of the summary or, without one, of the article text; "…" when cut.</summary>
+    public static string? Of(string? text)
+    {
+        var words = (text ?? string.Empty).Split((char[]?)null, ExcerptWords + 1, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (words.Length == 0)
+        {
+            return null;
+        }
+
+        return words.Length <= ExcerptWords
+            ? string.Join(' ', words)
+            : string.Join(' ', words.Take(ExcerptWords)).TrimEnd(',', ';', ':', '.', '-', '–') + " …";
     }
 }

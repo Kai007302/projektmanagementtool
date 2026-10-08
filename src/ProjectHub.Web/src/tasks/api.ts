@@ -62,8 +62,11 @@ export const fetchTasks = (projectId: string) => apiFetch<Paged<Task>>(`/api/v1/
 
 export const fetchTask = (id: string) => apiFetch<Task>(`/api/v1/tasks/${id}`)
 
-export const createTask = (projectId: string, title: string, parentTaskId: string | null, status?: TaskStatus) =>
-  apiFetch<Task>(`/api/v1/projects/${projectId}/tasks`, { method: 'POST', body: jsonBody({ title, parentTaskId, ...(status && { status }) }) })
+/** What the "Neue Aufgabe" window fills in besides the title; everything left out gets the server's default. */
+export type NewTaskDetails = Partial<Pick<Task, 'description' | 'priority' | 'startDate' | 'dueDate'>> & { assigneeIds?: string[] }
+
+export const createTask = (projectId: string, title: string, parentTaskId: string | null, status?: TaskStatus, details: NewTaskDetails = {}) =>
+  apiFetch<Task>(`/api/v1/projects/${projectId}/tasks`, { method: 'POST', body: jsonBody({ title, parentTaskId, ...(status && { status }), ...details }) })
 
 export const updateTask = (id: string, version: number, changes: TaskChanges) =>
   apiFetch<Task>(`/api/v1/tasks/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })

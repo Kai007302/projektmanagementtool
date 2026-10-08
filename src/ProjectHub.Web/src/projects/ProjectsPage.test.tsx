@@ -123,7 +123,7 @@ describe('ProjectsPage', () => {
     expect(window.location.pathname).toBe('/')
   })
 
-  it('creates a task', async () => {
+  it('creates a task in a window with all its fields', async () => {
     let tasks = [design]
     const api = fakeApi({
       ...projectRoutes(all, tasks),
@@ -138,12 +138,24 @@ describe('ProjectsPage', () => {
 
     const board = await openProject()
     await userEvent.click(board.getByRole('button', { name: '+ Aufgabe' }))
-    await userEvent.type(board.getByLabelText('Neue Aufgabe'), 'Texte schreiben{Enter}')
+    const dialog = within(screen.getByRole('dialog', { name: 'Neue Aufgabe' }))
+    await userEvent.type(dialog.getByLabelText('Titel'), 'Texte schreiben')
+    await userEvent.type(dialog.getByLabelText('Beschreibung'), 'Für die Startseite')
+    await userEvent.selectOptions(dialog.getByLabelText('Priorität'), 'high')
+    await userEvent.click(dialog.getByRole('checkbox', { name: 'Clara Editor' }))
+    await userEvent.type(dialog.getByLabelText('Fällig am'), '30.11.2026')
+    await userEvent.click(dialog.getByRole('button', { name: 'Aufgabe anlegen' }))
 
     expect(await board.findByRole('button', { name: /Texte schreiben/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Neue Aufgabe' })).not.toBeInTheDocument()
     expect(JSON.parse(String(api.calls.find((c) => c.key === 'POST /api/v1/projects/p-1/tasks')?.init?.body))).toEqual({
       title: 'Texte schreiben',
       parentTaskId: null,
+      status: 'todo',
+      description: 'Für die Startseite',
+      priority: 'high',
+      assigneeIds: ['u-clara'],
+      dueDate: '2026-11-30',
     })
   })
 
