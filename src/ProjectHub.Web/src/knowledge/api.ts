@@ -1,11 +1,25 @@
 import { apiFetch, jsonBody, type Paged } from '../api/client'
 import type { Block } from './blocks'
 
-export type ArticleType = 'article' | 'how_to' | 'best_practice' | 'process' | 'policy' | 'faq' | 'template' | 'checklist' | 'glossary'
+export type ArticleType =
+  | 'article'
+  | 'how_to'
+  | 'best_practice'
+  | 'process'
+  | 'policy'
+  | 'faq'
+  | 'template'
+  | 'checklist'
+  | 'glossary'
+  | InsightType
+
+/** Article types that are insights with a card, an outcome and a confidence (ADR 0023). */
+export type InsightType = 'experiment' | 'spike' | 'decision' | 'retro_learning' | 'incident' | 'release'
 export type ArticleStatus = 'draft' | 'review' | 'published' | 'archived'
 export type Visibility = 'organization' | 'department' | 'restricted'
 export type Grant = 'view' | 'edit' | 'admin'
-export type RelationType = 'RELATED' | 'REQUIRES' | 'PART_OF' | 'SUPERSEDES' | 'REFERENCES'
+export type RelationType = 'RELATED' | 'REQUIRES' | 'PART_OF' | 'SUPERSEDES' | 'REFERENCES' | 'BUILDS_ON' | 'CONFIRMS' | 'CONTRADICTS'
+export type UseCaseKey = 'general' | 'experiment' | 'software'
 export type ResourceType = 'project' | 'task' | 'department' | 'whiteboard'
 
 export const articleTypes: Record<ArticleType, string> = {
@@ -18,6 +32,12 @@ export const articleTypes: Record<ArticleType, string> = {
   template: 'Vorlage',
   checklist: 'Checkliste',
   glossary: 'Glossar',
+  experiment: 'Experiment',
+  spike: 'Spike',
+  decision: 'Entscheidung',
+  retro_learning: 'Retro-Learning',
+  incident: 'Vorfall',
+  release: 'Release',
 }
 
 /** Icon per article type, shown next to the type everywhere (decorative; the label stays). */
@@ -31,6 +51,12 @@ export const articleTypeEmoji: Record<ArticleType, string> = {
   template: '🧾',
   checklist: '✅',
   glossary: '🔤',
+  experiment: '🧪',
+  spike: '🔬',
+  decision: '⚖️',
+  retro_learning: '🔁',
+  incident: '🚨',
+  release: '🚀',
 }
 
 export const articleStatuses: Record<ArticleStatus, string> = {
@@ -55,6 +81,9 @@ export const relationTypes: Record<RelationType, { outgoing: string; incoming: s
   PART_OF: { outgoing: 'Teil von', incoming: 'Enthält' },
   SUPERSEDES: { outgoing: 'Ersetzt', incoming: 'Ersetzt durch' },
   REFERENCES: { outgoing: 'Verweist auf', incoming: 'Referenziert von' },
+  BUILDS_ON: { outgoing: 'Baut auf', incoming: 'Grundlage für' },
+  CONFIRMS: { outgoing: 'Bestätigt', incoming: 'Bestätigt durch' },
+  CONTRADICTS: { outgoing: 'Widerspricht', incoming: 'Widersprochen durch' },
 }
 
 export const resourceTypes: Record<ResourceType, string> = { project: 'Projekt', task: 'Aufgabe', department: 'Abteilung', whiteboard: 'Whiteboard' }
@@ -79,6 +108,10 @@ export type ArticleSummary = {
   departmentName?: string | null
   /** The first 25 words of the summary or the text, for overview cards. */
   excerpt?: string | null
+  /** Insights only (ADR 0023): the result, an outcome key of the kind, and how sure it is (1 to 4). */
+  outcome?: string | null
+  confidence?: number | null
+  createdAt?: string | null
 }
 
 export type Relation = { id: string; relationType: RelationType; direction: 'outgoing' | 'incoming'; articleId: string; title: string; articleType: ArticleType }
@@ -98,7 +131,16 @@ export type ArticleDetails = {
 
 export type VersionSummary = { id: string; versionNumber: number; createdBy: string; createdByName: string | null; changeNote: string | null; createdAt: string }
 
-export type Space = { id: string; name: string; description: string | null; articleCount: number; version: number; departmentId?: string | null }
+export type Space = {
+  id: string
+  name: string
+  description: string | null
+  articleCount: number
+  version: number
+  departmentId?: string | null
+  /** What the space is used for; it decides which insights its articles offer (ADR 0023). */
+  useCase?: UseCaseKey
+}
 
 export type Tag = { name: string; articleCount: number }
 
@@ -139,7 +181,15 @@ export type NewArticle = {
 
 export const createArticle = (article: NewArticle) => apiFetch<ArticleDetails>(`${base}/articles`, { method: 'POST', body: jsonBody(article) })
 
-export type ArticleChanges = Partial<{ title: string; summary: string | null; articleType: ArticleType; spaceId: string | null; visibility: Visibility }>
+export type ArticleChanges = Partial<{
+  title: string
+  summary: string | null
+  articleType: ArticleType
+  spaceId: string | null
+  visibility: Visibility
+  outcome: string | null
+  confidence: number | null
+}>
 
 export const updateArticle = (id: string, version: number, changes: ArticleChanges) =>
   apiFetch<ArticleDetails>(`${base}/articles/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })
@@ -164,8 +214,11 @@ export const fetchTags = () => apiFetch<Tag[]>(`${base}/tags`)
 /** The knowledge spaces I can see; with a department only those of that department. */
 export const fetchSpaces = (departmentId = '') => apiFetch<Space[]>(`${base}/spaces${departmentId ? `?departmentId=${departmentId}` : ''}`)
 
-export const createSpace = (name: string, description: string, departmentId = '') =>
-  apiFetch<Space>(`${base}/spaces`, { method: 'POST', body: jsonBody({ name, description, departmentId: departmentId || null }) })
+export const createSpace = (name: string, description: string, departmentId = '', useCase: UseCaseKey = 'general') =>
+  apiFetch<Space>(`${base}/spaces`, { method: 'POST', body: jsonBody({ name, description, departmentId: departmentId || null, useCase }) })
+
+export const updateSpace = (id: string, version: number, changes: Partial<{ name: string; description: string | null; useCase: UseCaseKey }>) =>
+  apiFetch<Space>(`${base}/spaces/${id}`, { method: 'PATCH', body: jsonBody({ version, ...changes }) })
 
 export const fetchPermissions = (id: string) => apiFetch<Permission[]>(`${base}/articles/${id}/permissions`)
 

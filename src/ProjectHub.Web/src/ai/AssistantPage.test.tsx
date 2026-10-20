@@ -70,7 +70,7 @@ describe('AssistantPage', () => {
     await userEvent.click(within(answer).getAllByRole('button', { name: 'Projekt-Kickoff durchführen' })[1])
     expect(onOpen).toHaveBeenCalledWith(kickoff)
     const body = JSON.parse(String(calls.find((c) => c.key === 'POST /api/v1/ai/chat')!.init!.body))
-    expect(body).toEqual({ messages: [{ role: 'user', text: 'Wie läuft ein Kickoff ab?' }], projectId: 'p-1' })
+    expect(body).toEqual({ messages: [{ role: 'user', text: 'Wie läuft ein Kickoff ab?' }], projectId: 'p-1', spaceId: null, articleId: null })
   })
 
   it('shows a failure of the model as an alert and sends earlier turns along', async () => {
@@ -140,6 +140,8 @@ describe('AssistantPage', () => {
     expect(second).toEqual({
       messages: [{ role: 'user', text: 'Leg eine Aufgabe an' }],
       projectId: null,
+      spaceId: null,
+      articleId: null,
       continuation: 'geheim',
       approvals: [{ id: 'a-1', approved: true }],
     })

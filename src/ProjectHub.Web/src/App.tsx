@@ -251,6 +251,7 @@ function App() {
                 departmentId={department}
                 initialArticleId={openArticle}
                 initialMode={knowledgeMode ?? 'galaxy'}
+                ai={session.ai}
               />
             )}
             {shown === 'admin' && managesAnything(session.me) && (

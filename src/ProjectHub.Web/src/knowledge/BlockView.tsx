@@ -2,23 +2,43 @@ import { useEffect, useState } from 'react'
 import { fetchProject } from '../projects/api'
 import { fetchTask } from '../tasks/api'
 import { fetchArticle } from './api'
-import { calloutTones, safeUrl, type Block } from './blocks'
+import { calloutTones, safeUrl, type Block, type InsightBlockField } from './blocks'
+import { DataTableView } from './DataTableView'
+import type { InsightKind } from './useCases'
+import './insights.css'
 
-type Props = { blocks: Block[]; onOpenArticle?: (id: string) => void }
+/** kind: the insight kind of the article, it marks the field that carries the result. */
+type Props = { blocks: Block[]; onOpenArticle?: (id: string) => void; kind?: InsightKind | null }
 
 /** Renders article content. Blocks are plain text; React escapes everything. */
-export function BlockView({ blocks, onOpenArticle }: Props) {
+export function BlockView({ blocks, onOpenArticle, kind = null }: Props) {
   if (blocks.length === 0) return <p className="muted">Noch kein Inhalt.</p>
   return (
     <div className="article-content">
       {blocks.map((block, index) => (
-        <BlockItem key={block.id || index} block={block} onOpenArticle={onOpenArticle} />
+        <BlockItem key={block.id || index} block={block} onOpenArticle={onOpenArticle} kind={kind} />
       ))}
     </div>
   )
 }
 
-function BlockItem({ block, onOpenArticle }: { block: Block; onOpenArticle?: (id: string) => void }) {
+/** The card of an insight: its fields side by side, the result field highlighted. Empty fields show as a hint. */
+export function InsightCard({ fields, kind }: { fields: InsightBlockField[]; kind: InsightKind | null }) {
+  const highlight = kind?.fields.find((f) => f.highlight)?.key ?? fields[fields.length - 1]?.key
+  if (fields.length === 0) return null
+  return (
+    <dl className="insight-card">
+      {fields.map((field) => (
+        <div key={field.key} className={field.key === highlight ? 'insight-field highlight' : 'insight-field'}>
+          <dt>{field.label}</dt>
+          <dd>{field.text.trim() ? field.text : <span className="muted">Noch offen</span>}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function BlockItem({ block, onOpenArticle, kind }: { block: Block; onOpenArticle?: (id: string) => void; kind: InsightKind | null }) {
   switch (block.type) {
     case 'heading': {
       const Heading = (['h3', 'h4', 'h5'] as const)[block.level - 1]
@@ -84,6 +104,10 @@ function BlockItem({ block, onOpenArticle }: { block: Block; onOpenArticle?: (id
       return <ResolvedReference kind="Aufgabe" id={block.taskId} resolve={taskTitle} />
     case 'project_reference':
       return <ResolvedReference kind="Projekt" id={block.projectId} resolve={projectTitle} />
+    case 'insight':
+      return <InsightCard fields={block.fields} kind={kind} />
+    case 'data_table':
+      return <DataTableView title={block.title} columns={block.columns} rows={block.rows} chart={block.chart} />
     case 'knowledge_reference':
       return (
         <ResolvedReference

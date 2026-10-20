@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { fetchProjects, type ProjectSummary } from '../projects/api'
 import { fetchTasks, type Task } from '../tasks/api'
 import { searchArticles, type ArticleSummary } from './api'
-import { blockTypes, calloutTones, move, newBlock, type Block, type BlockType, type CalloutTone } from './blocks'
+import { addableBlockTypes, blockTypes, calloutTones, chartKinds, move, newBlock, type Block, type BlockType, type CalloutTone, type ChartKind } from './blocks'
+import { parseTable } from './dataTable'
+import { DataTableView } from './DataTableView'
 import { CloseIcon } from '../ui/icons'
 
 type Props = { blocks: Block[]; onChange: (blocks: Block[]) => void; articleId?: string }
@@ -52,9 +54,9 @@ export function BlockEditor({ blocks, onChange, articleId }: Props) {
         <label>
           Neuer Block
           <select value={type} onChange={(event) => setType(event.target.value as BlockType)}>
-            {Object.entries(blockTypes).map(([value, label]) => (
+            {addableBlockTypes.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {blockTypes[value]}
               </option>
             ))}
           </select>
@@ -196,7 +198,88 @@ function BlockFields({ block, position, onChange, articleId }: FieldsProps) {
       return <TaskPicker label={name} value={block.taskId} onChange={(taskId) => onChange({ ...block, taskId })} />
     case 'knowledge_reference':
       return <ArticlePicker label={name} value={block.articleId} exclude={articleId} onChange={(id) => onChange({ ...block, articleId: id })} />
+    case 'insight':
+      return (
+        <fieldset className="block-fields stacked insight-editor">
+          <legend>{name}</legend>
+          {block.fields.map((field, index) => (
+            <label key={field.key}>
+              {field.label}
+              <textarea
+                value={field.text}
+                rows={2}
+                maxLength={20000}
+                onChange={(event) => onChange({ ...block, fields: block.fields.map((f, i) => (i === index ? { ...f, text: event.target.value } : f)) })}
+              />
+            </label>
+          ))}
+        </fieldset>
+      )
+    case 'data_table':
+      return <DataTableEditor block={block} name={name} onChange={onChange} />
   }
+}
+
+type DataBlock = Extract<Block, { type: 'data_table' }>
+
+/** The data come in as text: pasted from Excel (tabs) or a CSV file, the first line names the columns. */
+const asText = (block: DataBlock) => (block.columns.length === 0 ? '' : [block.columns, ...block.rows].map((row) => row.join('\t')).join('\n'))
+
+function DataTableEditor({ block, name, onChange }: { block: DataBlock; name: string; onChange: (block: Block) => void }) {
+  const [text, setText] = useState(() => asText(block))
+  const [notes, setNotes] = useState<string[]>([])
+
+  function take(value: string) {
+    setText(value)
+    const table = parseTable(value)
+    setNotes(table.notes)
+    onChange({ ...block, columns: table.columns, rows: table.rows })
+  }
+
+  async function load(file: File | undefined) {
+    if (!file) return
+    take(await file.text())
+  }
+
+  return (
+    <fieldset className="block-fields stacked data-editor">
+      <legend>{name}</legend>
+      <div className="block-fields">
+        <label className="grow">
+          Titel
+          <input value={block.title ?? ''} onChange={(event) => onChange({ ...block, title: event.target.value || undefined })} maxLength={500} placeholder="z. B. Zugfestigkeit über die Zeit" />
+        </label>
+        <label>
+          Darstellung
+          <select value={block.chart} onChange={(event) => onChange({ ...block, chart: event.target.value as ChartKind })}>
+            {Object.entries(chartKinds).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label>
+        Daten (aus Excel kopieren und hier einfügen, oder CSV; erste Zeile = Spaltennamen)
+        <textarea className="code-input" value={text} rows={6} onChange={(event) => take(event.target.value)} placeholder={'Stunden\tKlebstoff A\tKlebstoff B\n0\t2\t1\n8\t14\t7'} />
+      </label>
+      <label>
+        Oder CSV-Datei laden
+        <input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={(event) => void load(event.target.files?.[0])} />
+      </label>
+      {notes.map((note) => (
+        <p key={note} className="muted">
+          {note}
+        </p>
+      ))}
+      {block.columns.length > 0 && (
+        <div className="data-preview" aria-label="Vorschau">
+          <DataTableView title={block.title} columns={block.columns} rows={block.rows} chart={block.chart} />
+        </div>
+      )}
+    </fieldset>
+  )
 }
 
 type PickerProps = { label: string; value: string; onChange: (id: string) => void }

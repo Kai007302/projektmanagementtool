@@ -9,6 +9,7 @@ import {
   neighborsOf,
   nodeAt,
   nodeRadius,
+  relationThreads,
   typeColors,
   zoomAt,
   type GraphNode,
@@ -20,6 +21,13 @@ import { GalaxyReader } from './GalaxyReader'
 import { drawPlanet } from './planets'
 import { createSpace, drawSpace, float, wrapTitle } from './space'
 import { useLayout } from './useLayout'
+import { kindOf, outcomeOf, tonePlanetColors, toneLabels, useUseCases, type Tone, type UseCase } from '../useCases'
+
+/** Insights take the color of their result (ADR 0023), all other articles the color of their type. */
+function planetColor(useCases: UseCase[], node: Pick<GraphNode, 'articleType' | 'outcome'>): string {
+  const outcome = outcomeOf(kindOf(useCases, node.articleType), node.outcome)
+  return outcome ? tonePlanetColors[outcome.tone] : typeColors[node.articleType]
+}
 
 type Props = { spaces: Space[]; /** Only the knowledge of this department; '' for all I can see. */ departmentId?: string; onOpenArticle: (id: string) => void }
 
@@ -110,6 +118,8 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
   }, [filter, departmentId])
 
   const layout = useLayout(graph, !reducedMotion, narrow ? 0.45 : 1)
+  const useCases = useUseCases()
+  const colorOf = useCallback((node: GraphNode) => planetColor(useCases, node), [useCases])
   const selected = graph?.nodes.find((n) => n.id === selectedId) ?? null
   const reading = graph?.nodes.find((n) => n.id === readingId) ?? null
 
@@ -207,10 +217,11 @@ export function KnowledgeGalaxy({ spaces, departmentId = '', onOpenArticle }: Pr
             onRead={read}
             onDismiss={dismiss}
             reader={reader}
+            colorOf={colorOf}
           />
           <aside className="project-side">
-            <GalaxyDetails graph={graph} node={selected} onSelect={select} onRead={read} />
-            <Legend graph={graph} />
+            <GalaxyDetails graph={graph} node={selected} onSelect={select} onRead={read} colorOf={colorOf} />
+            <Legend graph={graph} useCases={useCases} />
           </aside>
         </div>
       )}
@@ -232,9 +243,10 @@ type CanvasProps = {
   onDismiss: () => void
   /** The open article, shown over the galaxy in full screen. */
   reader: ReactNode
+  colorOf: (node: GraphNode) => string
 }
 
-function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reducedMotion, fullscreen, onFullscreen, onSelect, onRead, onDismiss, reader }: CanvasProps) {
+function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reducedMotion, fullscreen, onFullscreen, onSelect, onRead, onDismiss, reader, colorOf }: CanvasProps) {
   const wrapper = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const transform = useRef<Transform>(identity)
@@ -298,23 +310,39 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
         const bend = 0.12
         return { x: (a.x + b.x) / 2 - (b.y - a.y) * bend, y: (a.y + b.y) / 2 + (b.x - a.x) * bend }
       }
+      // Relations between insights have their own color and dash: confirms green, builds on blue, contradicts orange.
+      const threads = [null, ...Object.keys(relationThreads)] as (keyof typeof relationThreads | null)[]
       for (const highlighted of [false, true]) {
         if (highlighted && !focus) continue
-        ctx.lineWidth = (highlighted ? (selectedFocus ? 3.5 : 2.5) : 1.4) / t.k
-        ctx.strokeStyle = highlighted ? 'rgba(251, 207, 232, 0.95)' : focus ? 'rgba(244, 170, 255, 0.08)' : 'rgba(244, 170, 255, 0.4)'
-        ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
-        ctx.shadowBlur = highlighted && glow ? (selectedFocus ? 18 : 12) : 0
-        ctx.beginPath()
-        for (const edge of graph.edges) {
-          const a = at(edge.source)
-          const b = at(edge.target)
-          if (!a || !b || (edge.source === focus || edge.target === focus) !== highlighted) continue
-          const c = curve(a, b)
-          ctx.moveTo(a.x, a.y)
-          ctx.quadraticCurveTo(c.x, c.y, b.x, b.y)
+        for (const type of threads) {
+          const thread = type ? relationThreads[type]! : null
+          ctx.lineWidth = (highlighted ? (selectedFocus ? 3.5 : 2.5) : thread ? 2 : 1.4) / t.k
+          ctx.strokeStyle = thread
+            ? thread.color
+            : highlighted
+              ? 'rgba(251, 207, 232, 0.95)'
+              : focus
+                ? 'rgba(244, 170, 255, 0.08)'
+                : 'rgba(244, 170, 255, 0.4)'
+          ctx.globalAlpha = thread && focus && !highlighted ? 0.15 : 1
+          ctx.setLineDash(thread ? thread.dash.map((d) => d / t.k) : [])
+          ctx.shadowColor = 'rgba(236, 72, 153, 0.9)'
+          ctx.shadowBlur = highlighted && glow ? (selectedFocus ? 18 : 12) : 0
+          ctx.beginPath()
+          for (const edge of graph.edges) {
+            if ((relationThreads[edge.relationType] ? edge.relationType : null) !== type) continue
+            const a = at(edge.source)
+            const b = at(edge.target)
+            if (!a || !b || (edge.source === focus || edge.target === focus) !== highlighted) continue
+            const c = curve(a, b)
+            ctx.moveTo(a.x, a.y)
+            ctx.quadraticCurveTo(c.x, c.y, b.x, b.y)
+          }
+          ctx.stroke()
         }
-        ctx.stroke()
       }
+      ctx.setLineDash([])
+      ctx.globalAlpha = 1
       // Sparks travel along the selected article's relations, from source to target.
       if (selectedFocus && time > 0) {
         ctx.fillStyle = '#ffffff'
@@ -349,7 +377,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
         const sy = p.y * t.k + t.y
         const sr = r * t.k
         if (sx < -sr - 200 || sx > width + sr || sy < -sr || sy > height + sr) continue
-        const color = typeColors[node.articleType]
+        const color = colorOf(node)
         const dimmed = neighborIds !== null && !neighborIds.has(node.id)
         ctx.globalAlpha = dimmed ? (selectedFocus ? 0.18 : 0.25) : 1
 
@@ -409,7 +437,7 @@ function GalaxyCanvas({ graph, positions, settled, selectedId, readingId, reduce
       }
       ctx.globalAlpha = 1
     },
-    [graph, positions, width, height, neighborIds, selectedId, hoverId, space],
+    [graph, positions, width, height, neighborIds, selectedId, hoverId, space, colorOf],
   )
 
   // Without reduced motion a frame loop keeps the bubbles floating; otherwise draw on change only.
@@ -840,9 +868,15 @@ function GalaxySheet({ children, onClose }: { children: ReactNode; onClose: () =
   )
 }
 
-type DetailsProps = { graph: KnowledgeGraph; node: GraphNode | null; onSelect: (id: string) => void; onRead: (id: string) => void }
+type DetailsProps = {
+  graph: KnowledgeGraph
+  node: GraphNode | null
+  onSelect: (id: string) => void
+  onRead: (id: string) => void
+  colorOf: (node: GraphNode) => string
+}
 
-function GalaxyDetails({ graph, node, onSelect, onRead }: DetailsProps) {
+function GalaxyDetails({ graph, node, onSelect, onRead, colorOf }: DetailsProps) {
   if (!node) {
     return (
       <section className="panel" aria-labelledby="galaxy-details-heading">
@@ -861,7 +895,7 @@ function GalaxyDetails({ graph, node, onSelect, onRead }: DetailsProps) {
         {node.title}
       </h3>
       <p className="muted">
-        <span className="legend-dot" style={{ background: typeColors[node.articleType] }} aria-hidden="true" /> {articleTypes[node.articleType]} ·{' '}
+        <span className="legend-dot" style={{ background: colorOf(node) }} aria-hidden="true" /> {articleTypes[node.articleType]} ·{' '}
         {articleStatuses[node.status]}
       </p>
       {node.summary && <p>{node.summary}</p>}
@@ -887,19 +921,38 @@ function GalaxyDetails({ graph, node, onSelect, onRead }: DetailsProps) {
   )
 }
 
-function Legend({ graph }: { graph: KnowledgeGraph }) {
-  const present = new Set(graph.nodes.map((n) => n.articleType))
+function Legend({ graph, useCases }: { graph: KnowledgeGraph; useCases: UseCase[] }) {
+  const tones = new Set<Tone>()
+  const ordinary = new Set<ArticleType>()
+  for (const node of graph.nodes) {
+    const outcome = outcomeOf(kindOf(useCases, node.articleType), node.outcome)
+    if (outcome) tones.add(outcome.tone)
+    else ordinary.add(node.articleType)
+  }
+  const threads = (Object.keys(relationThreads) as (keyof typeof relationThreads)[]).filter((type) => graph.edges.some((e) => e.relationType === type))
   return (
     <section className="panel" aria-labelledby="galaxy-legend-heading">
       <h3 id="galaxy-legend-heading">Legende</h3>
       <ul className="plain-list legend">
         {(Object.keys(articleTypes) as ArticleType[])
-          .filter((type) => present.has(type))
+          .filter((type) => ordinary.has(type))
           .map((type) => (
             <li key={type}>
               <span className="legend-dot" style={{ background: typeColors[type] }} aria-hidden="true" /> {articleTypes[type]}
             </li>
           ))}
+        {(Object.keys(tonePlanetColors) as Tone[])
+          .filter((tone) => tones.has(tone))
+          .map((tone) => (
+            <li key={tone}>
+              <span className="legend-dot" style={{ background: tonePlanetColors[tone] }} aria-hidden="true" /> Erkenntnis: {toneLabels[tone]}
+            </li>
+          ))}
+        {threads.map((type) => (
+          <li key={type}>
+            <span className={`legend-thread thread-${type.toLowerCase()}`} aria-hidden="true" /> {relationTypes[type].outgoing}
+          </li>
+        ))}
       </ul>
       <p className="muted">Größere Kugeln haben mehr Beziehungen.</p>
     </section>

@@ -49,6 +49,9 @@ Diese Punkte müssen vor Produktivbetrieb mit der Unternehmens-IT/Security abges
 | DEC-043 | Veröffentlichte Images | offen | öffentlich in GHCR (`ghcr.io/kai007302/projecthub-*`), wie das Repository selbst; enthalten keine Secrets und keine Konfiguration. Privat ginge auch, dann braucht der Server Zugangsdaten für GHCR (ADR 0019) |
 | DEC-044 | Projektlogos | offen | PNG, JPEG oder WebP bis 256 KB in PostgreSQL, kein SVG; ändern darf, wer im Projekt Schreibrecht hat (ADR 0020) |
 | DEC-045 | Regel für den berechneten Fortschritt | offen | Kai (2026-10-08): Fortschritt nicht mehr von Hand. Vorschlag: ohne Unteraufgaben Offen 0 %, In Arbeit 50 %, Erledigt 100 %; mit Unteraufgaben gerundetes Mittel der Unteraufgaben, erledigt immer 100 %. Alternative: Anteil erledigter Unteraufgaben, „In Arbeit“ dann 0 % (ADR 0022) |
+| DEC-046 | Katalog der Anwendungsfälle | offen | fest im Code (`KnowledgeUseCases`): Allgemein, Experiment, Softwareentwicklung mit festen Feldern und Ergebnissen je Erkenntnisart; neue Fälle oder Felder per Codeänderung, nicht je Organisation konfigurierbar (ADR 0023) |
+| DEC-047 | Grenzen des Messdaten-Blocks | offen | bis 20 Spalten, 500 Zeilen, 200 Zeichen je Zelle, Diagramm aus höchstens 6 Zahlenspalten; Daten nur als eingefügter Text (Excel) oder CSV, kein Einlesen von xlsx-Dateien (ADR 0023) |
+| DEC-048 | Bezug der Fragen zur Doku | offen | Fragt man in einem Artikel oder einer Kategorie, sucht der Assistent nur in dieser Kategorie (harter Filter), nicht bevorzugt dort und dann überall; „ganze Galaxie“ sucht wie bisher in allem, was die Person lesen darf (ADR 0023) |
 
 
 ## Knowledge / AI
