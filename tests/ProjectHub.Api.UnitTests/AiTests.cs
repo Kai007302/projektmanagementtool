@@ -383,4 +383,20 @@ public sealed class MarkdownBlocksTests
         Assert.Equal(["heading", "paragraph", "link"], replaced["blocks"]!.AsArray().Select(b => b!["type"]!.GetValue<string>()).ToList());
         Assert.Equal("## Neu\n\nText", MarkdownBlocks.FromContent(replaced));
     }
+
+    [Fact]
+    public void Shows_insight_cards_and_data_tables_as_markdown_and_keeps_them_on_replace()
+    {
+        var current = new JsonObject
+        {
+            ["blocks"] = new JsonArray(
+                new JsonObject { ["type"] = "insight", ["fields"] = new JsonArray(new JsonObject { ["key"] = "insight", ["label"] = "Erkenntnis", ["text"] = "B braucht 24 h." }) },
+                new JsonObject { ["type"] = "data_table", ["title"] = "Messung", ["columns"] = new JsonArray("h", "MPa"), ["rows"] = new JsonArray(new JsonArray("8", "1|2")) }),
+        };
+
+        Assert.Equal("**Erkenntnis:** B braucht 24 h.\n\nTabelle: Messung\n| h | MPa |\n| --- | --- |\n| 8 | 1\\|2 |",
+            MarkdownBlocks.FromContent(current).Replace("\r\n", "\n"));
+        var replaced = MarkdownBlocks.ReplaceText(current, "Neu");
+        Assert.Equal(["paragraph", "insight", "data_table"], replaced["blocks"]!.AsArray().Select(b => b!["type"]!.GetValue<string>()).ToList());
+    }
 }

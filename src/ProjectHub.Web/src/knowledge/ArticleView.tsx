@@ -19,15 +19,29 @@ import {
   type Space,
   type Visibility,
 } from './api'
+import type { AiStatus } from '../ai/api'
 import { ArticleComments, PermissionsPanel, ReferencesPanel, RelationsPanel, TagsPanel, VersionsPanel } from './ArticlePanels'
 import { BlockEditor } from './BlockEditor'
 import { BlockView } from './BlockView'
+import { DocChat } from './DocChat'
+import { Confidence, OutcomeBadge, OutcomePicker } from './Insight'
+import { SlideShow } from './SlideShow'
+import { kindOf, findUseCase, useUseCases, withCard, type UseCase } from './useCases'
 import { Menu } from '../ui/Menu'
 import type { Block } from './blocks'
 import { Skeleton } from '../ui/Skeleton'
 import { rememberVisit } from '../ui/recent'
 
-type Props = { articleId: string; me: Me; startEditing?: boolean; onBack: () => void; onOpenArticle: (id: string) => void; onChanged: () => void }
+type Props = {
+  articleId: string
+  me: Me
+  startEditing?: boolean
+  /** With an enabled assistant the article offers "Fragen zur Doku" (ADR 0023). */
+  ai?: AiStatus | null
+  onBack: () => void
+  onOpenArticle: (id: string) => void
+  onChanged: () => void
+}
 
 /**
  * Status changes the UI offers; the API checks the rights again (Edit for review, Admin for the rest). The usual next
@@ -55,11 +69,14 @@ const conflictText = 'Jemand anderes hat den Artikel inzwischen geändert. Der a
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
-export function ArticleView({ articleId, me, startEditing = false, onBack, onOpenArticle, onChanged }: Props) {
+export function ArticleView({ articleId, me, startEditing = false, ai = null, onBack, onOpenArticle, onChanged }: Props) {
   const [details, setDetails] = useState<ArticleDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(startEditing)
   const [revision, setRevision] = useState(0)
+  const [presenting, setPresenting] = useState(false)
+  const [chatting, setChatting] = useState(false)
+  const useCases = useUseCases()
 
   const load = useCallback(() => {
     fetchArticle(articleId).then(setDetails, (e: Error) => setError(e.message))
@@ -112,6 +129,7 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
 
   const { article, capabilities } = details
   const actions = transitions[article.status].filter((t) => (t.admin ? capabilities.canAdmin : capabilities.canEdit))
+  const kind = kindOf(useCases, article.articleType)
 
   return (
     <section className="article-view" aria-labelledby="article-heading">
@@ -129,8 +147,32 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
             {article.ownerName && ` · verantwortlich: ${article.ownerName}`}
             {` · Version ${details.versionNumber}, ${dateFormat.format(new Date(article.updatedAt))}`}
           </p>
+          {kind && (
+            <div className="insight-meta">
+              {/* While the editor saves, a change here would race it and be refused as a conflict. */}
+              {capabilities.canEdit && !editing ? (
+                <>
+                  <OutcomePicker kind={kind} outcome={article.outcome} onChange={(outcome) => void run(() => updateArticle(article.id, article.version, { outcome }))} />
+                  <Confidence value={article.confidence} onChange={(confidence) => void run(() => updateArticle(article.id, article.version, { confidence }))} />
+                </>
+              ) : (
+                <>
+                  <OutcomeBadge kind={kind} outcome={article.outcome} />
+                  <Confidence value={article.confidence} />
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="article-actions">
+          <button type="button" onClick={() => setPresenting(true)}>
+            Als Folien zeigen
+          </button>
+          {ai?.enabled && (
+            <button type="button" onClick={() => setChatting(true)}>
+              Fragen zur Doku
+            </button>
+          )}
           {capabilities.canEdit && !editing && (
             <button type="button" onClick={() => setEditing(true)}>
               Bearbeiten
@@ -170,7 +212,7 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
           ) : (
             <article className="panel">
               {article.summary && <p className="article-summary">{article.summary}</p>}
-              <BlockView key={revision} blocks={details.content.blocks} onOpenArticle={onOpenArticle} />
+              <BlockView key={revision} blocks={details.content.blocks} onOpenArticle={onOpenArticle} kind={kind} />
             </article>
           )}
           <ArticleComments articleId={article.id} me={me} canModerate={capabilities.canAdmin} />
@@ -183,6 +225,17 @@ export function ArticleView({ articleId, me, startEditing = false, onBack, onOpe
           {capabilities.canAdmin && <PermissionsPanel details={details} onChanged={changed} />}
         </aside>
       </div>
+      {presenting && <SlideShow details={details} kind={kind} onClose={() => setPresenting(false)} onOpenArticle={onOpenArticle} />}
+      {chatting && (
+        <DocChat
+          article={{ id: article.id, title: article.title, spaceId: article.spaceId }}
+          onOpenArticle={(id) => {
+            setChatting(false)
+            onOpenArticle(id)
+          }}
+          onClose={() => setChatting(false)}
+        />
+      )}
     </section>
   )
 }
@@ -202,6 +255,16 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
   const [spaces, setSpaces] = useState<Space[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const useCases = useUseCases()
+
+  // An insight always has its card: an older article that became one shows it on top and saves it with the next change.
+  const kind = kindOf(useCases, articleType)
+  const shownBlocks = kind !== null && !blocks.some((block) => block.type === 'insight') ? withCard(blocks, kind) : blocks
+
+  function changeType(type: ArticleType) {
+    setArticleType(type)
+    setBlocks((current) => withCard(current, kindOf(useCases, type)))
+  }
 
   useEffect(() => {
     fetchSpaces(article.departmentId ?? '').then(setSpaces, () => setSpaces([]))
@@ -220,7 +283,7 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
     try {
       let version = article.version
       if (Object.keys(changes).length > 0) version = (await updateArticle(article.id, version, changes)).article.version
-      if (JSON.stringify(blocks) !== JSON.stringify(details.content.blocks)) await saveContent(article.id, version, blocks, changeNote)
+      if (JSON.stringify(shownBlocks) !== JSON.stringify(details.content.blocks)) await saveContent(article.id, version, shownBlocks, changeNote)
       onSaved()
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
@@ -243,13 +306,7 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
         </label>
         <label>
           Art
-          <select value={articleType} onChange={(event) => setArticleType(event.target.value as ArticleType)}>
-            {Object.entries(articleTypes).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <TypeSelect value={articleType} useCases={useCases} preferred={findUseCase(useCases, spaces.find((space) => space.id === spaceId)?.useCase)} onChange={changeType} />
         </label>
         <label>
           Kategorie
@@ -281,7 +338,7 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
         Zusammenfassung
         <textarea value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} maxLength={2000} />
       </label>
-      <BlockEditor blocks={blocks} onChange={setBlocks} articleId={article.id} />
+      <BlockEditor blocks={shownBlocks} onChange={setBlocks} articleId={article.id} />
       <label>
         Änderungsnotiz
         <input value={changeNote} onChange={(event) => setChangeNote(event.target.value)} maxLength={500} placeholder="Was wurde geändert?" />
@@ -296,5 +353,31 @@ function ArticleEditor({ details, onSaved, onConflict, onCancel }: EditorProps) 
       </div>
       {error && <p role="alert">{error}</p>}
     </form>
+  )
+}
+
+type TypeSelectProps = { value: ArticleType; useCases: UseCase[]; preferred: UseCase | null; onChange: (type: ArticleType) => void }
+
+/** Article types grouped: the insights of the space's use case first, then the ordinary types, then the other insights. */
+function TypeSelect({ value, useCases, preferred, onChange }: TypeSelectProps) {
+  const insights = new Set(useCases.flatMap((u) => u.kinds.map((k) => k.articleType)))
+  const ordinary = (Object.keys(articleTypes) as ArticleType[]).filter((type) => !insights.has(type))
+  const groups = [
+    ...(preferred && preferred.kinds.length > 0 ? [preferred] : []),
+    { key: 'ordinary', label: 'Wissen', kinds: ordinary.map((articleType) => ({ articleType })) },
+    ...useCases.filter((u) => u.kinds.length > 0 && u.key !== preferred?.key),
+  ]
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value as ArticleType)}>
+      {groups.map((group) => (
+        <optgroup key={group.key} label={group.label}>
+          {group.kinds.map(({ articleType }) => (
+            <option key={articleType} value={articleType}>
+              {articleTypes[articleType]}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   )
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import type { AiStatus } from '../ai/api'
 import { knowledgePath, showPath } from '../navigation/location'
 import { canManageDepartment } from '../departments/currentDepartment'
 import type { Me } from '../identity/api'
@@ -13,12 +14,20 @@ import {
   fetchSpaces,
   fetchTags,
   searchArticles,
+  updateSpace,
   type ArticleFilter,
   type ArticleSummary,
+  type ArticleType,
   type Space,
   type Tag,
+  type UseCaseKey,
 } from './api'
 import { ArticleView } from './ArticleView'
+import { DocChat } from './DocChat'
+import { OutcomeBadge } from './Insight'
+import { SpaceInsights } from './SpaceInsights'
+import { kindOf, findUseCase, useUseCases, type UseCase } from './useCases'
+import { Menu } from '../ui/Menu'
 import { typeColors } from './galaxy/graph'
 import { KnowledgeGalaxy } from './galaxy/KnowledgeGalaxy'
 import { toast } from '../ui/toast'
@@ -26,13 +35,25 @@ import { Skeleton } from '../ui/Skeleton'
 import { CloseIcon } from '../ui/icons'
 
 /** departmentId: only the knowledge of this department; '' for all I can see (ADR 0021). */
-type Props = { me: Me; departmentId?: string; initialArticleId?: string | null; initialMode?: Mode }
+/** ai: with an enabled assistant the knowledge offers "Fragen zur Doku" (ADR 0023). */
+type Props = { me: Me; departmentId?: string; initialArticleId?: string | null; initialMode?: Mode; ai?: AiStatus | null }
 
 type Open = { id: string; editing: boolean }
 
+/** The title a new draft starts with, in the right grammatical gender. */
+const newTitles: Partial<Record<ArticleType, string>> = {
+  article: 'Neuer Artikel',
+  experiment: 'Neues Experiment',
+  spike: 'Neuer Spike',
+  decision: 'Neue Entscheidung',
+  retro_learning: 'Neues Retro-Learning',
+  incident: 'Neuer Vorfall',
+  release: 'Neues Release',
+}
+
 type Mode = 'articles' | 'galaxy'
 
-export function KnowledgePage({ me, departmentId = '', initialArticleId = null, initialMode = 'galaxy' }: Props) {
+export function KnowledgePage({ me, departmentId = '', initialArticleId = null, initialMode = 'galaxy', ai = null }: Props) {
   const [open, setOpen] = useState<Open | null>(initialArticleId ? { id: initialArticleId, editing: false } : null)
   const [filter, setFilter] = useState<ArticleFilter>({})
   const [articles, setArticles] = useState<ArticleSummary[] | null>(null)
@@ -40,6 +61,9 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
   const [tags, setTags] = useState<Tag[]>([])
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(initialMode)
+  const [chatting, setChatting] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const useCases = useUseCases()
   const openId = open?.id ?? null
   useEffect(() => showPath(knowledgePath(openId, mode)), [openId, mode])
 
@@ -61,6 +85,7 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
   const changed = useCallback(() => {
     load()
     loadFacets()
+    setRevision((r) => r + 1)
   }, [load, loadFacets])
 
   const openArticle = useCallback((id: string) => setOpen({ id, editing: false }), [])
@@ -72,6 +97,7 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
         articleId={open.id}
         me={me}
         startEditing={open.editing}
+        ai={ai}
         onBack={() => setOpen(null)}
         onOpenArticle={openArticle}
         onChanged={changed}
@@ -79,13 +105,17 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
     )
   }
 
+  const currentSpace = spaces.find((space) => space.id === filter.spaceId) ?? null
+  const currentUseCase = currentSpace ? findUseCase(useCases, currentSpace.useCase) : null
+
   /** Like a new page in Notion: the draft exists at once and opens in the editor, where title and type are set. */
-  async function newArticle() {
+  async function newArticle(articleType: ArticleType = 'article') {
     setError(null)
     try {
+      const kind = kindOf(useCases, articleType)
       const created = await createArticle({
-        title: 'Neuer Artikel',
-        articleType: 'article',
+        title: newTitles[articleType] ?? (kind ? kind.label : 'Neuer Artikel'),
+        articleType,
         summary: '',
         spaceId: filter.spaceId || null,
         visibility: 'department',
@@ -101,10 +131,27 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
     <section className="knowledge" aria-labelledby="knowledge-heading">
       <header className="page-header">
         <h2 id="knowledge-heading">Galaxie</h2>
-        <button type="submit" onClick={() => void newArticle()}>
-          + Artikel
-        </button>
+        <div className="row">
+          {ai?.enabled && (
+            <button type="button" onClick={() => setChatting(true)}>
+              Fragen zur Doku
+            </button>
+          )}
+          <button type="submit" onClick={() => void newArticle()}>
+            + Artikel
+          </button>
+        </div>
       </header>
+      {chatting && (
+        <DocChat
+          spaceId={filter.spaceId || null}
+          onOpenArticle={(id) => {
+            setChatting(false)
+            openArticle(id)
+          }}
+          onClose={() => setChatting(false)}
+        />
+      )}
       {error && <p role="alert">{error}</p>}
       <nav className="tabs" aria-label="Wissen anzeigen als">
         {(['galaxy', 'articles'] as Mode[]).map((value) => (
@@ -126,6 +173,17 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
           <SearchBar key={filter.spaceId ?? ''} spaces={spaces} tags={tags} initial={filter} onSearch={setFilter} />
           <div className="project-layout">
             <div>
+              {currentSpace && currentUseCase && currentUseCase.kinds.length > 0 && (
+                <SpaceInsights
+                  space={currentSpace}
+                  useCase={currentUseCase}
+                  type={filter.type ?? ''}
+                  revision={revision}
+                  onType={(type) => setFilter((f) => ({ ...f, type: type || undefined }))}
+                  onCreate={(type) => void newArticle(type)}
+                  onOpen={openArticle}
+                />
+              )}
               {articles === null ? (
                 <Skeleton kind="list" count={4} label="Artikel werden geladen" />
               ) : articles.length === 0 ? (
@@ -136,14 +194,22 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
                 <ul className="card-list" aria-label="Artikel">
                   {articles.map((article) => (
                     <li key={article.id}>
-                      <ArticleCard article={article} onOpen={() => openArticle(article.id)} />
+                      <ArticleCard article={article} useCases={useCases} onOpen={() => openArticle(article.id)} />
                     </li>
                   ))}
                 </ul>
               )}
             </div>
             <aside className="project-side">
-              <SpacesPanel me={me} departmentId={departmentId} spaces={spaces} current={filter.spaceId ?? ''} onFilter={(spaceId) => setFilter({ spaceId })} onCreated={loadFacets} />
+              <SpacesPanel
+                me={me}
+                departmentId={departmentId}
+                spaces={spaces}
+                useCases={useCases}
+                current={filter.spaceId ?? ''}
+                onFilter={(spaceId) => setFilter({ spaceId })}
+                onCreated={loadFacets}
+              />
               <p className="muted knowledge-note">Neue Artikel sind Entwürfe und nur für dich sichtbar, bis sie veröffentlicht werden.</p>
             </aside>
           </div>
@@ -153,7 +219,8 @@ export function KnowledgePage({ me, departmentId = '', initialArticleId = null, 
   )
 }
 
-export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOpen: () => void }) {
+export function ArticleCard({ article, useCases = [], onOpen }: { article: ArticleSummary; useCases?: UseCase[]; onOpen: () => void }) {
+  const kind = kindOf(useCases, article.articleType)
   return (
     <button
       type="button"
@@ -172,6 +239,12 @@ export function ArticleCard({ article, onOpen }: { article: ArticleSummary; onOp
         {articleTypes[article.articleType]} · <span className={`article-status status-${article.status}`}>{articleStatuses[article.status]}</span>
         {article.departmentName && ` · ${article.departmentName}`}
         {article.spaceName && ` · ${article.spaceName}`}
+        {kind && (
+          <>
+            {' '}
+            <OutcomeBadge kind={kind} outcome={article.outcome} />
+          </>
+        )}
       </span>
       {(article.excerpt ?? article.summary) && (
         <span className="article-card-summary">
@@ -295,18 +368,41 @@ function SearchBar({ spaces, tags, initial, onSearch }: SearchProps) {
   )
 }
 
-type SpacesProps = { me: Me; departmentId: string; spaces: Space[]; current: string; onFilter: (spaceId: string) => void; onCreated: () => void }
+type SpacesProps = {
+  me: Me
+  departmentId: string
+  spaces: Space[]
+  useCases: UseCase[]
+  current: string
+  onFilter: (spaceId: string) => void
+  onCreated: () => void
+}
 
-/** Knowledge spaces of the department; its leads and organization admins create new ones (ADR 0021). */
-function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }: SpacesProps) {
+/**
+ * Knowledge spaces of the department; its leads and organization admins create new ones (ADR 0021) and choose what each is
+ * used for: general knowledge, experiments or software development (ADR 0023).
+ */
+function SpacesPanel({ me, departmentId, spaces, useCases, current, onFilter, onCreated }: SpacesProps) {
   const [name, setName] = useState('')
+  const [useCase, setUseCase] = useState<UseCaseKey>('general')
   const [error, setError] = useState<string | null>(null)
+
+  async function changeUseCase(space: Space, value: UseCaseKey) {
+    setError(null)
+    try {
+      await updateSpace(space.id, space.version, { useCase: value })
+      toast(`„${space.name}“ ist jetzt für ${findUseCase(useCases, value)?.label ?? value}.`)
+      onCreated()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
 
   async function submit(event: FormEvent, close: () => void) {
     event.preventDefault()
     setError(null)
     try {
-      await createSpace(name, '', departmentId)
+      await createSpace(name, '', departmentId, useCase)
       toast(`Kategorie „${name}“ angelegt.`)
       setName('')
       close()
@@ -325,20 +421,46 @@ function SpacesPanel({ me, departmentId, spaces, current, onFilter, onCreated }:
             Alle Kategorien
           </button>
         </li>
-        {spaces.map((space) => (
-          <li key={space.id} className="row">
-            <button type="button" className={current === space.id ? 'link-button active' : 'link-button'} aria-pressed={current === space.id} onClick={() => onFilter(space.id)}>
-              {space.name}
-            </button>
-            <small className="muted">{space.articleCount} Artikel</small>
-          </li>
-        ))}
+        {spaces.map((space) => {
+          const spaceUseCase = findUseCase(useCases, space.useCase)
+          const manages = canManageDepartment(me, space.departmentId ?? departmentId)
+          return (
+            <li key={space.id} className="row">
+              <button type="button" className={current === space.id ? 'link-button active' : 'link-button'} aria-pressed={current === space.id} onClick={() => onFilter(space.id)}>
+                {space.name}
+              </button>
+              <small className="muted">
+                {space.articleCount} Artikel{spaceUseCase && space.useCase !== 'general' && ` · ${spaceUseCase.label}`}
+              </small>
+              {manages && (
+                <Menu
+                  label={`Anwendungsfall von ${space.name}`}
+                  items={useCases
+                    .filter((u) => u.key !== (space.useCase ?? 'general'))
+                    .map((u) => ({ label: `Anwendungsfall: ${u.label}`, onSelect: () => void changeUseCase(space, u.key) }))}
+                />
+              )}
+            </li>
+          )
+        })}
       </ul>
       {departmentId && canManageDepartment(me, departmentId) && (
         <Reveal label="Kategorie">
           {(close) => (
             <form className="quick-create" onSubmit={(event) => void submit(event, close)}>
               <input aria-label="Neue Kategorie" placeholder="Name, Enter zum Anlegen" value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} autoFocus />
+              {useCases.length > 0 && (
+                <label>
+                  Anwendungsfall
+                  <select value={useCase} onChange={(event) => setUseCase(event.target.value as UseCaseKey)}>
+                    {useCases.map((u) => (
+                      <option key={u.key} value={u.key}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {error && <p role="alert">{error}</p>}
             </form>
           )}

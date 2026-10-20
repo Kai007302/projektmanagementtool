@@ -49,6 +49,15 @@ public sealed record DepartmentItem(Guid DepartmentId, string Name, string? Desc
 
 public sealed record SpaceItem(Guid SpaceId, string Name, string? Description);
 
+/// <summary>
+/// What a conversation is about, set from the request: a knowledge space limits search_knowledge to that space unless the
+/// model names another one (questions about one topic, ADR 0023). External agents (MCP) have no scope.
+/// </summary>
+public sealed class AssistantScope
+{
+    public Guid? SpaceId { get; set; }
+}
+
 /// <summary>Knowledge articles the assistant looked at during one request, the sources of its answer.</summary>
 public sealed class AssistantSources
 {
@@ -88,6 +97,7 @@ public sealed partial class ProjectHubTools(
     DepartmentService departments,
     WhiteboardService whiteboards,
     AssistantSources sources,
+    AssistantScope scope,
     TimeProvider clock)
 {
     public const int MaxArticleChars = 20_000;
@@ -107,6 +117,7 @@ public sealed partial class ProjectHubTools(
     public async Task<object> SearchKnowledge(
         [Description("Search words or a question, preferably in German.")] string query,
         [Description("Maximum number of passages (1-20, default 8).")] int limit = 8,
+        [Description("Only articles of this knowledge space (Kategorie), from list_knowledge_spaces. Leave empty to search everywhere.")] Guid? spaceId = null,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -115,7 +126,7 @@ public sealed partial class ProjectHubTools(
         }
 
         var reader = await knowledgeAccess.ReaderAsync(user, ct);
-        var passages = await retrieval.RetrieveAsync(reader, query, limit, ct);
+        var passages = await retrieval.RetrieveAsync(reader, query, limit, ct, spaceId ?? scope.SpaceId);
         foreach (var passage in passages)
         {
             sources.Add(passage.ArticleId, passage.Title);

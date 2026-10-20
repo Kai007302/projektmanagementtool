@@ -12,6 +12,14 @@ export type Block =
   | { id: string; type: 'task_reference'; taskId: string }
   | { id: string; type: 'project_reference'; projectId: string }
   | { id: string; type: 'knowledge_reference'; articleId: string }
+  | { id: string; type: 'insight'; fields: InsightBlockField[] }
+  | { id: string; type: 'data_table'; title?: string; columns: string[]; rows: string[][]; chart: ChartKind }
+
+/** A field of an insight card (ADR 0023); the label is stored with it, so the card reads the same after a type change. */
+export type InsightBlockField = { key: string; label: string; text: string }
+
+/** none: only the table; line or bar: a chart of the number columns over the first column. */
+export type ChartKind = 'none' | 'line' | 'bar'
 
 export type BlockType = Block['type']
 
@@ -32,7 +40,14 @@ export const blockTypes: Record<BlockType, string> = {
   task_reference: 'Aufgabe',
   project_reference: 'Projekt',
   knowledge_reference: 'Wissensartikel',
+  insight: 'Erkenntnis-Karte',
+  data_table: 'Messdaten / Tabelle',
 }
+
+/** Blocks a person adds by hand; the insight card comes with the article type. */
+export const addableBlockTypes = (Object.keys(blockTypes) as BlockType[]).filter((type) => type !== 'insight')
+
+export const chartKinds: Record<ChartKind, string> = { line: 'Liniendiagramm', bar: 'Balkendiagramm', none: 'Nur Tabelle' }
 
 export const calloutTones: Record<CalloutTone, string> = { info: 'Info', warning: 'Warnung', success: 'Erfolg' }
 
@@ -65,6 +80,10 @@ export function newBlock(type: BlockType): Block {
       return { id, type, projectId: '' }
     case 'knowledge_reference':
       return { id, type, articleId: '' }
+    case 'insight':
+      return { id, type, fields: [] }
+    case 'data_table':
+      return { id, type, title: '', columns: [], rows: [], chart: 'line' }
   }
 }
 

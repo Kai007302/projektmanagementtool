@@ -67,6 +67,7 @@ public sealed class AssistantActions(
         ["finish_to_start"] = "Ende → Anfang", ["start_to_start"] = "Anfang → Anfang", ["finish_to_finish"] = "Ende → Ende", ["start_to_finish"] = "Anfang → Ende",
         ["article"] = "Artikel", ["how_to"] = "Anleitung", ["best_practice"] = "Best Practice", ["process"] = "Prozess", ["policy"] = "Richtlinie",
         ["faq"] = "FAQ", ["template"] = "Vorlage", ["checklist"] = "Checkliste", ["glossary"] = "Glossar",
+        ["experiment"] = "Experiment", ["spike"] = "Spike", ["decision"] = "Entscheidung", ["retro_learning"] = "Retro-Learning", ["incident"] = "Vorfall", ["release"] = "Release",
     };
 
     public static bool IsKnown(string tool) => Tools.ContainsKey(tool);

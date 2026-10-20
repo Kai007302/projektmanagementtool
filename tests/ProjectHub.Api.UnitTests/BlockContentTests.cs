@@ -44,6 +44,12 @@ public class BlockContentTests
     [InlineData("""{"blocks":[{"type":"bullet_list","items":[1,2]}]}""")]
     [InlineData("""{"blocks":[{"type":"project_reference","projectId":"nein"}]}""")]
     [InlineData("""{"blocks":["text"]}""")]
+    [InlineData("""{"blocks":[{"type":"insight","fields":[{"key":"Frage!","label":"Frage","text":"x"}]}]}""")]
+    [InlineData("""{"blocks":[{"type":"insight","fields":[{"key":"a","label":"A"},{"key":"a","label":"B"}]}]}""")]
+    [InlineData("""{"blocks":[{"type":"data_table","columns":[],"rows":[]}]}""")]
+    [InlineData("""{"blocks":[{"type":"data_table","columns":["h","MPa"],"rows":[["1"]]}]}""")]
+    [InlineData("""{"blocks":[{"type":"data_table","columns":["h"],"rows":[[1]]}]}""")]
+    [InlineData("""{"blocks":[{"type":"data_table","columns":["h"],"rows":[],"chart":"pie"}]}""")]
     public void Rejects_invalid_content(string json)
     {
         Assert.Null(BlockContent.Normalize(JsonNode.Parse(json), out var error));
@@ -69,4 +75,51 @@ public class BlockContentTests
     [Fact]
     public void Slugs_are_limited_in_length() =>
         Assert.True(KnowledgeArticleService.Slugify(new string('a', 200)).Length <= 80);
+
+    [Fact]
+    public void Keeps_insight_fields_and_data_tables_with_their_text()
+    {
+        var content = JsonNode.Parse("""
+            {"blocks":[
+              {"type":"insight","fields":[{"key":"question","label":"Frage","text":"Härtet B bei Kälte?"},{"key":"insight","label":"Erkenntnis","text":""}]},
+              {"type":"data_table","title":"Zugfestigkeit","columns":["Stunden","A","B"],"rows":[["0","2","1"],["24","17","15"]],"chart":"line"}
+            ]}
+            """);
+
+        var normalized = BlockContent.Normalize(content, out var error);
+
+        Assert.Null(error);
+        var blocks = normalized!.Content["blocks"]!.AsArray();
+        Assert.Equal("Erkenntnis", blocks[0]!["fields"]![1]!["label"]!.GetValue<string>());
+        Assert.Equal("17", blocks[1]!["rows"]![1]![1]!.GetValue<string>());
+        Assert.Equal("line", blocks[1]!["chart"]!.GetValue<string>());
+        // Cells stay out of the search text, the title and the column names go in; empty fields add nothing.
+        Assert.Equal(["Frage: Härtet B bei Kälte?", "Zugfestigkeit", "Stunden A B"], normalized.PlainText.Split(Environment.NewLine));
+    }
+
+    [Fact]
+    public void Limits_the_rows_of_a_data_table()
+    {
+        var rows = new JsonArray(Enumerable.Range(0, BlockContent.MaxTableRows + 1).Select(i => (JsonNode)new JsonArray(JsonValue.Create(i.ToString()))).ToArray());
+        var content = new JsonObject { ["blocks"] = new JsonArray(new JsonObject { ["type"] = "data_table", ["columns"] = new JsonArray("n"), ["rows"] = rows }) };
+
+        Assert.Null(BlockContent.Normalize(content, out _));
+    }
+
+    [Fact]
+    public void Every_insight_kind_has_fields_one_highlight_and_known_tones()
+    {
+        var kinds = KnowledgeUseCases.All.SelectMany(u => u.Kinds).ToList();
+
+        Assert.NotEmpty(kinds);
+        Assert.All(kinds, kind =>
+        {
+            Assert.Contains(kind.ArticleType, KnowledgeArticleType.All);
+            Assert.Single(kind.Fields, f => f.Highlight);
+            Assert.Equal(kind.Fields.Count, kind.Fields.Select(f => f.Key).Distinct().Count());
+            Assert.All(kind.Outcomes, o => Assert.Contains(o.Tone, KnowledgeUseCases.Tones));
+            Assert.NotNull(BlockContent.Normalize(new JsonObject { ["blocks"] = new JsonArray(KnowledgeUseCases.InsightBlock(kind)) }, out _));
+        });
+        Assert.Equal(kinds.Count, kinds.Select(k => k.ArticleType).Distinct().Count());
+    }
 }

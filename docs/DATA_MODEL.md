@@ -22,6 +22,7 @@ Spätere Änderungen liegen als fortlaufende Skripte daneben (ADR 0005):
 - `016_departments.sql`: `department` und `department_member` ersetzen `team` und `team_member` (Teams werden zu Abteilungen mit derselben ID), `project.department_id` und `project.visibility`, `department_id` an `knowledge_space` und `knowledge_article`, Sichtbarkeit `department` für Artikel, `app_user.entra_groups_hash` (ADR 0021)
 - `017_task_assignees_progress.sql`: `task_assignee` (mehrere Zuständige je Aufgabe) ersetzt `task.assignee_id`; `task.progress` wird einmal nach der neuen Regel berechnet und ist danach immer berechnet (ADR 0022)
 - `018_kanban_column_color.sql`: `kanban_column.color`, eine Farbe aus fester Palette (`gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`, `pink`) oder leer. In der Oberfläche lassen sich an einer Spalte nur Name und Farbe ändern; Status und WIP-Limit bleiben, wie die Spalte angelegt wurde (die API nimmt sie weiter an)
+- `019_knowledge_insights.sql`: `knowledge_space.use_case` (`general`, `experiment`, `software`), neue Artikelarten für Erkenntnisse, `knowledge_article.outcome` und `knowledge_article.confidence` (1–4), Beziehungsarten `BUILDS_ON`, `CONFIRMS`, `CONTRADICTS` (ADR 0023)
 
 ## Regeln
 
@@ -50,6 +51,8 @@ Das SQL-Schema enthält dafür `organization_id` auf zentralen Entitäten; Cross
 ## KnowledgeSpace
 
 Optionaler Container für fachliche Wissensbereiche. Ein Projekt muss nicht an einen KnowledgeSpace gebunden sein.
+
+`use_case` sagt, wofür die Kategorie genutzt wird: `general` (Standard), `experiment` oder `software`. Er bestimmt, welche Erkenntnisarten zuerst angeboten werden und ob die Kategorie einen Zeitstrahl der Erkenntnisse zeigt (ADR 0023). Der Katalog steht in `KnowledgeUseCases` und unter `GET /api/v1/knowledge/use-cases`.
 
 ## KnowledgeArticle
 
@@ -83,7 +86,15 @@ faq
 template
 checklist
 glossary
+experiment
+spike
+decision
+retro_learning
+incident
+release
 ```
+
+Die letzten sechs sind Erkenntnisse (ADR 0023). Nur sie haben `outcome` (ein Ergebnis ihrer Art, z. B. `confirmed`) und `confidence` (1–4); die Anwendung prüft, dass das Ergebnis zur Art passt.
 
 ## KnowledgeVersion
 
@@ -118,6 +129,8 @@ Format (`BlockContent` im Backend prüft und normalisiert, unbekannte Felder wer
 | `checklist` | `items` (`text`, `checked`) |
 | `image` / `file` / `link` | `url` (nur `http(s)` oder Pfad mit `/`), `alt` / `name` / `label` |
 | `task_reference` / `project_reference` / `knowledge_reference` | `taskId` / `projectId` / `articleId` |
+| `insight` | `fields` (höchstens 12: `key`, `label`, `text`): die Erkenntnis-Karte einer Erkenntnisart (ADR 0023) |
+| `data_table` | `title` (optional), `columns` (1–20), `rows` (höchstens 500, Zellen bis 200 Zeichen), `chart` (`line`/`bar`/`none`) |
 
 Jede Speicherung erzeugt eine neue Version (`version_number` fortlaufend); Wiederherstellen speichert den alten Inhalt als neue Version. `knowledge_article.search_text` hält den Klartext der aktuellen Version für die Suche.
 
@@ -141,6 +154,9 @@ REQUIRES
 PART_OF
 SUPERSEDES
 REFERENCES
+BUILDS_ON
+CONFIRMS
+CONTRADICTS
 ```
 
 ## KnowledgeTag

@@ -1,0 +1,526 @@
+/* Insights, data tables, slides and the documentation chat (ADR 0023). */
+
+.outcome-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+select.outcome-picker {
+  border: 0;
+  height: auto;
+  min-height: 1.9rem;
+  padding-right: 1.6rem;
+  cursor: pointer;
+}
+
+.insight-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0;
+}
+
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.confidence-dots {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.confidence .dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  padding: 0;
+  min-height: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.confidence .dot.on {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+/* As buttons the dots need a bigger target; the visible dot stays small. */
+.confidence button.dot {
+  position: relative;
+  cursor: pointer;
+}
+
+.confidence button.dot::after {
+  content: '';
+  position: absolute;
+  inset: -0.55rem -0.25rem;
+}
+
+.insight-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+}
+
+.insight-field {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.insight-field dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+.insight-field dd {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.insight-field.highlight {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+}
+
+.insight-field.highlight dt {
+  color: var(--success);
+}
+
+.insight-field.highlight dd {
+  font-weight: 600;
+}
+
+.insight-editor label,
+.data-editor > label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+/* Data tables and charts */
+
+.data-block {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.data-block-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.data-block-title {
+  font-weight: 600;
+}
+
+.data-block-header .segmented {
+  margin-left: auto;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.segmented button {
+  border: 0;
+  border-radius: 0;
+  min-height: 2rem;
+  padding: 0 0.8rem;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  max-height: 24rem;
+}
+
+.data-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.data-table tbody th {
+  font-weight: 500;
+}
+
+.data-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.chart-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.chart-axis-name {
+  font-weight: 600;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.25rem;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.data-preview {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.75rem;
+}
+
+/* Time line of a space's insights */
+
+.space-insights-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.space-insights-header h3 {
+  margin: 0;
+}
+
+.space-insights .filter-chips {
+  margin: 0.75rem 0 0;
+}
+
+.insight-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insight-step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.6rem 0.2rem 0.4rem;
+  border: 0;
+  border-top: 4px solid var(--tone, var(--border-strong));
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.insight-step:hover .insight-title {
+  color: var(--accent-text);
+}
+
+.insight-date {
+  font-size: 0.75rem;
+}
+
+.insight-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Galaxy legend: the threads between insights */
+
+.legend-thread {
+  display: inline-block;
+  width: 1.4rem;
+  height: 0;
+  border-top: 2px solid #f4aaff;
+  vertical-align: middle;
+}
+
+.legend-thread.thread-confirms {
+  border-top-color: #22a35a;
+}
+
+.legend-thread.thread-builds_on {
+  border-top: 2px dotted #3b82f6;
+}
+
+.legend-thread.thread-contradicts {
+  border-top: 2px dashed #ea580c;
+}
+
+/* Slides */
+
+.slideshow {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.slide-bar,
+.slide-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+}
+
+.slide-bar {
+  border-bottom: 1px solid var(--border);
+}
+
+.slide-context {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.slide-progress {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.slide-progress span {
+  width: 1.4rem;
+  height: 0.25rem;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.slide-progress span.done {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.slide-progress span.on {
+  background: var(--accent);
+}
+
+.slide {
+  flex: 1;
+  overflow: auto;
+  width: min(68rem, 100%);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 5vh, 4rem) clamp(1rem, 5vw, 4rem);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.slide-kicker {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.slide-title {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.slide-heading {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  line-height: 1.15;
+}
+
+.slide-lead {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+  color: var(--muted);
+  max-width: 50rem;
+}
+
+.slide-statement {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.4vw, 2.4rem);
+  line-height: 1.3;
+  white-space: pre-line;
+  max-width: 56rem;
+}
+
+.slide-statement.highlight {
+  font-weight: 700;
+  color: var(--success);
+}
+
+.slide-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0;
+}
+
+.slide .article-content {
+  font-size: clamp(1rem, 1.8vw, 1.25rem);
+}
+
+.slide-nav {
+  justify-content: center;
+  border-top: 1px solid var(--border);
+}
+
+.data-block.large {
+  border: 0;
+  padding: 0;
+}
+
+/* Documentation chat beside the knowledge */
+
+.doc-chat {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(26rem, 100vw);
+  padding: 1rem 1.1rem;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.doc-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doc-chat-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.doc-chat-scope {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.doc-chat .assistant-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-chat .assistant-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.doc-chat-note {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 40rem) {
+  .slide-progress {
+    display: none;
+  }
+
+  .doc-chat {
+    top: auto;
+    height: 85vh;
+    width: 100vw;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+}

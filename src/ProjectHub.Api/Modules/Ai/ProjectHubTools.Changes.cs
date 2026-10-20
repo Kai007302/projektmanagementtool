@@ -225,7 +225,8 @@ public sealed partial class ProjectHubTools
     public async Task<object> CreateKnowledgeArticle(
         [Description("Title of the article.")] string title,
         [Description("Text of the article in Markdown.")] string markdown,
-        [Description("Kind: article (default), how_to, best_practice, process, policy, faq, template, checklist or glossary.")] string? articleType = null,
+        [Description("Kind: article (default), how_to, best_practice, process, policy, faq, template, checklist or glossary; "
+                     + "insights: experiment, spike, decision, retro_learning, incident or release.")] string? articleType = null,
         [Description("Optional one or two sentence summary.")] string? summary = null,
         [Description("Optional knowledge space id from list_knowledge_spaces.")] Guid? spaceId = null,
         [Description("Optional department id from list_departments; default: the space's department, else the user's first.")] Guid? departmentId = null,

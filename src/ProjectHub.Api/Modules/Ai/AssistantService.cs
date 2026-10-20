@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.AI;
 using ProjectHub.Api.Infrastructure.Outcomes;
 using ProjectHub.Api.Modules.Identity;
+using ProjectHub.Api.Modules.Knowledge;
 using ProjectHub.Api.Modules.Projects;
 
 namespace ProjectHub.Api.Modules.Ai;
@@ -18,11 +19,15 @@ public sealed record AssistantApproval(string? Id, bool Approved);
 /// The conversation so far; it lives in the browser, ProjectHub stores none of it (ADR 0015). To continue a turn that waits for
 /// approval, the browser sends the same messages with the <see cref="Continuation"/> it got and the person's decisions (ADR 0016).
 /// </summary>
+/// <param name="SpaceId">The knowledge space the questions are about (the documentation chat, ADR 0023): searches stay in it.</param>
+/// <param name="ArticleId">The article open beside the chat; the assistant reads it first.</param>
 public sealed record AssistantChatRequest(
     IReadOnlyList<AssistantMessage>? Messages,
     Guid? ProjectId,
     string? Continuation = null,
-    IReadOnlyList<AssistantApproval>? Approvals = null);
+    IReadOnlyList<AssistantApproval>? Approvals = null,
+    Guid? SpaceId = null,
+    Guid? ArticleId = null);
 
 public sealed record AssistantSource(Guid ArticleId, string Title, bool Cited);
 
@@ -50,7 +55,10 @@ public sealed class AssistantService(
     AssistantSources sources,
     AssistantActions actions,
     AssistantContinuations continuations,
+    AssistantScope scope,
     ProjectService projects,
+    KnowledgeArticleService articles,
+    KnowledgeSpaceService spaces,
     TimeProvider clock,
     ILogger<AssistantService> logger)
 {
@@ -259,6 +267,18 @@ public sealed class AssistantService(
         if (request.ProjectId is { } projectId && (await projects.GetAsync(user, projectId, ct)).Value is { } project)
         {
             context += $" Geöffnet ist das Projekt „{project.Name}“ (projectId {project.Id}).";
+        }
+
+        // Only what the person may see becomes context: an unknown or hidden space or article is left out silently.
+        if (request.SpaceId is { } spaceId && (await spaces.ListAsync(user, ct)).FirstOrDefault(s => s.Id == spaceId) is { } space)
+        {
+            scope.SpaceId = space.Id;
+            context += $" Die Fragen beziehen sich auf die Kategorie „{space.Name}“ (spaceId {space.Id}); search_knowledge sucht nur dort.";
+        }
+
+        if (request.ArticleId is { } articleId && (await articles.GetAsync(user, articleId, ct)).Value is { } article)
+        {
+            context += $" Geöffnet ist der Artikel „{article.Article.Title}“ (articleId {article.Article.Id}); lies ihn mit read_knowledge_article, bevor du antwortest.";
         }
 
         var messages = new List<ChatMessage>();

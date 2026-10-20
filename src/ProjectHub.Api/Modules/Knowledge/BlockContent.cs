@@ -15,13 +15,22 @@ public static class BlockContent
     public const int MaxTextLength = 20_000;
     public const int MaxItems = 500;
 
+    /// <summary>Limits of a data table (DEC-046): enough for a series of measurements, small enough to render in the browser.</summary>
+    public const int MaxTableColumns = 20;
+    public const int MaxTableRows = 500;
+    public const int MaxCellLength = 200;
+    public const int MaxInsightFields = 12;
+
     public static readonly IReadOnlyList<string> Types =
     [
         "heading", "paragraph", "bullet_list", "numbered_list", "checklist", "quote", "callout", "code",
-        "image", "file", "link", "task_reference", "project_reference", "knowledge_reference",
+        "image", "file", "link", "task_reference", "project_reference", "knowledge_reference", "insight", "data_table",
     ];
 
     public static readonly IReadOnlyList<string> CalloutTones = ["info", "warning", "success"];
+
+    /// <summary>How a data table is drawn: as a table only, or with a line or bar chart of its number columns.</summary>
+    public static readonly IReadOnlyList<string> ChartKinds = ["none", "line", "bar"];
 
     public static JsonObject Empty() => new() { ["blocks"] = new JsonArray() };
 
@@ -81,6 +90,8 @@ public static class BlockContent
                 "task_reference" => Reference(block, output, "taskId", tasks),
                 "project_reference" => Reference(block, output, "projectId", projects),
                 "knowledge_reference" => Reference(block, output, "articleId", articles),
+                "insight" => Insight(block, output, text),
+                "data_table" => DataTable(block, output, text),
                 _ => $"unknown type '{type}'",
             };
 
@@ -186,6 +197,90 @@ public static class BlockContent
         }
 
         output["items"] = result;
+        return null;
+    }
+
+    /// <summary>The card of an insight (ADR 0023): labelled text fields such as "Hypothese" or "Erkenntnis".</summary>
+    private static string? Insight(JsonObject block, JsonObject output, StringBuilder text)
+    {
+        if (block["fields"] is not JsonArray fields || fields.Count > MaxInsightFields)
+        {
+            return $"fields must be an array of at most {MaxInsightFields} entries";
+        }
+
+        var result = new JsonArray();
+        var keys = new HashSet<string>();
+        foreach (var field in fields)
+        {
+            if (field is not JsonObject entry
+                || String(entry, "key") is not { Length: > 0 and <= 32 } key || !key.All(c => c is >= 'a' and <= 'z' or '_')
+                || String(entry, "label") is not { Length: > 0 and <= 100 } label
+                || (String(entry, "text") ?? string.Empty) is not { Length: <= MaxTextLength } fieldText)
+            {
+                return "every field needs a key (a-z, _), a label of at most 100 and a text of at most 20000 characters";
+            }
+
+            if (!keys.Add(key))
+            {
+                return $"field '{key}' appears twice";
+            }
+
+            result.Add(new JsonObject { ["key"] = key, ["label"] = label, ["text"] = fieldText });
+            if (fieldText.Length > 0)
+            {
+                text.Append(label).Append(": ").AppendLine(fieldText);
+            }
+        }
+
+        output["fields"] = result;
+        return null;
+    }
+
+    /// <summary>
+    /// Measurements or any other table pasted from a spreadsheet: column names and rows of plain text cells. Only the title
+    /// and the column names go into the search text, the cells would drown it.
+    /// </summary>
+    private static string? DataTable(JsonObject block, JsonObject output, StringBuilder text)
+    {
+        if (Optional(block, output, "title", text) is { } titleError)
+        {
+            return titleError;
+        }
+
+        if (block["columns"] is not JsonArray columns || columns.Count is 0 || columns.Count > MaxTableColumns
+            || columns.Any(c => c?.GetValueKind() != JsonValueKind.String || c.GetValue<string>().Length > MaxCellLength))
+        {
+            return $"columns must be 1 to {MaxTableColumns} names of at most {MaxCellLength} characters";
+        }
+
+        if (block["rows"] is not JsonArray rows || rows.Count > MaxTableRows)
+        {
+            return $"rows must be an array of at most {MaxTableRows} rows";
+        }
+
+        var normalizedRows = new JsonArray();
+        foreach (var row in rows)
+        {
+            if (row is not JsonArray cells || cells.Count != columns.Count
+                || cells.Any(c => c?.GetValueKind() != JsonValueKind.String || c.GetValue<string>().Length > MaxCellLength))
+            {
+                return $"every row needs one text cell of at most {MaxCellLength} characters per column";
+            }
+
+            normalizedRows.Add(new JsonArray(cells.Select(c => (JsonNode)JsonValue.Create(c!.GetValue<string>())).ToArray()));
+        }
+
+        var chart = String(block, "chart") ?? "none";
+        if (!ChartKinds.Contains(chart))
+        {
+            return $"chart must be one of {string.Join(", ", ChartKinds)}";
+        }
+
+        var names = columns.Select(c => c!.GetValue<string>()).ToList();
+        output["columns"] = new JsonArray(names.Select(n => (JsonNode)JsonValue.Create(n)).ToArray());
+        output["rows"] = normalizedRows;
+        output["chart"] = chart;
+        text.AppendLine(string.Join(" ", names));
         return null;
     }
 

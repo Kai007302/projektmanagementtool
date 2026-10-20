@@ -10,6 +10,8 @@ export type GraphNode = {
   spaceId: string | null
   summary: string | null
   degree: number
+  /** The result of an insight (ADR 0023); such planets take the color of the result. */
+  outcome?: string | null
 }
 
 export type GraphEdge = { id: string; source: string; target: string; relationType: RelationType }
@@ -36,6 +38,19 @@ export const typeColors: Record<ArticleType, string> = {
   template: '#d39070',
   checklist: '#cc86b0',
   glossary: '#9aa3b8',
+  experiment: '#8fa8d8',
+  spike: '#7fb6d6',
+  decision: '#b59ad8',
+  retro_learning: '#c9a27a',
+  incident: '#d98a7a',
+  release: '#8cc0a6',
+}
+
+/** Thread colors of the relations between insights; all others keep the pink light (ADR 0023). */
+export const relationThreads: Partial<Record<RelationType, { color: string; dash: number[] }>> = {
+  CONFIRMS: { color: 'rgba(110, 231, 160, 0.85)', dash: [] },
+  BUILDS_ON: { color: 'rgba(147, 197, 253, 0.85)', dash: [2, 6] },
+  CONTRADICTS: { color: 'rgba(251, 146, 60, 0.9)', dash: [10, 6] },
 }
 
 export type Point = { x: number; y: number }

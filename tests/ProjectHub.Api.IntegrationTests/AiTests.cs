@@ -45,6 +45,26 @@ public sealed class AiTests(InfrastructureFixture infrastructure) : ApiTestBase(
         Assert.DoesNotContain(SourceIds(await ChatAsync(Fritz, "Kickoff Rabattstaffeln Störungen")), id => id != FabrikamArticle.Id);
     }
 
+    [Fact]
+    public async Task A_question_about_one_space_searches_only_there()
+    {
+        static IEnumerable<Guid> SourceIds(IReadOnlyList<SseEvent> events) =>
+            events.Where(e => e.Type == "sources").SelectMany(e => e.Data.GetProperty("sources").EnumerateArray()).Select(s => s.GetProperty("articleId").GetGuid());
+        AssistantChatRequest Ask(Guid spaceId) => new([new AssistantMessage("user", "Kickoff Störung")], null, SpaceId: spaceId);
+
+        var methods = SourceIds(await ChatAsync(Ben, Ask(MethodsSpace.Id))).ToList();
+        var platform = SourceIds(await ChatAsync(Ben, Ask(PlatformSpace.Id))).ToList();
+        // A space of another organization is no scope at all, it never narrows or widens what the person sees.
+        var foreign = SourceIds(await ChatAsync(Ben, Ask(FabrikamSpace.Id))).ToList();
+
+        Assert.Contains(KickoffArticle.Id, methods);
+        Assert.DoesNotContain(IncidentArticle.Id, methods);
+        Assert.Contains(IncidentArticle.Id, platform);
+        Assert.DoesNotContain(KickoffArticle.Id, platform);
+        Assert.Contains(KickoffArticle.Id, foreign);
+        Assert.DoesNotContain(FabrikamArticle.Id, foreign);
+    }
+
     [Theory]
     [InlineData("""{"messages":[]}""")]
     [InlineData("""{"messages":[{"role":"assistant","text":"Hallo"}]}""")]

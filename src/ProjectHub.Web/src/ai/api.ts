@@ -66,20 +66,23 @@ export function parseEvents(buffer: string): { events: AssistantEvent[]; rest: s
   return { events, rest }
 }
 
+/** What the questions are about: an open project, or for the documentation chat a knowledge space and the open article (ADR 0023). */
+export type ChatContext = { projectId?: string | null; spaceId?: string | null; articleId?: string | null }
+
 /**
  * Sends the conversation and calls onEvent for every streamed event. The conversation lives only here in the
  * browser; the API stores none of it. With a continuation, the turn that waited for approval goes on.
  */
 export async function streamChat(
   messages: ChatMessage[],
-  projectId: string | null,
+  context: ChatContext,
   onEvent: (event: AssistantEvent) => void,
   signal?: AbortSignal,
   continuation?: Continuation,
 ): Promise<void> {
   const response = await apiStream('/api/v1/ai/chat', {
     method: 'POST',
-    body: jsonBody({ messages, projectId, ...continuation }),
+    body: jsonBody({ messages, projectId: context.projectId || null, spaceId: context.spaceId || null, articleId: context.articleId || null, ...continuation }),
     headers: { Accept: 'text/event-stream' },
     signal,
   })

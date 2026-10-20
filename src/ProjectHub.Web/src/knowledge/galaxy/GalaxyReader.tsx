@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { articleStatuses, articleTypeEmoji, articleTypes, fetchArticle, relationTypes, type ArticleDetails } from '../api'
 import { BlockView } from '../BlockView'
+import { Confidence, OutcomeBadge } from '../Insight'
+import { kindOf, useUseCases } from '../useCases'
 import { neighborsOf, typeColors, type GraphNode, type KnowledgeGraph } from './graph'
 
 type Props = {
@@ -21,6 +23,7 @@ export function GalaxyReader({ graph, node, onSelect, onClose, onOpenArticle }: 
   const [details, setDetails] = useState<ArticleDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const section = useRef<HTMLElement>(null)
+  const kind = kindOf(useUseCases(), node.articleType)
 
   useEffect(() => {
     let current = true
@@ -55,13 +58,18 @@ export function GalaxyReader({ graph, node, onSelect, onClose, onOpenArticle }: 
         </button>
       </div>
       <h3 id="galaxy-reader-heading">{node.title}</h3>
+      {kind && (
+        <p className="insight-meta">
+          <OutcomeBadge kind={kind} outcome={article?.outcome ?? node.outcome} /> <Confidence value={article?.confidence} />
+        </p>
+      )}
       {node.summary && <p className="article-summary">{node.summary}</p>}
       {error ? (
         <p role="alert">{error}</p>
       ) : !details ? (
         <p className="muted">Artikel wird geladen …</p>
       ) : (
-        <BlockView blocks={details.content.blocks} onOpenArticle={(id) => (inGalaxy.has(id) ? onSelect(id) : onOpenArticle(id))} />
+        <BlockView blocks={details.content.blocks} kind={kind} onOpenArticle={(id) => (inGalaxy.has(id) ? onSelect(id) : onOpenArticle(id))} />
       )}
       {neighbors.length > 0 && (
         <>
