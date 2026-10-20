@@ -31,6 +31,7 @@ public static class AiModule
         var options = AiOptions.FromConfiguration(configuration, environment);
         services.AddSingleton(options);
         services.AddScoped<AssistantSources>();
+        services.AddScoped<AssistantScope>();
         services.AddScoped<ProjectHubTools>();
 
         if (options.AssistantEnabled)

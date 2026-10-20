@@ -139,6 +139,7 @@ public static partial class MarkdownBlocks
         return content;
     }
 
+    /// <summary>Blocks a model writes as Markdown; insight cards and data tables are kept like links (ADR 0023).</summary>
     private static readonly HashSet<string> TextTypes =
         ["heading", "paragraph", "quote", "callout", "code", "bullet_list", "numbered_list", "checklist"];
 
@@ -187,6 +188,19 @@ public static partial class MarkdownBlocks
                     }
 
                     break;
+                case "insight":
+                    foreach (var field in b["fields"]?.AsArray() ?? [])
+                    {
+                        if (field?["text"]?.GetValue<string>() is { Length: > 0 } fieldText)
+                        {
+                            text.Append("**").Append(field["label"]?.GetValue<string>()).Append(":** ").AppendLine(fieldText);
+                        }
+                    }
+
+                    break;
+                case "data_table":
+                    AppendTable(text, b);
+                    break;
                 default:
                     // Links, files, images and references are not text; ReplaceText keeps them.
                     continue;
@@ -196,6 +210,32 @@ public static partial class MarkdownBlocks
         }
 
         return text.ToString().TrimEnd();
+    }
+
+    /// <summary>Measurements as a Markdown table, so the assistant can answer from them; long tables are cut.</summary>
+    private static void AppendTable(StringBuilder text, JsonObject block)
+    {
+        const int maxRows = 100;
+        static string Cell(JsonNode? cell) => (cell?.GetValue<string>() ?? string.Empty).Replace("|", "\\|").Replace("\n", " ");
+
+        if (block["title"]?.GetValue<string>() is { Length: > 0 } title)
+        {
+            text.Append("Tabelle: ").AppendLine(title);
+        }
+
+        var columns = block["columns"]?.AsArray() ?? [];
+        var rows = block["rows"]?.AsArray() ?? [];
+        text.Append("| ").Append(string.Join(" | ", columns.Select(Cell))).AppendLine(" |");
+        text.Append('|').Append(string.Concat(columns.Select(_ => " --- |"))).AppendLine();
+        foreach (var row in rows.Take(maxRows))
+        {
+            text.Append("| ").Append(string.Join(" | ", (row?.AsArray() ?? []).Select(Cell))).AppendLine(" |");
+        }
+
+        if (rows.Count > maxRows)
+        {
+            text.Append("(… ").Append(rows.Count - maxRows).AppendLine(" weitere Zeilen)");
+        }
     }
 
     [GeneratedRegex(@"^(#{1,6})\s+(.+)$")]

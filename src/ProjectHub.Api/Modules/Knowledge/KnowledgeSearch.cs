@@ -25,7 +25,10 @@ public sealed record ArticleSummary(
     long Version,
     Guid? DepartmentId = null,
     string? DepartmentName = null,
-    string? Excerpt = null);
+    string? Excerpt = null,
+    string? Outcome = null,
+    short? Confidence = null,
+    DateTimeOffset? CreatedAt = null);
 
 /// <summary><c>DepartmentId</c> narrows the result to the articles of one department (ADR 0021).</summary>
 public sealed record KnowledgeQuery(string? Text, string? ArticleType, string? Status, Guid? SpaceId, string? Tag, Guid? DepartmentId = null);
@@ -50,7 +53,8 @@ public sealed record KnowledgePassage(Guid ArticleId, string Title, string? Spac
 /// </summary>
 public interface IKnowledgeRetrieval
 {
-    Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct);
+    /// <param name="spaceId">Only passages of articles in this knowledge space, e.g. for questions about one topic (ADR 0023).</param>
+    Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct, Guid? spaceId = null);
 }
 
 /// <summary>PostgreSQL full-text search (German stemming) over title, summary and the current content.</summary>
@@ -118,16 +122,22 @@ public sealed partial class PostgresKnowledgeRetrieval(ProjectHubDbContext db, K
     private const int MaxTerms = 24;
     private const string HeadlineOptions = "MaxFragments=3, MaxWords=45, MinWords=15, FragmentDelimiter=\" … \", StartSel=\"\", StopSel=\"\"";
 
-    public async Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct)
+    public async Task<IReadOnlyList<KnowledgePassage>> RetrieveAsync(KnowledgeReader reader, string question, int limit, CancellationToken ct, Guid? spaceId = null)
     {
         if (TermQuery(question) is not { } terms)
         {
             return [];
         }
 
+        var visible = access.Visible(reader);
+        if (spaceId is { } only)
+        {
+            visible = visible.Where(a => a.KnowledgeSpaceId == only);
+        }
+
         // The query is built inline: EF translates EF.Functions only inside the expression tree.
         var rows = await (
-                from article in access.Visible(reader)
+                from article in visible
                 let query = EF.Functions.ToTsQuery(PostgresKnowledgeSearch.TextSearchConfiguration, terms)
                 where article.SearchVector.Matches(query)
                 join space in db.Set<KnowledgeSpace>() on article.KnowledgeSpaceId equals space.Id into spaces
@@ -211,7 +221,8 @@ internal static class KnowledgeSummaries
             return new ArticleSummary(
                 a.Id, a.Title, a.Slug, a.ArticleType, a.Summary, a.Status, a.Visibility, a.KnowledgeSpaceId, row.SpaceName,
                 a.OwnerId, row.OwnerName, tagsByArticle.GetValueOrDefault(a.Id, []), a.UpdatedAt, a.PublishedAt, a.Version,
-                a.DepartmentId, row.DepartmentName, ArticleExcerpt.Of(string.IsNullOrWhiteSpace(a.Summary) ? a.SearchText : a.Summary));
+                a.DepartmentId, row.DepartmentName, ArticleExcerpt.Of(string.IsNullOrWhiteSpace(a.Summary) ? a.SearchText : a.Summary),
+                a.Outcome, a.Confidence, a.CreatedAt);
         }).ToList();
     }
 }

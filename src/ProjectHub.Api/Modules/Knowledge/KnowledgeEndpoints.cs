@@ -20,6 +20,9 @@ public static class KnowledgeEndpoints
     {
         var knowledge = api.MapGroup("/knowledge");
 
+        // The fixed use cases of spaces with their insight kinds, fields and outcomes (ADR 0023).
+        knowledge.MapGet("/use-cases", () => Results.Ok(KnowledgeUseCases.All));
+
         knowledge.MapGet("/spaces", async (UserContext user, KnowledgeSpaceService service, Guid? departmentId, CancellationToken ct) =>
             Results.Ok(await service.ListAsync(user, ct, departmentId)));
 

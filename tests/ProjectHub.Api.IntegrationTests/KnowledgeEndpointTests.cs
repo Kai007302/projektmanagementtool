@@ -455,6 +455,80 @@ public sealed class KnowledgeEndpointTests(InfrastructureFixture infrastructure)
         Assert.Empty(graph.Edges);
     }
 
+    [Fact]
+    public async Task Spaces_have_a_use_case_that_only_their_leads_change()
+    {
+        var created = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest($"Versuche {Guid.NewGuid():N}", null, GeneralDepartment.Id, "experiment"));
+        var invalid = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/spaces", new CreateSpaceRequest("Falsch", null, GeneralDepartment.Id, "lab"));
+        var space = (await created.Content.ReadFromJsonAsync<SpaceResponse>())!;
+        var byMember = await As(Eva).PatchAsJsonAsync($"/api/v1/knowledge/spaces/{space.Id}", new { version = space.Version, useCase = "software" });
+        var byAdmin = await As(Ada).PatchAsJsonAsync($"/api/v1/knowledge/spaces/{space.Id}", new { version = space.Version, useCase = "software" });
+        var useCases = await As(Eva).GetFromJsonAsync<List<KnowledgeUseCase>>("/api/v1/knowledge/use-cases");
+
+        Assert.Equal("experiment", space.UseCase);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, byMember.StatusCode);
+        Assert.Equal("software", (await byAdmin.Content.ReadFromJsonAsync<SpaceResponse>())!.UseCase);
+        Assert.Equal(["general", "experiment", "software"], useCases!.Select(u => u.Key));
+        Assert.Contains(useCases![2].Kinds, k => k.ArticleType == "spike" && k.Fields.Any(f => f.Key == "learning" && f.Highlight));
+    }
+
+    [Fact]
+    public async Task Insights_start_with_their_card_and_first_outcome_and_keep_outcomes_of_their_kind()
+    {
+        var response = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/articles", new CreateArticleRequest("Kälteversuch", "experiment", null, null, null, null));
+        var experiment = (await response.Content.ReadFromJsonAsync<ArticleDetails>())!;
+        var card = experiment.Content["blocks"]![0]!;
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal("running", experiment.Article.Outcome);
+        Assert.Equal("insight", card["type"]!.GetValue<string>());
+        Assert.Equal(["question", "setup", "result", "insight"], card["fields"]!.AsArray().Select(f => f!["key"]!.GetValue<string>()));
+
+        var url = $"/api/v1/knowledge/articles/{experiment.Article.Id}";
+        var wrongOutcome = await As(Ada).PatchAsJsonAsync(url, new { version = experiment.Article.Version, outcome = "adopted" });
+        var wrongConfidence = await As(Ada).PatchAsJsonAsync(url, new { version = experiment.Article.Version, confidence = 5 });
+        var confirmed = await As(Ada).PatchAsJsonAsync(url, new { version = experiment.Article.Version, outcome = "confirmed", confidence = 3 });
+        var updated = (await confirmed.Content.ReadFromJsonAsync<ArticleDetails>())!;
+
+        Assert.Equal(HttpStatusCode.BadRequest, wrongOutcome.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, wrongConfidence.StatusCode);
+        Assert.Equal(("confirmed", (short?)3), (updated.Article.Outcome, updated.Article.Confidence));
+        Assert.Contains(await SearchAsync(Ada, "Kälteversuch"), a => a.Id == experiment.Article.Id && a.Outcome == "confirmed" && a.CreatedAt != null);
+
+        // Another kind of insight starts again with its own first outcome; an ordinary article has none.
+        var spike = (await (await As(Ada).PatchAsJsonAsync(url, new { version = updated.Article.Version, articleType = "spike" })).Content.ReadFromJsonAsync<ArticleDetails>())!;
+        Assert.Equal("running", spike.Article.Outcome);
+        var article = (await (await As(Ada).PatchAsJsonAsync(url, new { version = spike.Article.Version, articleType = "article" })).Content.ReadFromJsonAsync<ArticleDetails>())!;
+        Assert.Equal(((string?)null, (short?)null), (article.Article.Outcome, article.Article.Confidence));
+        var noOutcome = await As(Ada).PatchAsJsonAsync(url, new { version = article.Article.Version, outcome = "running" });
+        Assert.Equal(HttpStatusCode.BadRequest, noOutcome.StatusCode);
+    }
+
+    [Fact]
+    public async Task Galaxy_shows_outcomes_and_insight_relations()
+    {
+        var refuted = await CreateInsightAsync("Primer ersetzt Anschleifen");
+        var confirmed = await CreateInsightAsync("Anschleifen verdoppelt die Haftung");
+        var patched = await As(Ada).PatchAsJsonAsync($"/api/v1/knowledge/articles/{refuted.Article.Id}", new { version = refuted.Article.Version, outcome = "refuted" });
+        var relation = await As(Ada).PostAsJsonAsync($"/api/v1/knowledge/articles/{refuted.Article.Id}/relations", new CreateRelationRequest(confirmed.Article.Id, "CONTRADICTS"));
+
+        var graph = (await As(Ada).GetFromJsonAsync<KnowledgeGraph>("/api/v1/knowledge/graph?type=experiment"))!;
+
+        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, relation.StatusCode);
+        Assert.Equal("refuted", graph.Nodes.Single(n => n.Id == refuted.Article.Id).Outcome);
+        Assert.Equal("running", graph.Nodes.Single(n => n.Id == confirmed.Article.Id).Outcome);
+        Assert.Contains(graph.Edges, e => e.Source == refuted.Article.Id && e.Target == confirmed.Article.Id && e.RelationType == "CONTRADICTS");
+    }
+
+    private async Task<ArticleDetails> CreateInsightAsync(string title)
+    {
+        var response = await As(Ada).PostAsJsonAsync("/api/v1/knowledge/articles", new CreateArticleRequest(title, "experiment", null, null, null, null));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<ArticleDetails>())!;
+    }
+
     private static JsonObject Paragraph(string text) => new() { ["type"] = "paragraph", ["text"] = text };
 
     private static JsonObject Blocks(params JsonNode[] blocks) => new() { ["blocks"] = new JsonArray(blocks) };

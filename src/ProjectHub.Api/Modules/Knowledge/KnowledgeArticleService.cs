@@ -149,7 +149,16 @@ public sealed class KnowledgeArticleService(
             return invalid;
         }
 
-        var content = BlockContent.Normalize(request.Content ?? BlockContent.Empty(), out var contentError);
+        // An insight starts with its empty card and its first outcome, e.g. a new experiment "Läuft" (ADR 0023).
+        var kind = KnowledgeUseCases.KindOf(article.ArticleType);
+        var initial = request.Content ?? BlockContent.Empty();
+        if (kind is not null && initial["blocks"] is JsonArray { Count: 0 })
+        {
+            initial = new JsonObject { ["blocks"] = new JsonArray(KnowledgeUseCases.InsightBlock(kind)) };
+        }
+
+        article.Outcome = kind?.Outcomes[0].Key;
+        var content = BlockContent.Normalize(initial, out var contentError);
         if (content is null)
         {
             return ServiceFailure.Invalid("content", contentError!);
@@ -208,9 +217,23 @@ public sealed class KnowledgeArticleService(
             || !patch.TryApply<Guid?>("spaceId", v => article.KnowledgeSpaceId = v, changed, out error)
             || !patch.TryApply<string>("visibility", v => article.Visibility = v ?? string.Empty, changed, out error)
             || !patch.TryApply<Guid?>("departmentId", v => article.DepartmentId = v ?? Guid.Empty, changed, out error)
-            || !patch.TryApply<DateOnly?>("reviewDueAt", v => article.ReviewDueAt = v, changed, out error))
+            || !patch.TryApply<DateOnly?>("reviewDueAt", v => article.ReviewDueAt = v, changed, out error)
+            || !patch.TryApply<string>("outcome", v => article.Outcome = v, changed, out error)
+            || !patch.TryApply<short?>("confidence", v => article.Confidence = v, changed, out error))
         {
             return error!;
+        }
+
+        if (changed.Contains("articleType") && !changed.Contains("outcome"))
+        {
+            // Another kind has other outcomes: keep a result that fits, else start with the new kind's first one.
+            var kind = KnowledgeUseCases.KindOf(article.ArticleType);
+            article.Outcome = kind is null ? null
+                : kind.Outcomes.Any(o => o.Key == article.Outcome) ? article.Outcome : kind.Outcomes[0].Key;
+            if (kind is null)
+            {
+                article.Confidence = null;
+            }
         }
 
         if ((changed.Contains("visibility") || changed.Contains("departmentId")) && right < KnowledgeRight.Admin)
@@ -654,6 +677,19 @@ public sealed class KnowledgeArticleService(
         if (!KnowledgeArticleType.All.Contains(article.ArticleType))
         {
             return ServiceFailure.Invalid("articleType", $"Must be one of: {string.Join(", ", KnowledgeArticleType.All)}.");
+        }
+
+        var insight = KnowledgeUseCases.KindOf(article.ArticleType);
+        if (article.Outcome is not null && insight?.Outcomes.Any(o => o.Key == article.Outcome) != true)
+        {
+            return ServiceFailure.Invalid("outcome", insight is null
+                ? "Only insights (experiments, spikes, decisions …) have an outcome."
+                : $"Must be one of: {string.Join(", ", insight.Outcomes.Select(o => o.Key))}.");
+        }
+
+        if (article.Confidence is { } confidence && (insight is null || confidence is < 1 or > KnowledgeUseCases.MaxConfidence))
+        {
+            return ServiceFailure.Invalid("confidence", $"Only insights have a confidence, from 1 to {KnowledgeUseCases.MaxConfidence}.");
         }
 
         if (!KnowledgeVisibility.All.Contains(article.Visibility))

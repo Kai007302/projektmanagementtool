@@ -8,10 +8,11 @@ using ProjectHub.Api.Modules.Identity.Authorization;
 
 namespace ProjectHub.Api.Modules.Knowledge;
 
-public sealed record SpaceResponse(Guid Id, string Name, string? Description, int ArticleCount, long Version, Guid? DepartmentId = null);
+public sealed record SpaceResponse(Guid Id, string Name, string? Description, int ArticleCount, long Version, Guid? DepartmentId = null, string UseCase = KnowledgeUseCases.General);
 
 /// <summary>Without <c>DepartmentId</c> the space goes to the first department the caller leads (ADR 0021).</summary>
-public sealed record CreateSpaceRequest(string? Name, string? Description, Guid? DepartmentId = null);
+/// <summary><c>UseCase</c>: one of <see cref="KnowledgeUseCases.Keys"/>, general without one (ADR 0023).</summary>
+public sealed record CreateSpaceRequest(string? Name, string? Description, Guid? DepartmentId = null, string? UseCase = null);
 
 /// <summary>
 /// Knowledge spaces structure a department's knowledge (ADR 0021). The department's leads and members see them (with
@@ -36,7 +37,7 @@ public sealed class KnowledgeSpaceService(
 
         return await spaces
             .OrderBy(s => s.Name)
-            .Select(s => new SpaceResponse(s.Id, s.Name, s.Description, visible.Count(a => a.KnowledgeSpaceId == s.Id), s.Version, s.DepartmentId))
+            .Select(s => new SpaceResponse(s.Id, s.Name, s.Description, visible.Count(a => a.KnowledgeSpaceId == s.Id), s.Version, s.DepartmentId, s.UseCase))
             .ToListAsync(ct);
     }
 
@@ -70,6 +71,7 @@ public sealed class KnowledgeSpaceService(
             DepartmentId = departmentId.Value,
             Name = request.Name?.Trim() ?? string.Empty,
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            UseCase = request.UseCase ?? KnowledgeUseCases.General,
             OwnerId = user.UserId,
             CreatedAt = now,
             UpdatedAt = now,
@@ -83,7 +85,7 @@ public sealed class KnowledgeSpaceService(
         db.Set<KnowledgeSpace>().Add(space);
         audit.Record(user, AuditActions.KnowledgeSpaceCreated, "knowledge_space", space.Id, new { space.Name });
         await db.SaveChangesAsync(ct);
-        return new SpaceResponse(space.Id, space.Name, space.Description, 0, space.Version, space.DepartmentId);
+        return new SpaceResponse(space.Id, space.Name, space.Description, 0, space.Version, space.DepartmentId, space.UseCase);
     }
 
     public async Task<ServiceResult<SpaceResponse>> UpdateAsync(UserContext user, Guid spaceId, PatchDocument patch, CancellationToken ct)
@@ -111,7 +113,8 @@ public sealed class KnowledgeSpaceService(
 
         var changed = new List<string>();
         if (!patch.TryApply<string>("name", v => space.Name = v?.Trim() ?? string.Empty, changed, out var error)
-            || !patch.TryApply<string>("description", v => space.Description = string.IsNullOrWhiteSpace(v) ? null : v.Trim(), changed, out error))
+            || !patch.TryApply<string>("description", v => space.Description = string.IsNullOrWhiteSpace(v) ? null : v.Trim(), changed, out error)
+            || !patch.TryApply<string>("useCase", v => space.UseCase = v ?? string.Empty, changed, out error))
         {
             return error!;
         }
@@ -131,7 +134,7 @@ public sealed class KnowledgeSpaceService(
         }
 
         return (await ListAsync(user, ct)).SingleOrDefault(s => s.Id == spaceId)
-               ?? new SpaceResponse(space.Id, space.Name, space.Description, 0, space.Version, space.DepartmentId);
+               ?? new SpaceResponse(space.Id, space.Name, space.Description, 0, space.Version, space.DepartmentId, space.UseCase);
     }
 
     private static ServiceFailure? Validate(KnowledgeSpace space) =>
@@ -139,5 +142,7 @@ public sealed class KnowledgeSpaceService(
             ? ServiceFailure.Invalid("name", $"Required, at most {MaxNameLength} characters.")
             : space.Description?.Length > MaxDescriptionLength
                 ? ServiceFailure.Invalid("description", $"At most {MaxDescriptionLength} characters.")
-                : null;
+                : !KnowledgeUseCases.Keys.Contains(space.UseCase)
+                    ? ServiceFailure.Invalid("useCase", $"Must be one of: {string.Join(", ", KnowledgeUseCases.Keys)}.")
+                    : null;
 }

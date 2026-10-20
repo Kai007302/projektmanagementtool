@@ -4,7 +4,8 @@ using ProjectHub.Api.Modules.Identity;
 
 namespace ProjectHub.Api.Modules.Knowledge;
 
-public sealed record GraphNode(Guid Id, string Title, string ArticleType, string Status, Guid? SpaceId, string? Summary, int Degree);
+/// <param name="Outcome">The result of an insight (ADR 0023); the galaxy colors insights by it.</param>
+public sealed record GraphNode(Guid Id, string Title, string ArticleType, string Status, Guid? SpaceId, string? Summary, int Degree, string? Outcome = null);
 
 public sealed record GraphEdge(Guid Id, Guid Source, Guid Target, string RelationType);
 
@@ -43,7 +44,7 @@ public sealed class KnowledgeGraphService(ProjectHubDbContext db, KnowledgeAcces
             .OrderByDescending(a => a.UpdatedAt)
             .ThenBy(a => a.Id)
             .Take(MaxNodes + 1)
-            .Select(a => new { a.Id, a.Title, a.ArticleType, a.Status, a.KnowledgeSpaceId, a.Summary })
+            .Select(a => new { a.Id, a.Title, a.ArticleType, a.Status, a.KnowledgeSpaceId, a.Summary, a.Outcome })
             .ToListAsync(ct);
         var truncated = nodes.Count > MaxNodes;
         if (truncated)
@@ -60,7 +61,7 @@ public sealed class KnowledgeGraphService(ProjectHubDbContext db, KnowledgeAcces
 
         var degree = edges.SelectMany(e => new[] { e.Source, e.Target }).GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
         return new KnowledgeGraph(
-            nodes.Select(n => new GraphNode(n.Id, n.Title, n.ArticleType, n.Status, n.KnowledgeSpaceId, n.Summary, degree.GetValueOrDefault(n.Id))).ToList(),
+            nodes.Select(n => new GraphNode(n.Id, n.Title, n.ArticleType, n.Status, n.KnowledgeSpaceId, n.Summary, degree.GetValueOrDefault(n.Id), n.Outcome)).ToList(),
             edges,
             truncated);
     }
