@@ -1,6 +1,6 @@
 # ProjectHub API (ADR 0012). Build from the repository root, the migrations are embedded:
 # docker build -f src/ProjectHub.Api/Dockerfile -t projecthub-api .
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY src/ProjectHub.Api/ProjectHub.Api.csproj src/ProjectHub.Api/
 RUN dotnet restore src/ProjectHub.Api/ProjectHub.Api.csproj
